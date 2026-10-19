@@ -1,0 +1,2607 @@
+{
+  "id": "C-2023-S1",
+  "intake": "2023-S1",
+  "programmeId": "BSC-DS",
+  "students": [
+    {
+      "id": "S-0001",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 8,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 4,
+        "CLO6": 5,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0002",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 9,
+        "CLO3": 7,
+        "CLO4": 8,
+        "CLO5": 6,
+        "CLO6": 8,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0003",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 4,
+        "CLO3": 3,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0004",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 8,
+        "CLO5": 7,
+        "CLO6": 5,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0005",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 8,
+        "CLO5": 5,
+        "CLO6": 3,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0006",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 7,
+        "CLO5": 4,
+        "CLO6": 5,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0007",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 8,
+        "CLO3": 10,
+        "CLO4": 6,
+        "CLO5": 8,
+        "CLO6": 7,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0008",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 8,
+        "CLO3": 8,
+        "CLO4": 5,
+        "CLO5": 5,
+        "CLO6": 8,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0009",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 3,
+        "CLO3": 5,
+        "CLO4": 7,
+        "CLO5": 5,
+        "CLO6": 4,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0010",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 7,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0011",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 7,
+        "CLO3": 8,
+        "CLO4": 5,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0012",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 9,
+        "CLO5": 6,
+        "CLO6": 9,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0013",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 4,
+        "CLO3": 5,
+        "CLO4": 8,
+        "CLO5": 5,
+        "CLO6": 2,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0014",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 9,
+        "CLO3": 7,
+        "CLO4": 4,
+        "CLO5": 7,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0015",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 10,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0016",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 6,
+        "CLO3": 5,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 7,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0017",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 7,
+        "CLO3": 5,
+        "CLO4": 8,
+        "CLO5": 8,
+        "CLO6": 7,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0018",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 4,
+        "CLO3": 5,
+        "CLO4": 6,
+        "CLO5": 4,
+        "CLO6": 5,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0019",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 5,
+        "CLO4": 6,
+        "CLO5": 4,
+        "CLO6": 5,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0020",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 3,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 6,
+        "CLO5": 1,
+        "CLO6": 1,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0021",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 3,
+        "CLO5": 4,
+        "CLO6": 5,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0022",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 7,
+        "CLO3": 5,
+        "CLO4": 7,
+        "CLO5": 6,
+        "CLO6": 9,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0023",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 6,
+        "CLO3": 3,
+        "CLO4": 7,
+        "CLO5": 3,
+        "CLO6": 8,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0024",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 4,
+        "CLO3": 5,
+        "CLO4": 4,
+        "CLO5": 6,
+        "CLO6": 4,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0025",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 9,
+        "CLO5": 5,
+        "CLO6": 2,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0026",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 3,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 8,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0027",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 4,
+        "CLO3": 7,
+        "CLO4": 4,
+        "CLO5": 3,
+        "CLO6": 5,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0028",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 8,
+        "CLO3": 6,
+        "CLO4": 3,
+        "CLO5": 7,
+        "CLO6": 9,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0029",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 8,
+        "CLO3": 10,
+        "CLO4": 8,
+        "CLO5": 7,
+        "CLO6": 5,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0030",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 4,
+        "CLO3": 4,
+        "CLO4": 3,
+        "CLO5": 3,
+        "CLO6": 1,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0031",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 4,
+        "CLO3": 5,
+        "CLO4": 6,
+        "CLO5": 8,
+        "CLO6": 8,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0032",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0033",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 5,
+        "CLO5": 7,
+        "CLO6": 4,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0034",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 3,
+        "CLO4": 5,
+        "CLO5": 4,
+        "CLO6": 7,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0035",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 4,
+        "CLO3": 7,
+        "CLO4": 4,
+        "CLO5": 8,
+        "CLO6": 4,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0036",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 8,
+        "CLO3": 7,
+        "CLO4": 9,
+        "CLO5": 4,
+        "CLO6": 8,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0037",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 9,
+        "CLO5": 4,
+        "CLO6": 5,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0038",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 5,
+        "CLO3": 8,
+        "CLO4": 5,
+        "CLO5": 7,
+        "CLO6": 7,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0039",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 2,
+        "CLO2": 6,
+        "CLO3": 2,
+        "CLO4": 7,
+        "CLO5": 2,
+        "CLO6": 5,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0040",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 6,
+        "CLO3": 1,
+        "CLO4": 7,
+        "CLO5": 2,
+        "CLO6": 5,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0041",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 8,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 7,
+        "CLO6": 7,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0042",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 10,
+        "CLO3": 8,
+        "CLO4": 7,
+        "CLO5": 8,
+        "CLO6": 7,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0043",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 8,
+        "CLO3": 6,
+        "CLO4": 8,
+        "CLO5": 8,
+        "CLO6": 8,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0044",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 4,
+        "CLO3": 6,
+        "CLO4": 5,
+        "CLO5": 3,
+        "CLO6": 2,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0045",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 10,
+        "CLO3": 10,
+        "CLO4": 8,
+        "CLO5": 10,
+        "CLO6": 6,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0046",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 9,
+        "CLO5": 5,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0047",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 3,
+        "CLO2": 1,
+        "CLO3": 4,
+        "CLO4": 8,
+        "CLO5": 3,
+        "CLO6": 5,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0048",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 8,
+        "CLO4": 3,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0049",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 8,
+        "CLO3": 9,
+        "CLO4": 9,
+        "CLO5": 6,
+        "CLO6": 7,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0050",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 9,
+        "CLO3": 6,
+        "CLO4": 4,
+        "CLO5": 3,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0051",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 9,
+        "CLO5": 7,
+        "CLO6": 5,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0052",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 5,
+        "CLO3": 4,
+        "CLO4": 7,
+        "CLO5": 7,
+        "CLO6": 8,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0053",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 6,
+        "CLO5": 8,
+        "CLO6": 5,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0054",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 7,
+        "CLO3": 9,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 9,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0055",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 4,
+        "CLO3": 7,
+        "CLO4": 5,
+        "CLO5": 5,
+        "CLO6": 5,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0056",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 9,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0057",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 7,
+        "CLO5": 5,
+        "CLO6": 7,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0058",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 4,
+        "CLO5": 6,
+        "CLO6": 5,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0059",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 6,
+        "CLO3": 5,
+        "CLO4": 4,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0060",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 4,
+        "CLO3": 3,
+        "CLO4": 3,
+        "CLO5": 5,
+        "CLO6": 7,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0061",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 9,
+        "CLO3": 7,
+        "CLO4": 9,
+        "CLO5": 8,
+        "CLO6": 9,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0062",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 7,
+        "CLO3": 7,
+        "CLO4": 8,
+        "CLO5": 7,
+        "CLO6": 4,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0063",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 9,
+        "CLO2": 9,
+        "CLO3": 8,
+        "CLO4": 10,
+        "CLO5": 9,
+        "CLO6": 9,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0064",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 3,
+        "CLO3": 4,
+        "CLO4": 4,
+        "CLO5": 4,
+        "CLO6": 3,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0065",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 8,
+        "CLO5": 5,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0066",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 7,
+        "CLO3": 7,
+        "CLO4": 5,
+        "CLO5": 8,
+        "CLO6": 6,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0067",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 6,
+        "CLO3": 4,
+        "CLO4": 7,
+        "CLO5": 7,
+        "CLO6": 2,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0068",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 4,
+        "CLO3": 7,
+        "CLO4": 9,
+        "CLO5": 7,
+        "CLO6": 3,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0069",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 9,
+        "CLO2": 5,
+        "CLO3": 8,
+        "CLO4": 9,
+        "CLO5": 4,
+        "CLO6": 4,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0070",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 6,
+        "CLO3": 5,
+        "CLO4": 10,
+        "CLO5": 7,
+        "CLO6": 7,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0071",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 7,
+        "CLO3": 5,
+        "CLO4": 4,
+        "CLO5": 6,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0072",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 4,
+        "CLO3": 5,
+        "CLO4": 5,
+        "CLO5": 5,
+        "CLO6": 4,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0073",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 9,
+        "CLO2": 7,
+        "CLO3": 7,
+        "CLO4": 5,
+        "CLO5": 7,
+        "CLO6": 7,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0074",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0075",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 4,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 4,
+        "CLO6": 6,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0076",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 6,
+        "CLO3": 8,
+        "CLO4": 5,
+        "CLO5": 4,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0077",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 6,
+        "CLO5": 4,
+        "CLO6": 4,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0078",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 4,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 7,
+        "CLO6": 5,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0079",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 7,
+        "CLO3": 4,
+        "CLO4": 6,
+        "CLO5": 5,
+        "CLO6": 5,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0080",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 5,
+        "CLO3": 4,
+        "CLO4": 5,
+        "CLO5": 4,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0081",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 5,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0082",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 7,
+        "CLO6": 6,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0083",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 5,
+        "CLO5": 8,
+        "CLO6": 6,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0084",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 5,
+        "CLO3": 3,
+        "CLO4": 4,
+        "CLO5": 3,
+        "CLO6": 4,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0085",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 9,
+        "CLO2": 9,
+        "CLO3": 6,
+        "CLO4": 9,
+        "CLO5": 9,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0086",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 4,
+        "CLO3": 5,
+        "CLO4": 6,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0087",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 8,
+        "CLO3": 8,
+        "CLO4": 9,
+        "CLO5": 10,
+        "CLO6": 7,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0088",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 5,
+        "CLO3": 4,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 4,
+        "CLO7": 2
+      }
+    },
+    {
+      "id": "S-0089",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 8,
+        "CLO3": 9,
+        "CLO4": 3,
+        "CLO5": 6,
+        "CLO6": 8,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0090",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 10,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0091",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 6,
+        "CLO5": 5,
+        "CLO6": 4,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0092",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 2,
+        "CLO3": 6,
+        "CLO4": 5,
+        "CLO5": 4,
+        "CLO6": 5,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0093",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 9,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 10,
+        "CLO5": 6,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0094",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 4,
+        "CLO3": 5,
+        "CLO4": 2,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0095",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 8,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0096",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 8,
+        "CLO5": 6,
+        "CLO6": 9,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0097",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 7,
+        "CLO3": 5,
+        "CLO4": 5,
+        "CLO5": 5,
+        "CLO6": 4,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0098",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 8,
+        "CLO3": 7,
+        "CLO4": 9,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0099",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 6,
+        "CLO3": 5,
+        "CLO4": 1,
+        "CLO5": 1,
+        "CLO6": 6,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0100",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 9,
+        "CLO3": 6,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 5,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0101",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 5,
+        "CLO5": 5,
+        "CLO6": 3,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0102",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 8,
+        "CLO3": 5,
+        "CLO4": 7,
+        "CLO5": 5,
+        "CLO6": 1,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0103",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 3,
+        "CLO2": 4,
+        "CLO3": 6,
+        "CLO4": 2,
+        "CLO5": 5,
+        "CLO6": 5,
+        "CLO7": 1
+      }
+    },
+    {
+      "id": "S-0104",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 3,
+        "CLO3": 5,
+        "CLO4": 7,
+        "CLO5": 5,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0105",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 4,
+        "CLO3": 5,
+        "CLO4": 9,
+        "CLO5": 7,
+        "CLO6": 7,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0106",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 6,
+        "CLO5": 4,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0107",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 6,
+        "CLO3": 5,
+        "CLO4": 5,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0108",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 7,
+        "CLO6": 5,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0109",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 7,
+        "CLO3": 9,
+        "CLO4": 7,
+        "CLO5": 4,
+        "CLO6": 6,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0110",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 8,
+        "CLO3": 6,
+        "CLO4": 10,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0111",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 4,
+        "CLO3": 4,
+        "CLO4": 1,
+        "CLO5": 4,
+        "CLO6": 6,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0112",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 10,
+        "CLO2": 10,
+        "CLO3": 7,
+        "CLO4": 7,
+        "CLO5": 6,
+        "CLO6": 7,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0113",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 8,
+        "CLO3": 8,
+        "CLO4": 6,
+        "CLO5": 5,
+        "CLO6": 7,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0114",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 2,
+        "CLO2": 4,
+        "CLO3": 6,
+        "CLO4": 4,
+        "CLO5": 3,
+        "CLO6": 3,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0115",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 5,
+        "CLO3": 9,
+        "CLO4": 4,
+        "CLO5": 6,
+        "CLO6": 7,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0116",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 8,
+        "CLO5": 6,
+        "CLO6": 9,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0117",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 4,
+        "CLO6": 4,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0118",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 5,
+        "CLO5": 7,
+        "CLO6": 2,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0119",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 2,
+        "CLO2": 3,
+        "CLO3": 5,
+        "CLO4": 4,
+        "CLO5": 3,
+        "CLO6": 1,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0120",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 7,
+        "CLO3": 9,
+        "CLO4": 6,
+        "CLO5": 8,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0121",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 10,
+        "CLO2": 10,
+        "CLO3": 7,
+        "CLO4": 8,
+        "CLO5": 7,
+        "CLO6": 9,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0122",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 9,
+        "CLO3": 4,
+        "CLO4": 8,
+        "CLO5": 7,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0123",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 6,
+        "CLO5": 7,
+        "CLO6": 8,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0124",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 9,
+        "CLO3": 7,
+        "CLO4": 10,
+        "CLO5": 7,
+        "CLO6": 6,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0125",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 8,
+        "CLO5": 6,
+        "CLO6": 8,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0126",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 9,
+        "CLO5": 6,
+        "CLO6": 3,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0127",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 4,
+        "CLO6": 5,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0128",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 5,
+        "CLO5": 6,
+        "CLO6": 5,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0129",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 8,
+        "CLO3": 8,
+        "CLO4": 8,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0130",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 2,
+        "CLO5": 3,
+        "CLO6": 5,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0131",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 5,
+        "CLO5": 3,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0132",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 5,
+        "CLO3": 4,
+        "CLO4": 3,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0133",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 8,
+        "CLO5": 3,
+        "CLO6": 4,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0134",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 8,
+        "CLO3": 8,
+        "CLO4": 10,
+        "CLO5": 10,
+        "CLO6": 9,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0135",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 8,
+        "CLO3": 7,
+        "CLO4": 8,
+        "CLO5": 5,
+        "CLO6": 4,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0136",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 2,
+        "CLO4": 6,
+        "CLO5": 4,
+        "CLO6": 6,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0137",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 4,
+        "CLO5": 5,
+        "CLO6": 5,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0138",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 8,
+        "CLO5": 6,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0139",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 7,
+        "CLO3": 5,
+        "CLO4": 7,
+        "CLO5": 4,
+        "CLO6": 7,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0140",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 8,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 5,
+        "CLO6": 8,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0141",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 6,
+        "CLO5": 7,
+        "CLO6": 9,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0142",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 4,
+        "CLO5": 8,
+        "CLO6": 8,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0143",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 7,
+        "CLO3": 8,
+        "CLO4": 6,
+        "CLO5": 7,
+        "CLO6": 3,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0144",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 4,
+        "CLO4": 9,
+        "CLO5": 3,
+        "CLO6": 5,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0145",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 4,
+        "CLO4": 2,
+        "CLO5": 5,
+        "CLO6": 4,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0146",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 7,
+        "CLO5": 3,
+        "CLO6": 3,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0147",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 4,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 5,
+        "CLO6": 5,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0148",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 5,
+        "CLO5": 6,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0149",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 7,
+        "CLO3": 7,
+        "CLO4": 7,
+        "CLO5": 5,
+        "CLO6": 1,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0150",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 6,
+        "CLO3": 4,
+        "CLO4": 3,
+        "CLO5": 5,
+        "CLO6": 3,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0151",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 7,
+        "CLO3": 8,
+        "CLO4": 7,
+        "CLO5": 5,
+        "CLO6": 4,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0152",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 7,
+        "CLO3": 8,
+        "CLO4": 7,
+        "CLO5": 3,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0153",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 9,
+        "CLO3": 7,
+        "CLO4": 5,
+        "CLO5": 7,
+        "CLO6": 5,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0154",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 4,
+        "CLO3": 5,
+        "CLO4": 5,
+        "CLO5": 4,
+        "CLO6": 3,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0155",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 5,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 5,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0156",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 5,
+        "CLO5": 7,
+        "CLO6": 6,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0157",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 4,
+        "CLO6": 5,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0158",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 3,
+        "CLO2": 5,
+        "CLO3": 4,
+        "CLO4": 3,
+        "CLO5": 4,
+        "CLO6": 3,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0159",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 10,
+        "CLO2": 9,
+        "CLO3": 5,
+        "CLO4": 10,
+        "CLO5": 8,
+        "CLO6": 7,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0160",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 8,
+        "CLO3": 6,
+        "CLO4": 6,
+        "CLO5": 4,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0161",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 8,
+        "CLO3": 9,
+        "CLO4": 5,
+        "CLO5": 7,
+        "CLO6": 8,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0162",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 9,
+        "CLO3": 8,
+        "CLO4": 7,
+        "CLO5": 9,
+        "CLO6": 6,
+        "CLO7": 10
+      }
+    },
+    {
+      "id": "S-0163",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 10,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 9,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0164",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 9,
+        "CLO3": 5,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0165",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 5,
+        "CLO5": 5,
+        "CLO6": 5,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0166",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 4,
+        "CLO3": 4,
+        "CLO4": 6,
+        "CLO5": 5,
+        "CLO6": 5,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0167",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 3,
+        "CLO2": 5,
+        "CLO3": 3,
+        "CLO4": 1,
+        "CLO5": 4,
+        "CLO6": 4,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0168",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 8,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0169",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 2,
+        "CLO3": 2,
+        "CLO4": 3,
+        "CLO5": 2,
+        "CLO6": 1,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0170",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 7,
+        "CLO3": 4,
+        "CLO4": 9,
+        "CLO5": 7,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0171",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 5,
+        "CLO5": 5,
+        "CLO6": 6,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0172",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 3,
+        "CLO3": 4,
+        "CLO4": 1,
+        "CLO5": 1,
+        "CLO6": 1,
+        "CLO7": 2
+      }
+    },
+    {
+      "id": "S-0173",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 8,
+        "CLO3": 7,
+        "CLO4": 7,
+        "CLO5": 7,
+        "CLO6": 7,
+        "CLO7": 9
+      }
+    },
+    {
+      "id": "S-0174",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 7,
+        "CLO3": 5,
+        "CLO4": 6,
+        "CLO5": 3,
+        "CLO6": 4,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0175",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 6,
+        "CLO5": 3,
+        "CLO6": 5,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0176",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 5,
+        "CLO4": 2,
+        "CLO5": 4,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0177",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 6,
+        "CLO3": 2,
+        "CLO4": 8,
+        "CLO5": 3,
+        "CLO6": 6,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0178",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 3,
+        "CLO5": 4,
+        "CLO6": 1,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0179",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 7,
+        "CLO3": 7,
+        "CLO4": 9,
+        "CLO5": 6,
+        "CLO6": 8,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0180",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 3,
+        "CLO3": 5,
+        "CLO4": 2,
+        "CLO5": 4,
+        "CLO6": 3,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0181",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 6,
+        "CLO5": 6,
+        "CLO6": 9,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0182",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 2,
+        "CLO5": 5,
+        "CLO6": 5,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0183",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 4,
+        "CLO3": 4,
+        "CLO4": 3,
+        "CLO5": 6,
+        "CLO6": 6,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0184",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 8,
+        "CLO3": 4,
+        "CLO4": 4,
+        "CLO5": 6,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0185",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 9,
+        "CLO2": 7,
+        "CLO3": 8,
+        "CLO4": 7,
+        "CLO5": 7,
+        "CLO6": 7,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0186",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 5,
+        "CLO3": 4,
+        "CLO4": 6,
+        "CLO5": 8,
+        "CLO6": 6,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0187",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 3,
+        "CLO2": 7,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 4,
+        "CLO6": 1,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0188",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 7,
+        "CLO3": 9,
+        "CLO4": 6,
+        "CLO5": 7,
+        "CLO6": 9,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0189",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 3,
+        "CLO3": 5,
+        "CLO4": 6,
+        "CLO5": 4,
+        "CLO6": 6,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0190",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 7,
+        "CLO5": 5,
+        "CLO6": 5,
+        "CLO7": 4
+      }
+    },
+    {
+      "id": "S-0191",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 6,
+        "CLO3": 7,
+        "CLO4": 7,
+        "CLO5": 6,
+        "CLO6": 5,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0192",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 8,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 8,
+        "CLO5": 4,
+        "CLO6": 7,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0193",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 4,
+        "CLO3": 6,
+        "CLO4": 1,
+        "CLO5": 4,
+        "CLO6": 4,
+        "CLO7": 5
+      }
+    },
+    {
+      "id": "S-0194",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 7,
+        "CLO2": 6,
+        "CLO3": 6,
+        "CLO4": 4,
+        "CLO5": 6,
+        "CLO6": 8,
+        "CLO7": 8
+      }
+    },
+    {
+      "id": "S-0195",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 3,
+        "CLO2": 1,
+        "CLO3": 6,
+        "CLO4": 4,
+        "CLO5": 4,
+        "CLO6": 3,
+        "CLO7": 3
+      }
+    },
+    {
+      "id": "S-0196",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 7,
+        "CLO3": 4,
+        "CLO4": 7,
+        "CLO5": 3,
+        "CLO6": 5,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0197",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 5,
+        "CLO2": 2,
+        "CLO3": 3,
+        "CLO4": 1,
+        "CLO5": 4,
+        "CLO6": 1,
+        "CLO7": 1
+      }
+    },
+    {
+      "id": "S-0198",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 9,
+        "CLO2": 5,
+        "CLO3": 6,
+        "CLO4": 3,
+        "CLO5": 7,
+        "CLO6": 4,
+        "CLO7": 7
+      }
+    },
+    {
+      "id": "S-0199",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 4,
+        "CLO2": 8,
+        "CLO3": 5,
+        "CLO4": 9,
+        "CLO5": 6,
+        "CLO6": 7,
+        "CLO7": 6
+      }
+    },
+    {
+      "id": "S-0200",
+      "cohortId": "C-2023-S1",
+      "ratings": {
+        "CLO1": 6,
+        "CLO2": 6,
+        "CLO3": 4,
+        "CLO4": 6,
+        "CLO5": 2,
+        "CLO6": 1,
+        "CLO7": 6
+      }
+    }
+  ]
+}

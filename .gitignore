@@ -1,0 +1,15 @@
+# Published as .gitignore in the team repo.
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.local
+*.log
+*.pem
+*.key
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/settings.local.json

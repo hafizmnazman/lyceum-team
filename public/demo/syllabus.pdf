@@ -1,0 +1,32 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 795 >>
+stream
+BT /F1 11 Tf 56 748 Td 16 TL (CS220 Applied Machine Learning) Tj T* (Course Syllabus, Semester 1 2025 \(2025-S1\)) Tj T* () Tj T* (Course Learning Outcome) Tj T* (CLO4: Analyse and apply core machine learning methods, including) Tj T* (supervised learning, model evaluation, and regularisation.) Tj T* () Tj T* (Topics) Tj T* (1. Supervised learning: regression and classification) Tj T* (2. Model evaluation: cross-validation, bias and variance) Tj T* (3. Regularisation and feature engineering) Tj T* (4. Tree ensembles and gradient boosting) Tj T* (5. Neural networks: an introduction) Tj T* () Tj T* (Prerequisite: MA201 Linear Algebra) Tj T* (Assessment: coursework 40 percent, final examination 60 percent) Tj T* (Course coordinator: Dr Sobri \(verified on the faculty course page\)) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1157
+%%EOF
