@@ -301,7 +301,9 @@ const OPTION_NOTE: Record<BriefRecommendation, string> = {
   revise: "change outcomes or topics through the institution's review process, stating the hours and prerequisites it affects.",
   undecided: "the lecturer asks the meeting to weigh the options above.",
 };
-export function meetingBriefMarkdown(subject: Subject, report: EvidenceReport, sources: EvidenceSource[], mentions: SkillMention[], outcomes: CLO[], people: Person[], author: Person, input: { recommendation: BriefRecommendation; notes: string }, generatedAt: string): string {
+/** Optional "changes since" section, built by lib/snapshots from a frozen window and the current evidence. */
+export interface BriefChanges { since: string; note: string; lines: string[] }
+export function meetingBriefMarkdown(subject: Subject, report: EvidenceReport, sources: EvidenceSource[], mentions: SkillMention[], outcomes: CLO[], people: Person[], author: Person, input: { recommendation: BriefRecommendation; notes: string }, generatedAt: string, changes?: BriefChanges): string {
   const courseSources = sources.filter((s) => s.subjectId === subject.id && !s.duplicateOf);
   const postings = courseSources.filter((s) => s.kind === "job-posting");
   const dates = postings.map((s) => s.sourceDate).filter(Boolean).sort();
@@ -319,11 +321,12 @@ export function meetingBriefMarkdown(subject: Subject, report: EvidenceReport, s
     "- Publication dates as supplied: " + (dates.length ? dates[0] + " to " + dates[dates.length - 1] : "not supplied") + ".",
     "- Sources: " + collected.length + " collected on request (" + (labels.join("; ") || "none") + "), " + (postings.length - collected.length) + " lecturer-supplied, " + report.contextual + " contextual documents.",
     "- Excluded from the denominator: " + report.unreviewed + " unreviewed postings and " + report.duplicates + " duplicate copies.",
-    "- " + report.trendNote, "",
+    "- " + (changes ? changes.note : report.trendNote), "",
     "## What employers ask for", "",
     ...(top.length ? ["| Skill | Postings | Share | 95% interval | Coverage today | Target | Status |", "|---|---|---|---|---|---|---|",
       ...top.map((r) => "| " + [r.skill, r.postings + " of " + report.eligible, percent(r.share), r.interval ? percent(r.interval.low) + " to " + percent(r.interval.high) : "Unknown",
         STAGE_LABEL[r.stage], STAGE_LABEL[r.target], status(r)].join(" | ") + " |")] : ["No requirement has been quoted from a reviewed posting yet."]), "",
+    ...(changes ? ["## Changes since " + changes.since, "", ...changes.lines, ""] : []),
     "## Coverage against targets", "",
     report.targetCoverage
       ? "Target coverage index: " + percent(report.targetCoverage.value) + " over " + report.targetCoverage.knownSkills + " skills with a reviewed stage and target; " + percent(report.targetCoverage.unknownWeightShare) + " of the quoted demand weight has an unknown stage or target. " + report.coverageNote
@@ -336,6 +339,6 @@ export function meetingBriefMarkdown(subject: Subject, report: EvidenceReport, s
     "- Coverage stages are the lecturer's reviewed judgement with cited course evidence; they are ordinal review aids, not mastery.",
     "- No learning impact is estimated, and nothing in this brief changes the course by itself.", "",
     "## Appendix: evidence report with receipts", "",
-    evidenceMarkdown(subject, report, sources, mentions, outcomes, people, generatedAt),
+    evidenceMarkdown(subject, changes ? { ...report, trendNote: changes.note } : report, sources, mentions, outcomes, people, generatedAt),
   ].join("\n");
 }

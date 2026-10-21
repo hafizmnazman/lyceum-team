@@ -199,7 +199,7 @@ test("backups keep evidence, reject misquotes and accept the earlier schema", ()
   const id = posting(); quote(id, "Excel", "maintain Excel models"); setEvidenceSourceReviewed(id, true);
   setSkillMapping("BUS205", { skill: "Excel", cloIds: ["BUS205-outcome-1"], stage: "practised", target: "assessed", evidence: "Week 3 lab." });
   const raw = exportWorkspaceBackup(), people = getState().people.map((p) => p.id);
-  assert.equal(JSON.parse(raw).schemaVersion, 3);
+  assert.equal(JSON.parse(raw).schemaVersion, 4);
   const parsed = parseWorkspaceBackup(raw, people);
   assert.ok(parsed.ok);
   assert.equal(parsed.backup.data.evidenceSources.length, 1); assert.equal(parsed.backup.data.skillMappings.length, 1);

@@ -115,12 +115,12 @@ test("a meeting brief carries the evidence and reaches a colleague's inbox", asy
   assert.equal(prepareEvidenceBrief("CS310", { recommendation: "keep", notes: "" }).ok, true);
 });
 
-test("backups carry briefs and lexicons at schema 3 and older schemas still restore", async () => {
+test("backups carry briefs and lexicons at schema 4 and older schemas still restore", async () => {
   const sources = await collected();
   setSkillLexicon("CS310", ["SQL"]); scanForRequirements("CS310"); confirmProposals("CS310", getState().scanProposals); setSourcesReviewed("CS310", sources.map((s) => s.id), true);
   const prepared = prepareEvidenceBrief("CS310", { recommendation: "revise", notes: "" }); sendEvidenceBrief(prepared.briefId!, [PEOPLE_IDS.rahman]);
   const raw = exportWorkspaceBackup(), people = getState().people.map((p) => p.id);
-  assert.equal(JSON.parse(raw).schemaVersion, 3);
+  assert.equal(JSON.parse(raw).schemaVersion, 4);
   const parsed = parseWorkspaceBackup(raw, people);
   assert.ok(parsed.ok);
   assert.equal(parsed.backup.data.evidenceBriefs.length, 1); assert.deepEqual(parsed.backup.data.skillLexicon.CS310, ["SQL"]);

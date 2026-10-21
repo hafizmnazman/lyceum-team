@@ -4,12 +4,12 @@ import { COVERAGE_STAGES, EVIDENCE_KINDS, REQUIREMENT_LEVELS, locateExcerpt, ski
 
 export const WORKSPACE_DATA_KEYS = ["programme", "assignments", "subjects", "clos", "survey", "proposals",
   "notifications", "predictions", "resultUploads", "dataSources", "subjectVersions", "testDrafts", "teachingPlans",
-  "courseDefinitions", "curriculumDrafts", "evidenceSources", "skillMentions", "skillMappings", "evidenceBriefs", "skillLexicon", "relevanceRatings", "idSeq"] as const;
-/** Collections added after schema version 1 (2: evidence, 3: briefs and lexicon). Older backups restore with these empty. */
-const LATER_DEFAULTS: Partial<Record<typeof WORKSPACE_DATA_KEYS[number], unknown>> = { evidenceSources: [], skillMentions: [], skillMappings: [], evidenceBriefs: [], skillLexicon: {} };
-export const BACKUP_SCHEMA_VERSION = 3;
+  "courseDefinitions", "curriculumDrafts", "evidenceSources", "skillMentions", "skillMappings", "evidenceBriefs", "evidenceSnapshots", "skillLexicon", "relevanceRatings", "idSeq"] as const;
+/** Collections added after schema version 1 (2: evidence, 3: briefs and lexicon, 4: evidence snapshots). Older backups restore with these empty. */
+const LATER_DEFAULTS: Partial<Record<typeof WORKSPACE_DATA_KEYS[number], unknown>> = { evidenceSources: [], skillMentions: [], skillMappings: [], evidenceBriefs: [], evidenceSnapshots: [], skillLexicon: {} };
+export const BACKUP_SCHEMA_VERSION = 4;
 export type WorkspaceData = Pick<AppState, typeof WORKSPACE_DATA_KEYS[number]>;
-export interface WorkspaceBackup { application: "Lyceum"; schemaVersion: 1 | 2 | 3; exportedAt: string; data: WorkspaceData }
+export interface WorkspaceBackup { application: "Lyceum"; schemaVersion: 1 | 2 | 3 | 4; exportedAt: string; data: WorkspaceData }
 export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 type Check = (value: unknown) => boolean;
 const record = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
@@ -76,6 +76,10 @@ const predicates: Record<typeof WORKSPACE_DATA_KEYS[number], Check> = {
   skillMappings: array(shape({ subjectId: id, skill: str, cloIds: strings, stage: one(...COVERAGE_STAGES), target: one(...COVERAGE_STAGES), evidence: str, updatedBy: id, updatedAt: str })),
   evidenceBriefs: array(shape({ id, subjectId: id, createdBy: id, createdAt: str, recommendation: one("keep", "refresh", "revise", "undecided"), notes: str, markdown: str,
     recipients: strings, sentAt: x => x === null || str(x) }), 10000),
+  evidenceSnapshots: array(shape({ id, subjectId: id, label: str, takenBy: id, takenAt: str,
+    eligible: integer, organisations: integer, unreviewed: integer, duplicates: integer, contextual: integer, lookedFor: array(str, 10000),
+    skills: array(shape({ key: str, skill: str, postings: integer, required: integer, preferred: integer, stage: one(...COVERAGE_STAGES), target: one(...COVERAGE_STAGES), sourceIds: array(id, 10000) }), 10000),
+    postings: array(shape({ id, identity: str, title: str, organisation: str, url: str, sourceDate: str, textHash: str }), 10000) }), 1000),
   skillLexicon: dict(array(str, 100)),
   relevanceRatings: array(shape({ subjectId: id, score: num, band: one("aligned","drifting","misaligned","unrated"),
     perCLO: array(shape({ cloId: id, score: num, movedBy: array(str) })),
@@ -108,7 +112,7 @@ export function parseWorkspaceBackup(raw: string, knownPersonIds: string[]): { o
   for (const key of WORKSPACE_DATA_KEYS) if (!predicates[key](data[key])) return fail("Invalid workspace data in " + key + ".");
   const backup = parsed as unknown as WorkspaceBackup;
   const d = backup.data;
-  if (![d.subjects,d.clos,d.proposals,d.notifications,d.resultUploads,d.subjectVersions,d.testDrafts,d.curriculumDrafts,d.evidenceSources,d.skillMentions,d.evidenceBriefs].every(uniqueIds))
+  if (![d.subjects,d.clos,d.proposals,d.notifications,d.resultUploads,d.subjectVersions,d.testDrafts,d.curriculumDrafts,d.evidenceSources,d.skillMentions,d.evidenceBriefs,d.evidenceSnapshots].every(uniqueIds))
     return fail("The backup contains duplicate record identities.");
   const subjects = new Set(d.subjects.map(s => s.id)), people = new Set(knownPersonIds);
   if (!people.has(d.programme.departmentOwnerId)) return fail("The programme owner is unknown to this local workspace.");
@@ -183,6 +187,19 @@ export function parseWorkspaceBackup(raw: string, knownPersonIds: string[]): { o
   }
   if (d.notifications.some(n => n.briefId !== undefined && !briefIds.has(n.briefId))) return fail("A notification refers to a missing evidence brief.");
   if (Object.keys(d.skillLexicon).some(subjectId => !subjects.has(subjectId))) return fail("A skill lexicon refers to an unknown course.");
+  const snapshotLabels = new Set<string>();
+  for (const snap of d.evidenceSnapshots) {
+    if (!subjects.has(snap.subjectId) || !people.has(snap.takenBy)) return fail("An evidence snapshot refers to an unknown course or person.");
+    const labelKey = snap.subjectId + "\n" + snap.label.trim().toLowerCase();
+    if (!snap.label.trim() || snapshotLabels.has(labelKey)) return fail("Evidence snapshots need distinct names within a course.");
+    snapshotLabels.add(labelKey);
+    // A frozen window must be internally consistent: its postings are its denominator, and every count stays within it.
+    const postingIds = new Set(snap.postings.map(p => p.id));
+    if (postingIds.size !== snap.postings.length || snap.postings.length !== snap.eligible) return fail("An evidence snapshot's postings do not match its denominator.");
+    if (new Set(snap.skills.map(k => k.key)).size !== snap.skills.length) return fail("An evidence snapshot lists a skill twice.");
+    if (snap.skills.some(k => k.postings > snap.eligible || k.required + k.preferred > k.postings || k.sourceIds.length !== k.postings || k.sourceIds.some(x => !postingIds.has(x))))
+      return fail("An evidence snapshot's counts do not match its postings.");
+  }
   const mappingKeys = new Set<string>();
   for (const mapping of d.skillMappings) {
     const mappingKey = mapping.subjectId + "\n" + skillKey(mapping.skill);

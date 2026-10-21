@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import {
-  clearCollection, clearProposals, confirmProposals, dismissProposal, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
+  clearCollection, clearProposals, confirmProposals, dismissProposal, evidenceTrendNote, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
   scanForRequirements, selectBrief, sendEvidenceBrief, setSkillLexicon, setSourcesReviewed, type AppState,
 } from "../../app/store.ts";
 import { briefDeck, downloadDeck } from "../../lib/slides.ts";
@@ -161,7 +161,7 @@ export function MeetingBriefPanel({ state, person, subject, mayEdit }: Props) {
         <p className="muted">Prepared {current.createdAt} by {name(current.createdBy)}{current.sentAt ? " · sent " + current.sentAt + " to " + current.recipients.map(name).join(", ") : " · not sent"}</p></div>
         <div className="button-row">
           <Button data-demo-id="brief-download" onClick={() => downloadText(subject.id + "-meeting-brief.md", current.markdown)}>Download brief (.md)</Button>
-          <Button data-demo-id="brief-slides" onClick={() => { const outcomes = state.clos.filter((c) => c.subjectId === subject.id); void downloadDeck(briefDeck(subject, current, evidenceReport(subject.id, state.evidenceSources, state.skillMentions, state.skillMappings, outcomes), state.evidenceSources, state.skillMentions, outcomes, state.people, nowIso())); }}>Download slides (.pptx)</Button>
+          <Button data-demo-id="brief-slides" onClick={() => { const outcomes = state.clos.filter((c) => c.subjectId === subject.id); void downloadDeck(briefDeck(subject, current, { ...evidenceReport(subject.id, state.evidenceSources, state.skillMentions, state.skillMappings, outcomes), trendNote: evidenceTrendNote(subject.id) }, state.evidenceSources, state.skillMentions, outcomes, state.people, nowIso())); }}>Download slides (.pptx)</Button>
           {briefs.length > 1 ? <Select aria-label="Choose a prepared brief" value={current.id} onChange={(e) => selectBrief(e.target.value)}>{briefs.map((b) => <option key={b.id} value={b.id}>{b.createdAt} · {RECOMMENDATION_LABEL[b.recommendation]}</option>)}</Select> : null}
         </div></div>
       {current.notes ? <p className="preserve-lines">{current.notes}</p> : null}

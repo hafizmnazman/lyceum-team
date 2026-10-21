@@ -547,6 +547,25 @@ export interface CollectedPosting {
   publishedAt: string; // as published by the board, empty when unknown
   updatedAt: string; text: string; retrievedAt: string;
 }
+// ---------- watching the evidence over time ----------
+/** A reviewed posting as it stood when a snapshot was frozen. `identity` stays stable across re-imports of the same board posting. */
+export interface SnapshotPosting { id: string; identity: string; title: string; organisation: string; url: string; sourceDate: string; textHash: string }
+/** One skill's counts at the moment of freezing. Intervals are recomputed from these counts, never stored. */
+export interface SnapshotSkill {
+  key: string; skill: string;
+  postings: number; required: number; preferred: number; // reviewed vacancy clusters quoting it
+  stage: CoverageStage; target: CoverageStage; // the lecturer's reviewed coverage at the time
+  sourceIds: string[]; // the canonical postings behind the count, for receipts
+}
+/** The reviewed evidence for one course, frozen at a moment so a later window can be compared with it. Never edited after it is taken. */
+export interface EvidenceSnapshot {
+  id: string; subjectId: SubjectId; label: string; takenBy: PersonId; takenAt: string;
+  eligible: number; organisations: number; unreviewed: number; duplicates: number; contextual: number;
+  lookedFor: string[]; // skill keys scanned for or quoted at the time; a skill outside this list was not looked for
+  skills: SnapshotSkill[];
+  postings: SnapshotPosting[];
+}
+
 export type BriefRecommendation = "keep" | "refresh" | "revise" | "undecided";
 /** A meeting brief prepared from the evidence at one moment; the markdown is a snapshot with receipts. */
 export interface EvidenceBrief {

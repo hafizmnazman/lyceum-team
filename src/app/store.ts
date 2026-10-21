@@ -55,6 +55,7 @@ import type {
   CollectedPosting,
   CollectionProvider,
   EvidenceBrief,
+  EvidenceSnapshot,
   EvidenceSource,
   SkillMapping,
   SkillMention,
@@ -86,6 +87,7 @@ import {
   type EvidenceSourceInput, type MappingInput, type MentionInput, type MentionProposal,
 } from "../lib/evidence.ts";
 import { BOARD_TOKEN, SOURCE_POLICIES } from "../lib/collect.ts";
+import { CURRENT_ID, buildSnapshot, compareSnapshots, comparisonMarkdown, snapshotLabelError, type SnapshotComparison } from "../lib/snapshots.ts";
 import { fetchCollection, type CollectionOutcome, type CollectionRequest } from "../agents/client.ts";
 import { ITEMS, itemsForCLOs } from "../data/items.ts";
 import {
@@ -164,6 +166,7 @@ export interface AppState {
   skillMentions: SkillMention[];
   skillMappings: SkillMapping[];
   evidenceBriefs: EvidenceBrief[];
+  evidenceSnapshots: EvidenceSnapshot[]; // frozen evidence windows, compared to watch change over time
   skillLexicon: Record<string, string[]>; // per course: the terms the lecturer scans for
   relevanceRatings: RelevanceRating[];
 
@@ -231,6 +234,7 @@ function seedState(): AppState {
     skillMentions: [],
     skillMappings: [],
     evidenceBriefs: [],
+    evidenceSnapshots: [],
     skillLexicon: {},
     relevanceRatings: computeRelevanceRatings(SUBJECTS, CLOS, SEED_NOW),
 
@@ -285,6 +289,7 @@ const PERSISTED_KEYS = [
   "skillMentions",
   "skillMappings",
   "evidenceBriefs",
+  "evidenceSnapshots",
   "skillLexicon",
   "relevanceRatings",
   "idSeq",
@@ -368,7 +373,7 @@ export function useStore(): AppState {
 
 function nextId(prefix: string): string {
   const used = new Set([...state.proposals, ...state.notifications, ...state.resultUploads, ...state.subjectVersions,
-    ...state.testDrafts, ...state.curriculumDrafts, ...state.agentRuns, ...state.evidenceSources, ...state.skillMentions, ...state.evidenceBriefs, ...state.teachingPlans.flatMap(p => p.sessions)].map(x => x.id));
+    ...state.testDrafts, ...state.curriculumDrafts, ...state.agentRuns, ...state.evidenceSources, ...state.skillMentions, ...state.evidenceBriefs, ...state.evidenceSnapshots, ...state.teachingPlans.flatMap(p => p.sessions)].map(x => x.id));
   let id: string;
   do { id = `${prefix}-${state.idSeq}`; state = { ...state, idSeq: state.idSeq + 1 }; } while (used.has(id));
   return id;
@@ -2055,8 +2060,10 @@ export function prepareEvidenceBrief(subjectId: SubjectId, input: { recommendati
   if (typeof input.notes !== "string" || input.notes.length > 20000) return { ok: false, error: "Keep the notes within 20,000 characters." };
   const subject = subjectById(subjectId)!, person = currentPerson()!, at = nowIso();
   const outcomes = state.clos.filter((c) => c.subjectId === subjectId);
+  const changes = changesSinceLastSnapshot(subjectId);
   const markdown = meetingBriefMarkdown(subject, evidenceReportForCourse(subjectId), state.evidenceSources, state.skillMentions, outcomes, state.people, person,
-    { recommendation: input.recommendation, notes: input.notes.trim() }, at);
+    { recommendation: input.recommendation, notes: input.notes.trim() }, at,
+    changes ? { since: changes.before.label, note: changes.note, lines: comparisonMarkdown(changes) } : undefined);
   const brief: EvidenceBrief = { id: nextId("BR-" + subjectId), subjectId, createdBy: person.id, createdAt: at, recommendation: input.recommendation, notes: input.notes.trim(), markdown, recipients: [], sentAt: null };
   set((s) => ({ evidenceBriefs: [...s.evidenceBriefs, brief], selectedBriefId: brief.id, toast: "Brief prepared. Review it, then download or send it." }));
   return { ok: true, briefId: brief.id };
@@ -2075,4 +2082,53 @@ export function sendEvidenceBrief(briefId: string, recipientIds: string[]): Save
     agentFindings: "Evidence brief for " + brief.subjectId + " from " + person.name + ": " + RECOMMENDATION_LABEL[brief.recommendation] + "." });
   set({ toast: "Brief sent to " + recipients.map((id) => personById(id)?.name ?? id).join(", ") + "." });
   return { ok: true };
+}
+
+// ---------- watching the evidence over time (the Watch step) ----------
+// A snapshot freezes the reviewed evidence for a course so a later window can be
+// compared with it. Snapshots are never edited; a comparison never changes a course.
+function snapshotsFor(subjectId: SubjectId): EvidenceSnapshot[] {
+  return state.evidenceSnapshots.filter((s) => s.subjectId === subjectId);
+}
+/** The evidence as it stands now, shaped like a snapshot but not saved. */
+export function currentEvidenceWindow(subjectId: SubjectId): EvidenceSnapshot {
+  return buildSnapshot({ id: CURRENT_ID, subjectId, label: "Current evidence", takenBy: currentPerson()?.id ?? "", takenAt: nowIso() },
+    evidenceReportForCourse(subjectId), state.evidenceSources, state.skillMentions, state.skillLexicon[subjectId] ?? []);
+}
+export function takeEvidenceSnapshot(subjectId: SubjectId, label: string): SaveResult & { snapshotId?: string } {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can freeze the evidence for this course." };
+  const error = snapshotLabelError(label, snapshotsFor(subjectId));
+  if (error) return { ok: false, error };
+  const report = evidenceReportForCourse(subjectId);
+  if (report.eligible === 0) return { ok: false, error: "Review at least one posting first. A snapshot with no reviewed postings has no denominator to compare later." };
+  const snapshot = buildSnapshot({ id: nextId("SN-" + subjectId), subjectId, label, takenBy: currentPerson()!.id, takenAt: nowIso() },
+    report, state.evidenceSources, state.skillMentions, state.skillLexicon[subjectId] ?? []);
+  set((s) => ({ evidenceSnapshots: [...s.evidenceSnapshots, snapshot],
+    toast: "Snapshot \"" + snapshot.label + "\" frozen: " + snapshot.eligible + " reviewed postings, " + snapshot.skills.length + " skills. Later evidence is compared with it." }));
+  return { ok: true, snapshotId: snapshot.id };
+}
+export function removeEvidenceSnapshot(snapshotId: string): SaveResult {
+  const snapshot = state.evidenceSnapshots.find((s) => s.id === snapshotId);
+  if (!snapshot || !mayPlan(snapshot.subjectId)) return { ok: false, error: "You cannot remove this snapshot." };
+  set((s) => ({ evidenceSnapshots: s.evidenceSnapshots.filter((x) => x.id !== snapshotId), toast: "Snapshot \"" + snapshot.label + "\" removed. Its sources and quotations are untouched." }));
+  return { ok: true };
+}
+/** Compare an earlier snapshot with a later one, or with the current evidence (afterId "current"). */
+export function compareEvidenceWindows(subjectId: SubjectId, beforeId: string, afterId: string): (SaveResult & { comparison?: SnapshotComparison }) {
+  const saved = snapshotsFor(subjectId);
+  const before = saved.find((s) => s.id === beforeId);
+  const after = afterId === CURRENT_ID ? currentEvidenceWindow(subjectId) : saved.find((s) => s.id === afterId);
+  if (!before || !after) return { ok: false, error: "Choose two snapshots of this course." };
+  if (before.id === after.id) return { ok: false, error: "Choose two different windows." };
+  return { ok: true, comparison: compareSnapshots(before, after) };
+}
+/** The latest frozen snapshot against the current evidence, or null when nothing has been frozen. */
+export function changesSinceLastSnapshot(subjectId: SubjectId): SnapshotComparison | null {
+  const saved = snapshotsFor(subjectId);
+  if (!saved.length) return null;
+  return compareSnapshots(saved[saved.length - 1], currentEvidenceWindow(subjectId));
+}
+/** The trend line shown beside the counts: the snapshot comparison when there is one, otherwise the honest default. */
+export function evidenceTrendNote(subjectId: SubjectId): string {
+  return changesSinceLastSnapshot(subjectId)?.note ?? evidenceReportForCourse(subjectId).trendNote;
 }

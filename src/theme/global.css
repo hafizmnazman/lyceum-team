@@ -329,6 +329,8 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 40px; }
 .evidence-table thead th { white-space: nowrap; }
 .evidence-table thead th { font-weight: 500; color: var(--ink-2); border-top: 0; }
 .evidence-table tbody th { font-weight: 500; }
+.watch-count { display: flex; flex-direction: column; gap: 2px; min-width: 96px; }
+.watch-reason { font-size: 12px; margin-top: 4px; max-width: 220px; }
 .mention-list { list-style: none; padding: 0; margin: 8px 0; }
 .mention-list li { border-top: 1px solid var(--border); padding: 8px 0; }
 .collect-log { list-style: none; padding: 10px 12px; margin: 8px 0 12px; background: var(--surface-2); border-radius: var(--radius-s); font-family: ui-monospace, Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.5; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }

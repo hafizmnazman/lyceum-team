@@ -21,7 +21,7 @@ On Windows PowerShell, use `npm.cmd` if `npm` is blocked. Open the URL it prints
 
 ```
 npm run typecheck
-npm run prove:all     # 160 checks today
+npm run prove:all     # 166 checks today
 npm run build
 npm run smoke         # the full demo tour in a headless browser
 ```

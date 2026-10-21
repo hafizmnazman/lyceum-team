@@ -19,7 +19,7 @@
     "prove:signal": "node src/prove-signal.ts",
     "prove:intake": "node src/prove-intake.ts",
     "prove:integrity": "node --test src/prove-integrity.ts",
-    "prove:all": "node src/prove-acceptance.ts && node src/prove-backtest.ts && node src/prove-flow.ts && node src/prove-signal.ts && node src/prove-intake.ts && node --test src/prove-integrity.ts && node --test src/prove-teaching.ts && node --test src/prove-curriculum.ts && node --test src/prove-evidence.ts && node --test src/prove-collect.ts && node --test src/prove-research.ts && node --test src/prove-slides.ts && node --test src/prove-benchmark.ts && node --test src/prove-journey.ts",
+    "prove:all": "node src/prove-acceptance.ts && node src/prove-backtest.ts && node src/prove-flow.ts && node src/prove-signal.ts && node src/prove-intake.ts && node --test src/prove-integrity.ts && node --test src/prove-teaching.ts && node --test src/prove-curriculum.ts && node --test src/prove-evidence.ts && node --test src/prove-collect.ts && node --test src/prove-research.ts && node --test src/prove-slides.ts && node --test src/prove-benchmark.ts && node --test src/prove-journey.ts && node --test src/prove-snapshots.ts",
     "gen:demo": "node scripts/gen-demo-files.mjs",
     "gen:music": "node scripts/gen-music.mjs",
     "smoke": "node scripts/demo-smoke.mjs",
@@ -34,6 +34,7 @@
     "prove:slides": "node --test src/prove-slides.ts",
     "prove:benchmark": "node --test src/prove-benchmark.ts",
     "prove:journey": "node --test src/prove-journey.ts",
+    "prove:snapshots": "node --test src/prove-snapshots.ts",
     "gen:sample": "node scripts/gen-collected-sample.mjs",
     "smoke:curriculum": "node scripts/curriculum-smoke.mjs"
   },

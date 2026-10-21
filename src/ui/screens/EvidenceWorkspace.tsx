@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { can } from "../../app/roles.ts";
 import {
-  addEvidenceSource, addSkillMention, nowIso, removeEvidenceSource, removeSkillMention, setEvidenceSourceReviewed, setSkillMapping, type AppState,
+  addEvidenceSource, addSkillMention, evidenceTrendNote, nowIso, removeEvidenceSource, removeSkillMention, setEvidenceSourceReviewed, setSkillMapping, type AppState,
 } from "../../app/store.ts";
 import {
   COVERAGE_STAGES, EVIDENCE_KINDS, KIND_LABEL, REQUIREMENT_LEVELS, STAGE_LABEL, evidenceMarkdown, evidenceReport, locateExcerpt,
@@ -13,6 +13,7 @@ import { Button, Field, Input, Select, Tag, Textarea } from "../primitives/index
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
 import { BarList, ShareBar } from "../primitives/ShareBar.tsx";
 import { MeetingBriefPanel, RequirementScan, ResearchRun } from "./EvidenceResearch.tsx";
+import { EvidenceWatch } from "./EvidenceWatch.tsx";
 
 type Props = { state: AppState; person: Person; subject: Subject };
 const pct = (x: number | null) => (x === null ? "Unknown" : Math.round(x * 1000) / 10 + "%");
@@ -51,8 +52,10 @@ export function EvidencePanel({ state, person, subject }: Props) {
       <p className="muted">{report.targetCoverage
         ? "Target coverage index: " + pct(report.targetCoverage.value) + " over " + report.targetCoverage.knownSkills + " skills with a reviewed stage and target; " + pct(report.targetCoverage.unknownWeightShare) + " of the quoted demand weight has an unknown stage or target. " + report.coverageNote
         : report.coverageNote}</p>
-      <p className="muted">{report.trendNote}</p>
+      <p className="muted" data-demo-id="trend-note">{evidenceTrendNote(subject.id)}</p>
     </section>
+
+    <EvidenceWatch state={state} person={person} subject={subject} mayEdit={mayEdit} />
 
     <MeetingBriefPanel state={state} person={person} subject={subject} mayEdit={mayEdit} />
     <section className="workspace-panel" aria-labelledby="evidence-sources">

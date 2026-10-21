@@ -1,5 +1,41 @@
 # Lyceum v3: Decisions log
 
+## 21 October 2026: the Watch step, evidence snapshots over time
+
+A research run was a one-off: the report could say what the recorded postings
+ask for, but not whether anything had changed since the course was last
+reviewed, and the evidence report said "Trend unavailable". Watch is the first
+of the six storyline steps and had no screen. Built on
+`feature/evidence-snapshots`:
+
+- **Snapshots are frozen windows.** "Freeze snapshot" in Evidence stores the
+  reviewed denominator, each skill's count, the lecturer's coverage stage and
+  target, the postings behind each count with their text fingerprints, and the
+  skills that were looked for. A snapshot is never edited; removing a source
+  later does not rewrite it. Unreviewed postings and duplicates stay out, and a
+  snapshot with no reviewed posting is refused because it has no denominator.
+- **A change is called only when the intervals separate.** Rising or falling
+  means the two 95% Wilson intervals do not overlap; everything else reads "no
+  clear change at this sample size". That is stricter than a formal test, so a
+  real shift can be missed, but 3 of 10 becoming 4 of 10 is never reported as a
+  trend. A skill that was not looked for in a window is "not comparable",
+  because its count there is unknown rather than zero.
+- **Postings are matched across windows** by board posting id (or source record
+  when pasted), so a re-collected posting whose text changed shows as changed,
+  not as new.
+- **The brief says what changed.** With a snapshot, the meeting brief and its
+  slides replace "Trend unavailable" with the comparison note, and the brief
+  gains a "Changes since <snapshot>" section with the table, the postings that
+  moved and the rule. Without a snapshot nothing changes.
+- **Backup schema 4.** Backups carry snapshots and reject inconsistent ones
+  (postings not matching the denominator, counts above it, unknown course or
+  person, duplicate names). Schema 1 to 3 backups restore with no snapshots.
+- Proofs: `src/prove-snapshots.ts`, six checks, in `prove:all` (166 in all).
+
+Not built: scheduled re-collection (a task that collects and freezes on a
+term calendar), employer-balanced comparisons, and snapshot comparison in the
+How it works timeline and the journey bar, which W16 will reorder anyway.
+
 ## 14 October 2026: the organizer's review, and the platform answer becomes work
 
 Cai Yiyu, the organizer who approves the travel fellowships, reviewed Lyceum
