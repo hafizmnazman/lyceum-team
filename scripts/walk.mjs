@@ -55,7 +55,7 @@ if (!executablePath) {
 }
 
 mkdirSync("docs/screenshots", { recursive: true });
-const browser = await puppeteer.launch({ executablePath, headless: "new" });
+const browser = await puppeteer.launch({ executablePath, headless: true });
 const page = await browser.newPage();
 await page.setViewport({ width: 1440, height: 900 });
 
