@@ -116,7 +116,7 @@ export function StudioScreen() {
 const STUDIO_HELPER: Record<"course" | "update" | "teach" | "history", StepHelper> = {
   course: { who: "folio", line: "Reads the syllabus, the outline and the documents you file, and keeps the outcomes, topics and hours in one record." },
   update: { who: "quill", line: "Checks a revision against the hours, the links and the protected topics. It never adopts a version for you." },
-  teach: { who: "prism", line: "Builds an editable teaching pack from a saved session and the evidence behind its outcomes. No model writes a word." },
+  teach: { who: "prism", line: "Builds an editable teaching pack from a saved session and the evidence behind its outcomes." },
   history: { who: "folio", line: "Keeps every version and every decision, in the order they were made." },
 };
 
@@ -165,7 +165,7 @@ export function ProposalScreen() {
   const lastProposal = [...state.proposals].reverse().find((p) => p.subjectId === subject.id);
   const mayDraft = can(person, "draft-change", { subjectId: subject.id, assignments: state.assignments });
   return <Page wide>
-    <PageHead eyebrow="Sandbox · illustrative" title="Change proposal" context="The earlier review chain: a drafted proposal, a coordinator review, an acceptance test on a synthetic cohort and a management approval. It is kept for the research sandbox; course decisions are recorded in each course's Decide step."
+    <PageHead eyebrow="Sandbox · illustrative" title="Change proposal" context="The earlier review chain, kept as an illustration: a drafted proposal, a coordinator review, an acceptance test on a synthetic cohort and a management approval. Course decisions are recorded in each course's Decide step."
       actions={subjects.length > 1 ? <label className="course-switcher">Course<Select aria-label="Choose course for the proposal" value={subject.id} onChange={(e) => { selectSubject(e.target.value); selectProposal(null); }}>{subjects.map((s) => <option key={s.id} value={s.id}>{s.id} · {s.title}</option>)}</Select></label> : undefined} />
     {proposal ? <>
       <div className="section-heading"><h2>{proposal.subjectId}: curriculum change proposal</h2><Tag tone={STATUS_TONE[proposal.status]}>{STATUS_LABEL[proposal.status]}</Tag></div>

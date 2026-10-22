@@ -27,7 +27,7 @@ export function OfficeScreen() {
   const roleName = (id: RoleId | "people") => id === "people" ? { name: "People", job: "A person decides" } : ROLES.find((r) => r.id === id)!;
   const seeRecord = () => { setRecordOpen(true); requestAnimationFrame(() => recordRef.current?.scrollIntoView({ block: "start" })); };
   return <Page wide>
-    <PageHead title="How Lyceum works" context="Seven helpers, one afternoon, nothing automatic. Each helper reads what you confirmed and hands the next one a record you can open; people decide."
+    <PageHead title="How Lyceum works" context="Each helper reads what you confirmed and hands the next one a record you can open. People decide."
       actions={<Button variant="primary" data-demo-id="see-record" onClick={seeRecord}>See the record on {subjectId ?? "this course"}</Button>} />
     <LoopGraphic onSelect={(who) => setOpen(open === who ? null : who)} selected={open} />
     <ol className="pipeline" aria-label="The seven helpers in order">

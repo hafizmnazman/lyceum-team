@@ -42,8 +42,8 @@ export function EvidenceWatch({ state, subject, mayEdit }: Props) {
   const comparison = result?.ok ? result.comparison! : null;
 
   return <section className="workspace-panel" aria-labelledby="evidence-watch" data-demo-id="evidence-watch">
-    <div className="section-heading"><div><h3 id="evidence-watch">Watch: evidence over time</h3>
-      <p className="muted">Freeze the reviewed evidence at each review. The next window is compared with it, and the meeting brief reports what changed.</p></div>
+    <div className="section-heading"><div><h3 id="evidence-watch">Evidence over time</h3>
+      <p className="muted">Freeze each review's evidence. The next window is compared with it, and the brief reports what changed.</p></div>
       <Tag>{snapshots.length} {snapshots.length === 1 ? "snapshot" : "snapshots"}</Tag></div>
 
     {mayEdit ? <form className="curriculum-object" aria-label="Freeze a snapshot" onSubmit={(e) => {
@@ -63,7 +63,7 @@ export function EvidenceWatch({ state, subject, mayEdit }: Props) {
     {snapshots.length ? <div className="table-scroll"><table className="evidence-table">
       <thead><tr><th scope="col">Snapshot</th><th scope="col">Frozen</th><th scope="col">Reviewed postings</th><th scope="col">Employers</th><th scope="col">Skills</th>{mayEdit ? <th scope="col" aria-label="Actions"></th> : null}</tr></thead>
       <tbody>{[...snapshots].reverse().map((s) => <tr key={s.id}>
-        <th scope="row">{s.label}</th><td>{s.takenAt} · {name(s.takenBy)}</td><td className="tabular">{s.eligible}</td><td className="tabular">{s.organisations}</td><td className="tabular">{s.skills.length}</td>
+        <th scope="row">{s.label}</th><td>{s.takenAt.slice(0, 16).replace("T", " ")} · {name(s.takenBy)}</td><td className="tabular">{s.eligible}</td><td className="tabular">{s.organisations}</td><td className="tabular">{s.skills.length}</td>
         {mayEdit ? <td><Button variant="quiet" aria-label={"Remove snapshot " + s.label} onClick={() => { removeEvidenceSnapshot(s.id); if (beforeId === s.id) setBeforeId(""); if (afterId === s.id) setAfterId(CURRENT_ID); }}>Remove</Button></td> : null}
       </tr>)}</tbody></table></div>
       : <p className="muted">No snapshot yet. Freeze one when you review this course; next term, collect again and compare.</p>}
@@ -80,20 +80,20 @@ export function EvidenceWatch({ state, subject, mayEdit }: Props) {
       </div>
       {!result?.ok ? <p role="alert" className="form-error">{result?.error}</p> : null}
       {comparison ? <>
+        {/* Only the counts that are not zero; the note below says what the zeros mean. */}
         <div className="preparation-summary">
-          <span><strong>{comparison.counts.rising}</strong> rising</span><span><strong>{comparison.counts.falling}</strong> falling</span>
-          <span><strong>{comparison.counts.steady}</strong> no clear change</span><span><strong>{comparison.counts["not-comparable"]}</strong> not comparable</span>
-          <span><strong>{comparison.postingsAdded.length}</strong> new postings</span><span><strong>{comparison.postingsGone.length}</strong> gone</span>
-          <span><strong>{comparison.textChanged.length}</strong> text changed</span>
+          {([[comparison.counts.rising, "rising"], [comparison.counts.falling, "falling"], [comparison.counts.steady, "no clear change"], [comparison.counts["not-comparable"], "not comparable"],
+            [comparison.postingsAdded.length, "new postings"], [comparison.postingsGone.length, "gone"], [comparison.textChanged.length, "text changed"]] as const)
+            .filter(([n]) => n > 0).map(([n, label]) => <span key={label}><strong>{n}</strong> {label}</span>)}
         </div>
         <p data-demo-id="snapshot-note">{comparison.note}</p>
         {comparison.skills.length ? <div className="table-scroll"><table className="evidence-table">
-          <caption className="muted">Each count is postings quoting the skill out of that window's reviewed postings, with its 95% Wilson interval as a whisker.</caption>
+          <caption className="muted">Each count is over that window's reviewed postings; the whisker is its 95% Wilson interval.</caption>
           <thead><tr><th scope="col">Skill</th><th scope="col">{comparison.before.label}</th><th scope="col">{comparison.after.label}</th><th scope="col">Change</th><th scope="col">Coverage</th></tr></thead>
           <tbody>{comparison.skills.map((c) => <tr key={c.key}>
             <th scope="row">{c.skill}{c.newlyQuoted ? <span className="muted"> · newly quoted</span> : c.noLongerQuoted ? <span className="muted"> · no longer quoted</span> : null}</th>
             <td><Count w={c.before} /></td><td><Count w={c.after} /></td>
-            <td><Tag tone={TONE[c.kind]}>{CHANGE_LABEL[c.kind]}</Tag><div className="muted watch-reason">{c.reason}</div></td>
+            <td><Tag tone={TONE[c.kind]}>{CHANGE_LABEL[c.kind]}</Tag>{c.kind === "steady" ? null : <div className="muted watch-reason">{c.reason}</div>}</td>
             <td>{coverage(c)}</td>
           </tr>)}</tbody></table></div> : <p className="muted">No skill has been quoted in either window.</p>}
         {comparison.postingsAdded.length || comparison.postingsGone.length || comparison.textChanged.length ? <details className="guide-entry"><summary><span>Postings that moved</span><Tag>{comparison.postingsAdded.length + comparison.postingsGone.length + comparison.textChanged.length}</Tag></summary>
@@ -102,7 +102,7 @@ export function EvidenceWatch({ state, subject, mayEdit }: Props) {
             {comparison.postingsGone.map((p) => <li key={"g" + p.identity}><strong>No longer in the reviewed set: {p.title}</strong><span>{p.organisation || "Organisation not named"}{p.sourceDate ? " · published " + p.sourceDate : ""}</span></li>)}
             {comparison.textChanged.map((p) => <li key={"t" + p.after.identity}><strong>Text changed: {p.after.title}</strong><span className="tabular">fingerprint {p.before.textHash} changed to {p.after.textHash}</span></li>)}
           </ul></div></details> : null}
-        <p className="limitation">A skill is rising or falling only when the two intervals do not overlap. That is stricter than a formal test, so a real shift can show as no clear change. Both windows are samples you chose; a change describes them, not the labour market, and nothing here changes the course.</p>
+        <p className="limitation">Rising or falling means the two intervals do not overlap, a stricter bar than a formal test, so a real shift can read as no clear change. Both windows are samples you chose: a change describes them, not the labour market.</p>
       </> : null}
     </div> : null}
   </section>;

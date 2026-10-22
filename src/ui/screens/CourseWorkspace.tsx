@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Download, Plus } from "lucide-react";
+import { plural } from "../../app/loop.ts";
 import { can, navAllows } from "../../app/roles.ts";
 import {
   definitionForCourse, deleteTeachingSession, downloadPack, navigate, nowIso, saveTeachingPlanDetails, saveTeachingSession,
@@ -47,7 +48,7 @@ export function CourseOverview({ state, person, subject, proposal, onPlan, onPro
           return <li key={clo.id} className="outline-card">
             <div className="outline-card-head"><strong>{clo.label ?? clo.id}</strong><Tag>{clo.bloomLevel}</Tag></div>
             <p>{clo.text}</p>
-            <p className="muted">{o?.assessmentEvidence ? "Achievement: " + o.assessmentEvidence : "Achievement evidence not recorded"} · {summary.sessions.filter((s) => s.cloIds.includes(clo.id)).length} linked sessions</p>
+            <p className="muted">{o?.assessmentEvidence ? "Achievement: " + o.assessmentEvidence : "Achievement evidence not recorded"} · {plural(summary.sessions.filter((s) => s.cloIds.includes(clo.id)).length, "linked session", "linked sessions")}</p>
           </li>;
         })}</ul> : <p>No outcomes are recorded for this course yet. {fresh ? "Start a revision in Update to write the first outcome; the loop opens once one exists." : ""}</p>}
         {!plan?.term && can(person, "draft-change", { subjectId: subject.id, assignments: state.assignments }) ? <TermSetter subjectId={subject.id} notes={plan?.notes ?? ""} /> : null}
@@ -55,7 +56,7 @@ export function CourseOverview({ state, person, subject, proposal, onPlan, onPro
       </section>
 
       <section className="workspace-panel" aria-labelledby="course-topics">
-        <div className="section-heading"><div><h2 id="course-topics">Topics and hours</h2><p className="muted">The outline as recorded in this version. Adding a topic never expands the timetable.</p></div></div>
+        <div className="section-heading"><div><h2 id="course-topics">Topics and hours</h2></div></div>
         {budget !== null ? <Meter value={contact} max={budget} over={contact > budget} label={<><strong className="tabular">{contact}</strong> of <span className="tabular">{budget}</span> contact hours outlined</>} note={contact > budget ? "Over the contact-hour budget: Update blocks a version like this." : undefined} />
           : <p className="muted">{contact} contact hours outlined; the contact-hour budget is not recorded.</p>}
         {topics.length ? <ol className="outline-cards topic-cards">{topics.map((t, i) => <li key={t.id} className="outline-card">
@@ -143,7 +144,7 @@ export function TeachingPlanPanel({ state, person, subject }: CourseProps) {
   return (
     <div>
       <div className="section-heading">
-        <div><h2>Teaching plan</h2><p className="muted">One course plan in this browser. Save each editor before leaving this course.</p></div>
+        <div><h2>Teaching plan</h2><p className="muted">Save each editor before you leave the course.</p></div>
         <div className="button-row">
           <Button onClick={exportPlan} disabled={!plan} data-demo-id="plan-export"><Download size={15} /> Export plan (.md)</Button>
           {mayEdit ? <Button ref={addButtonRef} variant="primary" disabled={editorOpen} onClick={add} data-demo-id="plan-add"><Plus size={15} /> Add session</Button> : null}
@@ -151,7 +152,7 @@ export function TeachingPlanPanel({ state, person, subject }: CourseProps) {
       </div>
       <PlanDetails key={subject.id} subjectId={subject.id} plan={plan} mayEdit={mayEdit} />
       <div className="preparation-summary" aria-label="Teaching plan summary">
-        <span><strong>{summary.sessions.length}</strong> sessions</span>
+        <span><strong>{summary.sessions.length}</strong> {summary.sessions.length === 1 ? "session" : "sessions"}</span>
         <span><strong>{summary.minutes}</strong> planned minutes</span>
         <span><strong>{summary.ready}</strong> ready</span>
         <span><strong>{summary.delivered}</strong> delivered</span>

@@ -55,14 +55,14 @@ export function ReportScreen() {
         <Disclosure summary="Duplicate copies set aside"><DuplicateList {...props} /></Disclosure>
       </section> : null}
       {tab === "count" ? <section className="workspace-panel" aria-labelledby="observed-requirements" data-demo-id="observed-requirements">
-        <div className="section-heading"><div><h3 id="observed-requirements">What employers ask for, counted</h3><p className="muted">Each card is postings quoting the skill over the {report.eligible} reviewed postings, with the 95% Wilson interval printed. No score.</p></div>
+        <div className="section-heading"><div><h3 id="observed-requirements">What employers ask for, counted</h3><p className="muted">Over the {report.eligible} reviewed postings, each with its 95% Wilson interval.</p></div>
           <EvidenceExport state={state} subject={subject} /></div>
         <SkillCards state={state} subject={subject} onMap={mayEdit ? (skill) => { setFocusSkill(skill); selectReportTab("map"); } : undefined} />
         <Disclosure summary="The full table, the coverage index and the trend"><CountTable state={state} subject={subject} /></Disclosure>
       </section> : null}
       {tab === "map" ? <section className="workspace-panel" aria-labelledby="coverage-ladder">
         <h3 id="coverage-ladder">What the course does about each skill</h3>
-        <p className="muted">Absent, introduced, practised, assessed: your reviewed judgement of the course today and the target it should reach, with the course evidence cited. It is not a measured outcome.</p>
+        <p className="muted">Your judgement of the course today and the target it should reach, with its evidence cited. Not a measured outcome.</p>
         <CoverageLadder {...props} focusSkill={focusSkill} />
       </section> : null}
       {tab === "brief" ? <MeetingBriefPanel {...props} /> : null}

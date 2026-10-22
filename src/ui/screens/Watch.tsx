@@ -22,11 +22,11 @@ export function WatchScreen() {
   const mayEdit = can(person, "draft-change", { subjectId: subject.id, assignments: state.assignments });
   const sources = state.evidenceSources.filter((s) => s.subjectId === subject.id);
   return <StepFrame state={state} step="watch" subject={subject} subjects={subjects}
-    helper={{ who: "scout", line: "Fetches only when you ask, from a source with a stated policy, and keeps the link, the publication date and the retrieval time." }}>
+    helper={{ who: "scout", line: "Fetches only when you ask, from a source with a stated policy, and keeps each posting's link and dates." }}>
     <div data-demo-id="evidence-panel">
       <ResearchRun state={state} person={person} subject={subject} mayEdit={mayEdit} />
       <section className="workspace-panel" aria-labelledby="kept-sources">
-        <div className="section-heading"><div><h2 id="kept-sources">Kept sources</h2><p className="muted">Each kept posting is a receipt: its link, its publication date as published, its retrieval time and a fingerprint of its text. It counts only after you review it in Report.</p></div></div>
+        <div className="section-heading"><div><h2 id="kept-sources">Kept sources</h2><p className="muted">Each one is a receipt: its link, its dates and a fingerprint of its text.</p></div></div>
         <SourceTimeline state={state} person={person} subject={subject} mayEdit={mayEdit} />
         <Disclosure summary="Paste a document you are permitted to keep" data-demo-id="paste-document">
           <RecordSourceForm state={state} person={person} subject={subject} mayEdit={mayEdit} />

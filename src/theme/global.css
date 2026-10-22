@@ -1383,7 +1383,6 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .ring-term { font-family: var(--font-mono); font-size: 12px; fill: var(--ink-2); }
 .ring-panel { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
 .ring-legend { flex: 1; min-width: 240px; }
-.ring-summary { margin: 0 0 10px !important; font-weight: 600; }
 .ring-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 4px 16px; }
 .ring-steps li { display: grid; grid-template-columns: 24px auto auto 1fr; gap: 8px; align-items: center; min-height: 32px; font-size: 14px; }
 .ring-mark { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--control-border); font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); background: var(--white); }
@@ -1540,7 +1539,8 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .filed-list, .planned-list { list-style: none; margin: 8px 0; padding: 0; }
 .filed-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--border); }
 .filed-list li > div { display: grid; gap: 2px; min-width: 0; }
-.planned-list li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; font-size: 14px; }
+.planned-list li { padding: 4px 0; font-size: 14px; }
+ul.planned-list { list-style: disc; padding-left: 22px; } /* the section is labelled Planned once, so its items are plain bullets */
 .intake-panel { margin-top: 8px; }
 
 /* History: versions and decisions on one timeline */

@@ -6,6 +6,7 @@
 // course by itself.
 
 import { useState } from "react";
+import { plural } from "../../app/loop.ts";
 import {
   addEvidenceSource, addSkillMention, evidenceTrendNote, nowIso, removeEvidenceSource, removeSkillMention, setEvidenceSourceReviewed, setSkillMapping, type AppState,
 } from "../../app/store.ts";
@@ -148,19 +149,32 @@ export function QuoteByHand({ state, subject, mayEdit }: Props) {
 }
 
 /** Every confirmed quotation, by source, re-verified against its source text on display. */
+/** How many confirmed quotations show before "Show all". A quotation that fails its check always shows, first. */
+const FIRST_QUOTATIONS = 5;
+
 export function ConfirmedQuotations({ state, subject, mayEdit }: Props) {
+  const [all, setAll] = useState(false);
   const sources = state.evidenceSources.filter((s) => s.subjectId === subject.id);
   const mentions = state.skillMentions.filter((m) => m.subjectId === subject.id);
   if (!mentions.length) return <p className="muted">No quotation confirmed yet.</p>;
-  return <ul className="mention-list" data-demo-id="confirmed-quotations">{mentions.map((m) => {
+  const checked = mentions.map((m) => {
     const source = sources.find((s) => s.id === m.sourceId);
-    const located = source ? locateExcerpt(source.text, m.excerpt) : { ok: false as const };
-    return <li key={m.id}><div className="button-row"><strong>{m.skill}</strong><Tag tone={m.requirement === "required" ? "accent" : "neutral"}>{m.requirement}</Tag>
-      <Tag tone={located.ok ? "ok" : "danger"}>{located.ok ? (located.match === "exact" ? "Verified in source" : "Verified, spacing differs") : "Not in source"}</Tag>
-      <span className="muted">{source?.title ?? "missing source"}</span>
-      {mayEdit ? <Button variant="quiet" aria-label={"Remove quotation for " + m.skill} onClick={() => removeSkillMention(m.id)}>Remove</Button> : null}</div>
-      <blockquote>{m.excerpt}</blockquote></li>;
-  })}</ul>;
+    return { m, source, located: source ? locateExcerpt(source.text, m.excerpt) : { ok: false as const } };
+  });
+  const failing = checked.filter((c) => !c.located.ok), passing = checked.filter((c) => c.located.ok);
+  const shown = all ? [...failing, ...passing] : [...failing, ...passing.slice(0, FIRST_QUOTATIONS)];
+  return <>
+    <p className="muted" role="status">{plural(mentions.length, "quotation", "quotations")} confirmed; {passing.length} of {mentions.length} verified in their source text right now.</p>
+    <ul className="mention-list" data-demo-id="confirmed-quotations">{shown.map(({ m, source, located }) =>
+      <li key={m.id}><div className="button-row"><strong>{m.skill}</strong><Tag tone={m.requirement === "required" ? "accent" : "neutral"}>{m.requirement}</Tag>
+        <Tag tone={located.ok ? "ok" : "danger"}>{located.ok ? (located.match === "exact" ? "Verified in source" : "Verified, spacing differs") : "Not in source"}</Tag>
+        <span className="muted">{source?.title ?? "missing source"}</span>
+        {mayEdit ? <Button variant="quiet" aria-label={"Remove quotation for " + m.skill} onClick={() => removeSkillMention(m.id)}>Remove</Button> : null}</div>
+        <blockquote>{m.excerpt}</blockquote></li>)}</ul>
+    {passing.length > FIRST_QUOTATIONS ? <div className="button-row source-more">
+      <Button aria-expanded={all} onClick={() => setAll(!all)}>{all ? "Show the first " + FIRST_QUOTATIONS : "Show all " + mentions.length + " quotations"}</Button>
+    </div> : null}
+  </>;
 }
 
 // ---------- Report: Review ----------
@@ -171,7 +185,7 @@ export function ReviewList({ state, subject, mayEdit }: Props) {
   const mentions = state.skillMentions.filter((m) => m.subjectId === subject.id);
   if (!postings.length) return null;
   return <ul className="review-list">{postings.map((s) => <li key={s.id}>
-    <div><strong>{s.title}</strong><span className="muted">{s.organisation || "Organisation not named"} · {mentions.filter((m) => m.sourceId === s.id).length} quotations</span></div>
+    <div><strong>{s.title}</strong><span className="muted">{s.organisation || "Organisation not named"} · {plural(mentions.filter((m) => m.sourceId === s.id).length, "quotation", "quotations")}</span></div>
     <div className="button-row"><Tag tone={s.reviewed ? "ok" : "warn"}>{s.reviewed ? "Reviewed, counted" : "Unreviewed, not counted"}</Tag>
       {mayEdit ? <label className="checkbox-line"><input type="checkbox" data-demo-id="source-reviewed" checked={s.reviewed} onChange={(e) => setEvidenceSourceReviewed(s.id, e.target.checked)} />Extraction reviewed</label> : null}</div>
   </li>)}</ul>;
@@ -260,7 +274,6 @@ function LadderRow({ row, subject, outcomes, mayEdit, startOpen }: { row: SkillR
         {row.target === rung ? <span className="ladder-mark is-target">Target</span> : null}
       </li>)}
     </ol>
-    {row.stage === "unknown" ? <p className="muted">Coverage today is unknown until you review it.</p> : null}
     {row.mapping?.evidence ? <Disclosure summary="Cited course evidence"><p>{row.mapping.evidence}</p></Disclosure> : null}
     {open ? <div className="ladder-editor">
       <fieldset className="clo-choices"><legend>Outcomes this skill relates to</legend>

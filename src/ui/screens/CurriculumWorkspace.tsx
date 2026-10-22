@@ -25,10 +25,10 @@ export function CurriculumPanel({ state, person, subject }: Props) {
   const [error, setError] = useState("");
   const baseline = draft && state.subjectVersions.find(v => v.id === draft.baselineVersionId)?.definition || current;
   return <div>
-    <div className="section-heading"><div><h2>Outcomes & topics</h2><p className="muted">Keep your course outcomes, topic outline and teaching constraints together.</p></div>
+    <div className="section-heading"><div><h2>Outcomes & topics</h2></div>
       <Button onClick={() => downloadText(subject.id + "-course-outline.md", curriculumMarkdown(subject, current, subject.currentVersionId))}>Export current outline</Button>
     </div>
-    <p className="limitation">This is your local preparation workspace. University syllabus approval continues through your existing process.</p>
+    <p className="limitation">University syllabus approval continues through your existing process.</p>
     {draft ? <RevisionEditor key={draft.id + "-" + draft.revision} {...{ state, person, subject, draft, baseline, mayEdit }} /> :
       <section className="workspace-panel">
         <div className="section-heading"><h3>Current course outline</h3><Tag>{subject.currentVersionId}</Tag></div>
@@ -52,9 +52,7 @@ function HoursMeters({ definition }: { definition: CourseDefinition }) {
 
 function DefinitionSummary({ definition }: { definition: CourseDefinition }) {
   return <div>
-    <dl className="context-list"><div><dt>Programme</dt><dd>{definition.brief.programmeTitle || "Not supplied"}</dd></div>
-      <div><dt>Contact hours</dt><dd>{definition.topics.reduce((n,t) => n + t.contactHours, 0)} outlined · budget {definition.brief.contactHours ?? "not supplied"}</dd></div>
-      <div><dt>Self-study hours</dt><dd>{definition.topics.reduce((n,t) => n + t.selfStudyHours, 0)} outlined · budget {definition.brief.selfStudyHours ?? "not supplied"}</dd></div></dl>
+    <dl className="context-list"><div><dt>Programme</dt><dd>{definition.brief.programmeTitle || "Not supplied"}</dd></div></dl>
     <HoursMeters definition={definition} />
     <h4>Course learning outcomes</h4>
     {definition.outcomes.length ? <ol className="outcome-list">{definition.outcomes.map(c => <li key={c.id}><strong>{c.label}</strong> · {c.bloomLevel}<p>{c.text}</p>
@@ -216,7 +214,7 @@ export function CurriculumHistoryPanel({ state, subject }: { state: AppState; su
     || (a.seq !== undefined && b.seq !== undefined ? b.seq - a.seq : a.kind !== b.kind ? (a.kind === "version" ? -1 : 1) : b.order - a.order));
   return <div>
     <section className="workspace-panel" aria-labelledby="history-title"><h2 id="history-title">Versions and decisions</h2>
-      <p className="muted">One timeline, newest first: every local course version and every decision recorded on a brief. Local versions preserve the outline, the reason and the teaching term; they do not attest university approval.</p>
+      <p className="muted">Newest first. A local version keeps the outline, the reason and the term; it does not attest university approval.</p>
       {entries.length ? <ol className="history-timeline" data-demo-id="history-timeline">{entries.map(e => e.kind === "version"
         ? <li key={"v" + e.v.id} className="history-entry">
           <span className="history-time mono">{e.at.slice(0, 16).replace("T", " ")}</span>

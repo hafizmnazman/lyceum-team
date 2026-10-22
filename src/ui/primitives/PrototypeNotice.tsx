@@ -1,4 +1,4 @@
-/** Visible on public and signed-in surfaces while the legacy fixtures remain. */
+/** Above every sandbox screen while the legacy fixtures remain: one line, the two facts that matter. */
 export function PrototypeNotice() {
   return (
     <aside
@@ -12,8 +12,7 @@ export function PrototypeNotice() {
         lineHeight: 1.5,
       }}
     >
-      <strong>Prototype data.</strong> Seeded market figures and learner examples are synthetic.
-      Uploaded files are user-provided; learning forecasts have not been validated.
+      <strong>Illustrative.</strong> The figures and learners on this screen are synthetic, and no forecast here is validated.
     </aside>
   );
 }

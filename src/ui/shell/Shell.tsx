@@ -246,11 +246,7 @@ export function Shell(props: { children: ReactNode }) {
             ) : null}
           </nav>
 
-          <div className="sidebar-foot">
-            Local prototype. Your work stays in this browser.
-            <br />
-            Sandbox screens use synthetic data and say so.
-          </div>
+          <div className="sidebar-foot">Local prototype. Work is saved in this browser.</div>
         </aside>
 
         {/* ---------- main column ---------- */}

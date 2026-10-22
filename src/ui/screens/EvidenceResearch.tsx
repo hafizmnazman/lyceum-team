@@ -39,12 +39,12 @@ export function ResearchRun({ state, subject, mayEdit }: Props) {
     if (!result.ok) setMessage(result.error);
   }
   return <section className="workspace-panel" aria-labelledby="research-run">
-    <div className="section-heading"><div><h3 id="research-run">Research run</h3><p className="muted">Fetch postings from a permitted employer board when you ask, then keep the ones worth reading as evidence.</p></div></div>
+    <div className="section-heading"><div><h3 id="research-run">Research run</h3><p className="muted">Fetch postings from a permitted employer board or the dated saved sample, then keep the ones worth reading.</p></div></div>
     {mayEdit ? <>
       <div className="form-grid form-grid-wide-first">
         <Field label="Source"><Select data-demo-id="collect-provider" value={provider} onChange={(e) => { setProvider(e.target.value as CollectionProvider); setMessage(""); }}>{PROVIDERS.map((p) => <option key={p} value={p}>{SOURCE_POLICIES[p].name}</option>)}</Select></Field>
         {provider !== "sample" ? <Field label="Employer board token" hint={provider === "greenhouse" ? "The name in boards.greenhouse.io/NAME, or in an employer's careers link." : "The name in jobs.lever.co/NAME."}><Input data-demo-id="collect-board" maxLength={80} value={board} onChange={(e) => setBoard(e.target.value)} placeholder={provider === "greenhouse" ? "e.g. stripe" : "e.g. palantir"} /></Field> : null}
-        <Field label="Role keywords" hint="Comma-separated. Matches posting titles; tick the box below to search inside the text too."><Input data-demo-id="collect-query" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. data analyst, analytics" /></Field>
+        <Field label="Role keywords" hint="Comma-separated, matched against posting titles."><Input data-demo-id="collect-query" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. data analyst, analytics" /></Field>
       </div>
       <label className="checkbox-line"><input type="checkbox" checked={inText} onChange={(e) => setInText(e.target.checked)} />Also match keywords inside the posting text</label>
       <details className="guide-entry"><summary><span>Source policy: {policy.name}</span><Tag tone={policy.enabled ? "ok" : "warn"}>{policy.enabled ? "Permitted on request" : "Disabled"}</Tag></summary>
@@ -98,7 +98,7 @@ export function QuoteProposals({ state, subject, mayEdit }: Props) {
   const withLevel = (p: MentionProposal) => ({ ...p, requirement: levels[key(p)] ?? p.requirement });
   if (!mayEdit) return <p className="muted">Only assigned lecturers and coordinators can quote evidence for this course.</p>;
   return <section aria-labelledby="requirement-scan">
-    <div className="section-heading"><div><h3 id="requirement-scan">Proposed quotations</h3><p className="muted">The scan proposes the sentence in each posting that names a skill you care about. You confirm every quotation, judging it against its source.</p></div>
+    <div className="section-heading"><div><h3 id="requirement-scan">Proposed quotations</h3><p className="muted">Name the skills, then scan the kept postings for them.</p></div>
       <Button variant="primary" data-demo-id="scan-run" disabled={dirty || !saved.length || !postings.length} onClick={() => {
         const result = scanForRequirements(subject.id);
         setMessage(result.ok ? result.count + " proposals across " + postings.length + " postings. Confirm the quotations you accept." : result.error);
@@ -141,7 +141,7 @@ export function DenominatorReview({ state, subject, mayEdit }: Props) {
     {mayEdit && unreviewed.length ? <div className="curriculum-object">
       <label className="checkbox-line"><input type="checkbox" data-demo-id="review-all-ack" checked={ack} onChange={(e) => setAck(e.target.checked)} />I have checked the quotations for these {unreviewed.length} postings, or deliberately skipped what the course does not need.</label>
       <Button variant="primary" data-demo-id="review-all" disabled={!ack} onClick={() => { setSourcesReviewed(subject.id, unreviewed.map((s) => s.id), true); setAck(false); }}>Mark {unreviewed.length} postings reviewed</Button>
-    </div> : postings.length ? <p className="muted">All kept postings are reviewed. Unmark one below if you need to revisit it.</p> : <p className="muted">No posting kept yet. Keep postings in Watch first.</p>}
+    </div> : postings.length ? <p className="muted">All reviewed. Unmark one to revisit it.</p> : <p className="muted">No posting kept yet. Keep postings in Watch first.</p>}
   </section>;
 }
 
@@ -169,14 +169,14 @@ export function MeetingBriefPanel({ state, person, subject, mayEdit }: Props) {
     </> : null}
     {current ? <article className="curriculum-object" data-demo-id="brief-current">
       <div className="section-heading"><div><h4>{RECOMMENDATION_LABEL[current.recommendation]}</h4>
-        <p className="muted">Prepared {current.createdAt} by {name(current.createdBy)}{current.sentAt ? " · sent " + current.sentAt + " to " + current.recipients.map(name).join(", ") : " · not sent"}</p></div>
+        <p className="muted">Prepared {current.createdAt.slice(0, 16).replace("T", " ")} by {name(current.createdBy)}{current.sentAt ? " · sent " + current.sentAt.slice(0, 16).replace("T", " ") + " to " + current.recipients.map(name).join(", ") : " · not sent"}</p></div>
         <div className="button-row">
           <Button data-demo-id="brief-download" onClick={() => downloadText(subject.id + "-meeting-brief.md", current.markdown)}>Download brief (.md)</Button>
           <Button data-demo-id="brief-slides" onClick={() => { const outcomes = state.clos.filter((c) => c.subjectId === subject.id); void downloadPack(subject.id, briefDeck(subject, current, { ...evidenceReport(subject.id, state.evidenceSources, state.skillMentions, state.skillMappings, outcomes), trendNote: evidenceTrendNote(subject.id) }, state.evidenceSources, state.skillMentions, outcomes, state.people, nowIso())); }}>Download slides (.pptx)</Button>
-          {briefs.length > 1 ? <Select aria-label="Choose a prepared brief" value={current.id} onChange={(e) => selectBrief(e.target.value)}>{briefs.map((b) => <option key={b.id} value={b.id}>{b.createdAt} · {RECOMMENDATION_LABEL[b.recommendation]}</option>)}</Select> : null}
+          {briefs.length > 1 ? <Select aria-label="Choose a prepared brief" value={current.id} onChange={(e) => selectBrief(e.target.value)}>{briefs.map((b) => <option key={b.id} value={b.id}>{b.createdAt.slice(0, 16).replace("T", " ")} · {RECOMMENDATION_LABEL[b.recommendation]}</option>)}</Select> : null}
         </div></div>
       {current.notes ? <p className="preserve-lines">{current.notes}</p> : null}
-      <p className="muted">The slide deck is generated from the current evidence and this brief's recommendation: decision, evidence base, table, coverage, options, limitations and one receipt slide per source. Editable in PowerPoint; no AI-written text.</p>
+      <p className="muted">The slides carry the decision asked for, the evidence, the options, the limits and one receipt per source. Editable in PowerPoint, with no AI-written text.</p>
       <details><summary>Read the full brief</summary><pre className="brief-body">{current.markdown}</pre></details>
       {mayEdit && !current.sentAt ? <fieldset className="clo-choices"><legend>Send to</legend>
         {others.map((p) => <label key={p.id}><input type="checkbox" data-demo-id={"brief-recipient-" + p.id} checked={recipients.includes(p.id)} onChange={(e) => setRecipients(e.target.checked ? [...recipients, p.id] : recipients.filter((id) => id !== p.id))} /><span>{p.name} · {p.orgRole}</span></label>)}

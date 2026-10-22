@@ -94,7 +94,7 @@ function DecisionForm({ briefId, isAuthor, singleOwner }: { briefId: string; isA
   };
   return <div className="decision-form" data-demo-id="decision-form">
     <h3>Record a decision</h3>
-    {isAuthor && !singleOwner ? <p className="limitation">You prepared this brief, so your decision is recorded as self-recorded. The step stays open until a second person decides.</p> : null}
+    {isAuthor && !singleOwner ? <p className="limitation">You prepared this brief, so your decision is marked self-recorded, and the step stays open until a second person decides.</p> : null}
     <Field label="Why: the reason travels with the record" hint={"Required. Up to " + NOTE_MAX + " characters."}>
       <Textarea data-demo-id="decide-note" maxLength={NOTE_MAX} value={note} onChange={(e) => setNote(e.target.value)} placeholder="For example: the dashboard exercise fits the existing hours; the statistics foundation is kept." />
     </Field>

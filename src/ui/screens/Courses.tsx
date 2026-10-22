@@ -30,16 +30,16 @@ export function CoursesScreen() {
   const years = [...new Set(subjects.map((s) => s.year))].sort((a, b) => a - b);
   function open(id: string) { selectSubject(id); navigate("studio"); }
   return <Page wide>
-    <PageHead title="Your courses" context="Prepare classes, keep outcomes in view, and return to unfinished work." actions={<><Button onClick={() => setBackups(!backups)} aria-expanded={backups}>Backups</Button>{person.orgRole === "academic" ? <Button variant="primary" data-demo-id="course-create-open" onClick={() => setCreating(true)}>Create course workspace</Button> : null}<Button onClick={() => navigate("guide")}>Lecturer guide</Button></>} />
+    <PageHead title="Your courses" actions={<><Button onClick={() => setBackups(!backups)} aria-expanded={backups}>Backups</Button>{person.orgRole === "academic" ? <Button variant="primary" data-demo-id="course-create-open" onClick={() => setCreating(true)}>Create course workspace</Button> : null}</>} />
     {creating ? <CourseCreationPanel onCancel={() => setCreating(false)} /> : null}
     {backups ? <WorkspaceBackupPanel /> : null}
-    <div className="preparation-summary"><span><strong>{courses.length}</strong> assigned courses</span><span><strong>{courses.reduce((n, c) => n + c.summary.sessions.length, 0)}</strong> saved teaching sessions</span><span><strong>{courses.filter((c) => c.proposal).length}</strong> open curriculum proposals</span></div>
+    <div className="preparation-summary">{([[courses.length, "assigned course", "assigned courses"], [courses.reduce((n, c) => n + c.summary.sessions.length, 0), "saved teaching session", "saved teaching sessions"], [courses.filter((c) => c.proposal).length, "open curriculum proposal", "open curriculum proposals"]] as const).map(([n, one, many]) => <span key={many}><strong>{n}</strong> {n === 1 ? one : many}</span>)}</div>
     <div className="filter-bar course-filters">
       <Field label="Search courses"><Input type="search" value={query} data-demo-id="course-search" placeholder="Course code or title" onChange={(e) => setQuery(e.target.value)} /></Field>
       <Field label="Year"><Select value={year} onChange={(e) => setYear(e.target.value)}><option value="all">All years</option>{years.map((y) => <option value={y} key={y}>Year {y}</option>)}</Select></Field>
       <Field label="Preparation"><Select value={filter} onChange={(e) => setFilter(e.target.value)}><option value="all">All courses</option><option value="unplanned">No teaching sessions</option><option value="drafts">Sessions to prepare</option><option value="proposal">Open proposal</option></Select></Field>
     </div>
-    <p className="muted" role="status">{visible.length} of {courses.length} courses shown. Preparation reflects saved work in this browser.</p>
+    <p className="muted" role="status">{visible.length} of {courses.length} courses shown.</p>
     <div className="course-grid">{visible.map(({ subject, clos, plan, summary, proposal }) => <article className="workspace-panel course-card" key={subject.id}>
       <div className="section-heading"><span className="eyebrow">{subject.id} · Year {subject.year}, semester {subject.semester}</span><Tag>{subject.workspaceOnly ? "Personal workspace" : subject.status}</Tag></div>
       <h2>{subject.title}</h2>

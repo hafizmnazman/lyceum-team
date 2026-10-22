@@ -37,7 +37,7 @@ export function LandingScreen() {
         <div>
           <p className="eyebrow">A lecturer's course workspace</p>
           <h1>Course decisions, with receipts.</h1>
-          <p className="landing-lead">Lyceum turns real job postings into a course decision with receipts, every semester. Watch what employers ask for, report it with every quotation, decide with a reason on record, update the course, teach it, and see what came back. Nothing runs by itself. Nothing changes a course without you.</p>
+          <p className="landing-lead">Lyceum turns real job postings into a course decision with receipts, every semester. Watch what employers ask for, report it with every quotation, decide with a reason on record, update the course, teach it, and see what came back. Nothing changes a course without you.</p>
           <div className="button-row"><Button variant="lime" onClick={() => navigate("login")}>Try it as a lecturer <ArrowRight size={15} /></Button><Button variant="ghost" onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={14} /> Watch the tour, about {tourMinutes()} minutes</Button></div>
         </div>
         <div className="landing-hero-loop"><LoopGraphic surface="forest" compact /></div>
@@ -58,7 +58,7 @@ export function LandingScreen() {
 
     <section className="landing-section" aria-labelledby="accreditors-title">
       <h2 id="accreditors-title">Each step answers what reviewers already look for</h2>
-      <p className="landing-lead">Accreditors and quality codes already ask for stakeholder evidence, documented decisions and programme review, and constructive alignment is the teaching principle behind Teach; the evidence is what is missing. The names are plain so the loop reads the same in Kuala Lumpur, Amsterdam, Jakarta or Boston.</p>
+      <p className="landing-lead">Accreditors and quality codes already ask for stakeholder evidence, documented decisions and programme review, and constructive alignment is the teaching principle behind Teach; the evidence is what is missing.</p>
       <ol className="accreditor-list">{ACCREDITOR_MAPPING.map((m) => <li key={m.step}>
         <div className="accreditor-step"><strong>{m.step}</strong><span className="muted">{m.what}</span></div>
         <div className="accreditor-clauses">{m.clauses.map((c) => <blockquote key={c.body} className="accreditor-clause">

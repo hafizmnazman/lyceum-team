@@ -117,7 +117,7 @@ export interface LoopState {
   summary: string; // literal and scoped; never "approved", "ready" or "good"
 }
 
-const plural = (n: number, one: string, many: string) => n + " " + (n === 1 ? one : many);
+export const plural = (n: number, one: string, many: string) => n + " " + (n === 1 ? one : many);
 
 export function loopState(state: AppState, subjectId: string): LoopState {
   const window = termWindow(state, subjectId);

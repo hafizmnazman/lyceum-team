@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { subjectsForPerson } from "../../app/roles.ts";
-import { loopState, stepDef } from "../../app/loop.ts";
+import { loopState, plural, stepDef } from "../../app/loop.ts";
 import { planSummary } from "../../lib/teachingPlan.ts";
 import { RECOMMENDATION_LABEL } from "../../lib/evidence.ts";
 import { downloadText } from "../../lib/download.ts";
@@ -84,19 +84,11 @@ export function InboxScreen() {
 
   return (
     <Page wide>
-      <PageHead
-        title={`Good day, ${person.name.split(" ").slice(-1)[0]}`}
-        context={
-          unread.length === 0
-            ? "Your teaching preparation and review work, in one place."
-            : `${unread.length} unread notification${unread.length === 1 ? "" : "s"}. Your course work is below.`
-        }
-        actions={<Button onClick={() => navigate("guide")}>Guide & progress</Button>}
-      />
+      <PageHead title={`Good day, ${person.name.split(" ").slice(-1)[0]}`} />
 
       {brief ? <section className="workspace-panel" data-demo-id="inbox-brief" aria-labelledby="inbox-brief-title">
         <div className="section-heading"><div><h2 id="inbox-brief-title">Evidence brief: {brief.subjectId}</h2>
-          <p className="muted">{RECOMMENDATION_LABEL[brief.recommendation]} · prepared {brief.createdAt} by {state.people.find((p) => p.id === brief.createdBy)?.name ?? brief.createdBy}. Receipts are attached; the decision remains with people.</p></div>
+          <p className="muted">{RECOMMENDATION_LABEL[brief.recommendation]} · prepared {brief.createdAt.slice(0, 16).replace("T", " ")} by {state.people.find((p) => p.id === brief.createdBy)?.name ?? brief.createdBy}</p></div>
           <div className="button-row"><Button onClick={() => downloadText(brief.subjectId + "-meeting-brief.md", brief.markdown)}>Download (.md)</Button><Button onClick={() => openStep(brief.subjectId, "decide")}>Open Decide</Button><Button onClick={() => selectBrief(null)}>Close</Button></div></div>
         {brief.notes ? <p className="preserve-lines">{brief.notes}</p> : null}
         <details><summary>Read the full brief with its receipts</summary><pre className="brief-body">{brief.markdown}</pre></details>
@@ -116,7 +108,7 @@ export function InboxScreen() {
       <section className="home-queues" aria-label="Your work">
         <Disclosure summary="Briefs waiting for a decision" count={waiting.length + (waiting.length === 1 ? " brief" : " briefs")} defaultOpen={waiting.length > 0} data-demo-id="home-briefs">
           {waiting.length ? <ul className="work-list">{waiting.map((b) => <li key={b.id}><div><strong>{b.subjectId}</strong><span>{b.recipients.includes(person.id) ? "From " + (state.people.find((p) => p.id === b.createdBy)?.name ?? b.createdBy) + ": " + RECOMMENDATION_LABEL[b.recommendation] : "Your brief: waiting for a second person's decision"}</span></div><Button aria-label={"Open the brief for " + b.subjectId} data-demo-id={"waiting-" + b.id} onClick={() => { if (b.recipients.includes(person.id)) selectBrief(b.id); else openStep(b.subjectId, "decide"); }}>Open</Button></li>)}</ul>
-            : <p>No brief is waiting for you. Briefs a colleague sends you, and your own briefs waiting for a second person, appear here.</p>}
+            : <p className="muted">No brief is waiting for you.</p>}
           {legacy.length ? <><h3>Illustrative sandbox</h3><ul className="work-list">{legacy.map((p) => <li key={p.id}><div><strong>{p.subjectId}</strong><span>Proposal awaits the sandbox approval</span></div><Button aria-label={"Open proposal for " + p.subjectId} onClick={() => { selectProposal(p.id); navigate("approval"); }}>Open</Button></li>)}</ul></> : null}
         </Disclosure>
 
@@ -136,7 +128,7 @@ export function InboxScreen() {
               </div>
             </Card>
           ) : (
-            <p className="muted">No unread notifications. Briefs, decisions on your briefs and sandbox results appear here when someone completes a step.</p>
+            <p className="muted">No unread notifications.</p>
           )}
           {rest.length > 0 ? (
             <div style={{ marginTop: 16 }}>
@@ -158,7 +150,7 @@ export function InboxScreen() {
           <div className="course-grid">{ownCourses.map((course) => {
             const summary = planSummary(state.teachingPlans.find((p) => p.subjectId === course.id), state.clos.filter((c) => c.subjectId === course.id));
             const loop = loopState(state, course.id);
-            return <article className="workspace-panel" key={course.id}><span className="eyebrow">{course.id} · Year {course.year}, semester {course.semester}</span><h3>{course.title}</h3><p className="muted">{loop.summary}</p><p className="muted">{summary.sessions.length} teaching sessions · {summary.ready} ready · {summary.delivered} delivered</p><Button onClick={() => openStep(course.id, loop.next ?? "course")}>Open {course.id}</Button></article>;
+            return <article className="workspace-panel" key={course.id}><span className="eyebrow">{course.id} · Year {course.year}, semester {course.semester}</span><h3>{course.title}</h3><p className="muted">{loop.summary}</p><p className="muted">{plural(summary.sessions.length, "teaching session", "teaching sessions")} · {summary.ready} ready · {summary.delivered} delivered</p><Button onClick={() => openStep(course.id, loop.next ?? "course")}>Open {course.id}</Button></article>;
           })}</div>
           <Button variant="quiet" onClick={() => navigate("courses")}>Browse courses <ArrowRight size={15} /></Button>
         </Disclosure> : null}
@@ -175,7 +167,7 @@ export function InboxScreen() {
     if (n.kind === "test-done") return "From the Cohort agent.";
     if ((n.kind === "evidence-brief" || n.kind === "brief-decision") && n.briefId) {
       const author = state.evidenceBriefs.find((b) => b.id === n.briefId)?.createdBy;
-      return n.kind === "brief-decision" ? "On your brief, recorded as data." : author ? "From " + (state.people.find((p) => p.id === author)?.name ?? author) + ", with receipts." : null;
+      return n.kind === "brief-decision" ? null : author ? "From " + (state.people.find((p) => p.id === author)?.name ?? author) + "." : null;
     }
     return null;
   }

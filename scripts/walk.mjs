@@ -6,7 +6,8 @@
 //
 // Uses the system Chrome/Edge via puppeteer-core (no Chromium download).
 
-import { existsSync, mkdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
@@ -151,6 +152,10 @@ try {
   await browser.close();
   server.close();
 }
+
+// The repository tracks only some of these captures (docs/decisions.md, A4); the rest this run wrote are deleted.
+const tracked = new Set(spawnSync("git", ["ls-files", "docs/screenshots"], { encoding: "utf8" }).stdout.split("\n").filter(Boolean));
+if (tracked.size) for (const f of readdirSync("docs/screenshots")) if (!tracked.has("docs/screenshots/" + f)) unlinkSync(join("docs/screenshots", f));
 
 console.log(failed === 0 ? "\nWALK OK" : `\n${failed} checks failed`);
 process.exit(failed === 0 ? 0 : 1);

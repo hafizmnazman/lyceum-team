@@ -9,7 +9,7 @@ import { runScanBenchmark, workspaceChecks } from "../../lib/benchmark.ts";
 import { BENCHMARK_LEXICON } from "../../data/scanBenchmark.ts";
 import { parseWorkspaceBackup } from "../../lib/workspaceBackup.ts";
 import { exportWorkspaceBackup, navigate, useStore } from "../../app/store.ts";
-import { Button, Page, PageHead, Tag } from "../primitives/index.tsx";
+import { Button, Disclosure, Page, PageHead, Tag } from "../primitives/index.tsx";
 import { BarList } from "../primitives/ShareBar.tsx";
 
 
@@ -47,18 +47,22 @@ export function EvaluationScreen() {
 
     <section className="workspace-panel" aria-labelledby="suites">
       <div className="section-heading"><div><h2 id="suites">Automated checks on the current code</h2><p className="muted">{total} checks across {SUITES.length} suites, plus four headless browser runs, one of them the full self-driving tour. Last run 22 October 2026. Reproduce with <code>npm run prove:all</code> and the smoke scripts.</p></div></div>
-      <div className="table-scroll"><table className="evidence-table"><thead><tr><th scope="col">Suite</th><th scope="col">Checks</th><th scope="col">Covers</th></tr></thead>
-        <tbody>{SUITES.map(([name, n, covers]) => <tr key={name}><th scope="row">{name}</th><td className="num">{n}</td><td>{covers}</td></tr>)}</tbody></table></div>
+      <Disclosure summary={"The " + SUITES.length + " suites and what each covers"}>
+        <div className="table-scroll"><table className="evidence-table"><thead><tr><th scope="col">Suite</th><th scope="col">Checks</th><th scope="col">Covers</th></tr></thead>
+          <tbody>{SUITES.map(([name, n, covers]) => <tr key={name}><th scope="row">{name}</th><td className="num">{n}</td><td>{covers}</td></tr>)}</tbody></table></div>
+      </Disclosure>
     </section>
 
     <section className="workspace-panel" aria-labelledby="student-bench">
-      <div className="section-heading"><div><h2 id="student-bench">Student-agent benchmark: the protocol</h2><p className="muted">The earlier Cohort agent simulates learners to estimate the effect of a course change. Its numbers are not evidence until they are benchmarked against real outcomes. This is how we will do it.</p></div></div>
+      <div className="section-heading"><div><h2 id="student-bench">Student-agent benchmark: the protocol</h2><p className="muted">The earlier Cohort agent simulates learners to estimate the effect of a course change. Its numbers are not evidence until they are benchmarked against real outcomes.</p></div></div>
+      <Disclosure summary="The protocol, in four parts">
       <ol className="protocol">
         <li><strong>Ground truth.</strong> One course, one term: per-outcome attainment from the filed results (earned marks over available marks per CLO, with the allocation rules stated) and the CLO self-rating survey, kept separate from marks.</li>
         <li><strong>Prediction before the term.</strong> The simulation's predicted mastery per CLO is frozen with the course version, cohort, term and model version, before results exist. Upload time is never teaching time.</li>
         <li><strong>Scoring.</strong> Mean absolute error and calibration of predicted against actual attainment per CLO; correlation with the survey; a naive baseline (last term's attainment) that the model must beat.</li>
         <li><strong>Transparency.</strong> Sample sizes, missingness and subgroup results reported; a learning-impact claim is made only after a held-out term, not from a fit.</li>
       </ol>
+      </Disclosure>
       <div className="stat-grid">
         <div className="stat-tile"><span className="stat-value">0.009</span><span className="stat-label">mean absolute error of the simulation on its synthetic backtest. Synthetic data; not evidence of real accuracy.</span><Tag tone="warn">Synthetic</Tag></div>
         <div className="stat-tile"><span className="stat-value">0</span><span className="stat-label">real terms benchmarked so far. The protocol needs one course and one term of results.</span><Tag tone="warn">Not yet run</Tag></div>

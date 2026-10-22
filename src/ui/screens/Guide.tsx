@@ -17,17 +17,14 @@ export function GuideScreen() {
     [guide.title, guide.purpose, guide.output, guide.limitation, ...guide.steps].join(" ").toLowerCase().includes(query.toLowerCase().trim()));
   return (
     <Page>
-      <PageHead title="Guide & development progress" context="What each section does, how to use it, and where the prototype still needs work." actions={<Button data-demo-id="guide-play-demo" onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={15} /> Play the demo tour</Button>} />
+      <PageHead title="Guide & development progress" context="How to use each section, and where the prototype still needs work." actions={<Button data-demo-id="guide-play-demo" onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={15} /> Play the demo tour</Button>} />
       <section className="workspace-panel" aria-labelledby="start-guide">
         <h2 id="start-guide">A lecturer's working session</h2>
         <ol className="journey-list">
-          <li><strong>Open or create a course.</strong> Use Courses to start a personal workspace or open an assigned course.</li>
-          <li><strong>Build the outline.</strong> In Outcomes & topics, record CLOs, achievement evidence, topic mappings, time budgets and prerequisites.</li>
-          <li><strong>Review a revision.</strong> Save, check constraints, compare the changes and record the teaching term and rationale. You decide whether to use the local version; university approval follows your existing process.</li>
-          <li><strong>Prepare a class.</strong> Save a CLO-linked session with an activity, learning check and references. Changed outcomes flag affected work for review.</li>
-          <li><strong>Take your work with you.</strong> Export the outline or teaching plan as Markdown; download a JSON workspace backup for later restore.</li>
+          <li><strong>Open a course.</strong> From Courses, open an assigned course or create a personal workspace, then set the term the loop runs for.</li>
+          <li><strong>Follow the path.</strong> Watch, Report, Decide, Update, Teach and Learn run across the top of every step. Each step asks its question and hands you to the next once its record exists.</li>
+          <li><strong>Save as you go.</strong> Each editor has its own Save. Work stays in this browser; a JSON backup moves it, without the original uploaded files or unsaved edits. Syncing across devices is planned.</li>
         </ol>
-        <p className="muted">Use Save in each editor. Work is stored in this browser; JSON backups preserve saved data and versions, but exclude original uploaded files and unsaved edits. Slide generation and cross-device syncing remain planned.</p>
       </section>
       <WorkspaceBackupPanel />
       <div className="section-heading"><h2>Section-by-section guide</h2></div>

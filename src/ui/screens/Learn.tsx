@@ -47,19 +47,19 @@ export function LearnScreen() {
   const mayFile = can(person, "upload-results", { subjectId: subject.id, assignments: state.assignments });
   const taught = taughtVersionId(state, subject.id);
   return <StepFrame state={state} step="learn" subject={subject} subjects={subjects}
-    helper={{ who: "lens", line: "Shows what came back for each outcome, with n of N, as filed. It claims no learning gain." }}>
+    helper={{ who: "lens", line: "Shows what came back for each outcome, with n of N, as filed." }}>
     <p className="limitation" data-demo-id="learn-claim">{LEARN_CLAIM}</p>
 
     <section className="workspace-panel" aria-labelledby="learn-attainment" data-demo-id="learn-attainment">
       <div className="section-heading"><div><h2 id="learn-attainment">What came back, per outcome</h2>
-        <p className="muted">Descriptive figures from the results file as filed: the mean mark on a 0 to 100 scale, its spread, and n of N, where N is the most students the file records for any one outcome. No interval, no pooling and no comparison with perception yet.</p></div></div>
+        <p className="muted">As filed: the mean mark out of 100, its spread, and n of N, where N is the most students the file records for any one outcome. No intervals, pooling or perception yet.</p></div></div>
       {latest ? <AttainmentCard state={state} subject={subject} upload={latest} clos={clos} />
         : <div className="empty-panel"><Mascot who="lens" mood="resting" size={56} /><div><h3>No results filed for {subject.id} yet</h3><p className="muted">File this term's results below. They are matched to the course version taught{taught ? ", " + taught + "," : ""} when you confirm them.</p></div></div>}
     </section>
 
     <section className="workspace-panel" aria-labelledby="learn-file" id="learn-file-section">
       <div className="section-heading"><div><h2 id="learn-file">File results or a survey</h2>
-        <p className="muted">The file is read, you see what was read beside what it was taken to mean, and nothing files until you confirm it. Results are matched to the course version taught{taught ? " (" + taught + " unless you choose another)" : ""}.</p></div></div>
+        <p className="muted">You see what was read and what it was taken to mean, and nothing is filed until you confirm. Results are matched to the version taught{taught ? ", " + taught + ", unless you choose another" : ""}.</p></div></div>
       {mayFile ? <IntakePanel samples={[["results.xlsx", "sample-results"], ["clo-survey.csv", "sample-survey"]]} prompt="Drop the term's results or a CLO survey export." />
         : <p className="muted">Only an assigned lecturer or coordinator can file results for this course.</p>}
     </section>
@@ -81,7 +81,7 @@ export function LearnScreen() {
 
     <section className="workspace-panel" aria-labelledby="learn-planned">
       <div className="section-heading"><h2 id="learn-planned">Planned for the pilot</h2><Tag tone="warn">Planned</Tag></div>
-      <ul className="planned-list">{PLANNED.map(([title, text]) => <li key={title}><Tag tone="warn">Planned</Tag><span><strong>{title}:</strong> {text}</span></li>)}</ul>
+      <ul className="planned-list">{PLANNED.map(([title, text]) => <li key={title}><strong>{title}:</strong> {text}</li>)}</ul>
       <Disclosure summary="The student-agent benchmark: the protocol and its status" data-demo-id="learn-protocol">
         <p><strong>Status: written, not run.</strong> Real terms benchmarked so far: 0. The protocol needs one course and one term of results.</p>
         <ol className="protocol">

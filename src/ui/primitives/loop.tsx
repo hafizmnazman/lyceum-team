@@ -53,13 +53,12 @@ export function Ring({ loop, size = 132, compact = false, leaf }: { loop: LoopSt
   );
 }
 
-/** The ring with its words: each step, done or next, and the literal summary line. */
+/** The ring with its words: each step, done or next, with its count, the ring's text equivalent. */
 export function RingPanel({ loop, onStep, size = 132 }: { loop: LoopState; onStep?: (step: CourseStep) => void; size?: number }) {
   return (
     <div className="ring-panel">
       <Ring loop={loop} size={size} />
       <div className="ring-legend">
-        <p className="ring-summary" data-demo-id="ring-summary">{loop.summary}</p>
         <ol className="ring-steps">
           {RING_STEPS.map((id) => {
             const st = loop.steps.find((s) => s.id === id)!, def = stepDef(id), isNext = loop.next === id;

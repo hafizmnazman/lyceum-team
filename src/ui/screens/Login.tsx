@@ -14,16 +14,16 @@ export function LoginScreen() {
 
   // One line per person: what they can do in the loop (plan Section 4.2), worked out from today's hats.
   function scopeLine(person: Person): string {
-    if (person.orgRole === "management") return "Management: appears only in the illustrative approval sandbox; no part in the loop";
-    if (person.orgRole === "department") return "Programme owner: decides on the briefs for every course in the programme, and assigns positions";
+    if (person.orgRole === "management") return "Management. Appears only in the illustrative approval sandbox.";
+    if (person.orgRole === "department") return "Programme owner. Decides on every course's brief and assigns positions.";
     const subjects = subjectsForPerson(person.id, state.assignments);
     const coordinating = subjects.filter((sid) => hatsOn(person.id, sid, state.assignments).includes("coordinator"));
     const lecturing = subjects.filter((sid) => !coordinating.includes(sid));
     const parts = [];
-    if (coordinating.length) parts.push("Coordinator of " + coordinating.join(" and ") + ": runs the loop, decides and adopts; a decision on their own brief is self-recorded");
-    if (lecturing.length) parts.push("Lecturer on " + lecturing.join(" and ") + ": watches, reports, briefs and teaches, but does not decide or adopt");
-    if (!person.verified) parts.push("unverified, so edits are flagged");
-    return parts.join("; ");
+    if (coordinating.length) parts.push("Coordinator of " + coordinating.join(" and ") + ". Runs the whole loop and decides.");
+    if (lecturing.length) parts.push("Lecturer on " + lecturing.join(" and ") + ". Prepares and teaches; others decide.");
+    if (!person.verified) parts.push("Unverified, so edits are flagged.");
+    return parts.join(" ");
   }
 
   return (
@@ -35,9 +35,8 @@ export function LoginScreen() {
           <h1 id="signin-title" className="wordmark">Lyceum</h1>
           <p className="signin-tagline">Course decisions, with receipts.</p>
           <p className="signin-lead">
-            Gather what employers ask for, confirm every requirement as an exact
-            quotation, see honest counts, decide what the course should do about
-            it, and take a brief to the meeting. Nothing runs by itself.
+            Lyceum turns real job postings into a course decision with receipts,
+            every semester. Nothing runs by itself.
           </p>
           <div>
             <Button variant="ghost" data-demo-id="view-index" onClick={() => navigate("index")}>
@@ -73,7 +72,7 @@ export function LoginScreen() {
               </button>
             ))}
           </div>
-          <p className="muted">One faculty, five local personas. Lecturers: choose Dr Sobri or Ms Tan for the full course workflow.</p>
+          <p className="muted">Five local personas, no passwords. Start with Dr Sobri for the whole loop.</p>
         </section>
       </div>
     </div>
