@@ -253,7 +253,7 @@ export function Shell(props: { children: ReactNode }) {
         <main ref={mainRef} id="main-content" tabIndex={-1} className="app-main" data-demo-id="main-scroll">
           {NOTICE_SCREENS.includes(state.screen) ? <PrototypeNotice /> : null}
           {state.persistenceStatus === "unavailable" ? <div role="alert" className="storage-warning">Browser storage is unavailable. Changes only last while this page is open. Export your teaching plan before closing.</div> : null}
-          <SectionHelp screen={state.screen} />
+          <SectionHelp screen={state.screen} label={state.screen === "studio" && step ? stepDef(step).label : state.screen === "office" ? "this page" : undefined} />
           {props.children}
         </main>
       </div>
