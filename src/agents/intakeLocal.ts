@@ -49,6 +49,23 @@ function normaliseScore(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
+/** The outcome a column headed "CLO3" belongs to. Outcome ids are global (CLO1 is CS101's), so once the course is known
+ *  its own outcome labelled CLO3 decides, and a column matching none of its outcomes is not read (depth plan Section 8.2);
+ *  without a course, the id as before. */
+function cloForHeader(header: string, subject: Subject | undefined, clos: CLO[]): string | null {
+  const m = header.match(/clo\s*[- ]?(\d+)/i);
+  if (!m) return null;
+  const label = `CLO${m[1]}`;
+  const pool = subject ? clos.filter((c) => c.subjectId === subject.id) : clos;
+  const own = subject ? pool.find((c) => (c.label ?? c.id).toUpperCase() === label) : pool.find((c) => c.id === label);
+  if (own) return own.id;
+  // A subject-scoped id written into the header, like "CS900-CLO1".
+  return pool.find((c) => header.toUpperCase().includes(c.id.toUpperCase()))?.id ?? null;
+}
+
+/** A row that summarises the class rather than listing a student. */
+const SUMMARY_ROW = /^\s*(average|mean|total|class average|std|sd|max|min|median)\b/i;
+
 export function interpretLocally(
   doc: ParsedDoc,
   subjects: Subject[],
@@ -83,16 +100,10 @@ export function interpretLocally(
     const headers = headerRow.map((h) => h.trim().toLowerCase());
     const cloCols: Array<{ col: number; cloId: string }> = [];
     for (let c = 0; c < headers.length; c += 1) {
-      const m = headers[c].match(/clo\s*[- ]?(\d+)/i);
-      if (m) {
-        const cloId = `CLO${m[1]}`;
-        if (clos.some((x) => x.id === cloId)) cloCols.push({ col: c, cloId });
-        else {
-          // A subject-scoped CLO like "CS900-CLO1".
-          const scoped = clos.find((x) => headers[c].toUpperCase().includes(x.id.toUpperCase()));
-          if (scoped) cloCols.push({ col: c, cloId: scoped.id });
-        }
-      }
+      if (!/clo\s*[- ]?\d+/i.test(headers[c]) || /^\s*clo\s*$/i.test(headers[c])) continue;
+      const cloId = cloForHeader(headers[c], subject, clos);
+      if (cloId) cloCols.push({ col: c, cloId });
+      else if (subject) notes.push(`Column "${headerRow[c]}" matches no outcome of ${subject.id}; it was not read.`);
     }
     if (cloCols.length === 0) continue;
 
@@ -156,10 +167,8 @@ export function interpretLocally(
       // Shape A: a "CLO" column plus mean/sd/n columns.
       const cloCol = headers.findIndex((h) => /clo/i.test(h));
       for (const row of dataRows) {
-        const m = String(row[cloCol] ?? "").match(/clo\s*[- ]?(\d+)/i);
-        if (!m) continue;
-        const cloId = `CLO${m[1]}`;
-        if (!clos.some((x) => x.id === cloId)) continue;
+        const cloId = cloForHeader(String(row[cloCol] ?? ""), subject, clos);
+        if (!cloId) continue;
         const mean = toNumber(row[meanCol] ?? "");
         if (mean === null) continue;
         rows.push({
@@ -171,19 +180,27 @@ export function interpretLocally(
       }
       if (rows.length > 0) notes.push(`Read one row per CLO; column "${headerRow[meanCol]}" as the mean.`);
     } else {
-      // Shape B: CLO columns; average the data rows per column.
+      // Shape B: one row per student, CLO columns. The listed students are N; per outcome, the valid marks out of 100 are
+      // kept sorted with no identifier, and a blank or a word such as ABS counts in N and is excluded from n (Section 8.1).
+      const idCol = headers.findIndex((h) => h.includes("student") || h === "id" || h.includes("matric"));
+      const listed = dataRows.filter((r) => !SUMMARY_ROW.test(String(r[0] ?? "")) &&
+        (idCol >= 0 ? String(r[idCol] ?? "").trim() !== "" : cloCols.some((cc) => String(r[cc.col] ?? "").trim() !== "")));
       for (const cc of cloCols) {
-        const values = dataRows
-          .map((r) => toNumber(r[cc.col] ?? ""))
+        const values = listed
+          .map((r) => toNumber(String(r[cc.col] ?? "").trim() === "" ? "x" : r[cc.col]))
           .filter((n): n is number => n !== null)
           .map(normaliseScore);
         if (values.length === 0) continue;
         const mean = values.reduce((a, b) => a + b, 0) / values.length;
         const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length);
-        rows.push({ cloId: cc.cloId, meanScore: mean, sd, n: values.length });
+        const marks = values.map((v) => Math.round(v * 10000) / 100).sort((a, b) => a - b);
+        rows.push({ cloId: cc.cloId, meanScore: mean, sd, n: values.length, marks, missing: listed.length - values.length });
       }
-      if (rows.length > 0)
-        notes.push(`Averaged ${dataRows.length} data rows per CLO column into means.`);
+      if (rows.length > 0) {
+        notes.push(`Read ${listed.length} listed students; kept each outcome's marks sorted, without an identifier.`);
+        const short = rows.filter((r) => r.missing);
+        if (short.length) notes.push("Without a mark: " + short.map((r) => `${r.missing} on ${clos.find((c) => c.id === r.cloId)?.label ?? r.cloId}`).join(", ") + "; counted in N, not in n.");
+      }
     }
 
     if (rows.length > 0) {

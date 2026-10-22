@@ -176,7 +176,7 @@ Visual: proof
 Chapter: What is real
 Hold: 1.0
 
-Host: By our own assessment the software sits at **TRL 6**, demonstrated on real postings from a real public board, a sample course outline and a lecturer persona. **185** automated checks pass. What is not built is shown in amber.
+Host: By our own assessment the software sits at **TRL 6**, demonstrated on real postings from a real public board, a sample course outline and a lecturer persona. **259** automated checks pass. What is not built is shown in amber.
 Lecturer: And the next step?
 Host: One department, one term, inside its LMS.
 

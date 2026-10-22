@@ -23,6 +23,9 @@ import { OfficeScreen } from "./Office.tsx";
 import { IndexScreen } from "./Index.tsx";
 import { GuideScreen } from "./Guide.tsx";
 import { EvaluationScreen } from "./Evaluation.tsx";
+import { JudgeScreen } from "./Judge.tsx";
+import { KioskScreen } from "./Kiosk.tsx";
+import { RecapScreen } from "./Recap.tsx";
 
 export const SCREENS: Record<Screen, ComponentType> = {
   login: LoginScreen,
@@ -47,4 +50,7 @@ export const SCREENS: Record<Screen, ComponentType> = {
   dataroom: DataRoomScreen,
   office: OfficeScreen,
   evaluation: EvaluationScreen,
+  judge: JudgeScreen,
+  kiosk: KioskScreen,
+  recap: RecapScreen,
 };

@@ -31,6 +31,7 @@ History keeps the versions and the decisions on one timeline.
 - Say when the workspace was exported. Every tool reply starts with that time; if the user may have worked since, ask them to export again.
 - Keep the labels: real, prototype, illustrative, planned. Synthetic data is synthetic. Anything from the illustrative sandbox (forecasts, the mock cohort, the relevance index) is illustrative and is never evidence.
 - No learning gain is claimed; the benchmark has not been run. Do not infer one from the Learn figures.
+- Quote attainment with its pass mark, its n of N and the KPI, and keep the survey's share beside the marks' share: they are different measures and are never averaged. A seeded example is never counted, and a report not saved says so.
 
 ## What you must not do
 
@@ -44,6 +45,8 @@ The door is read-only. Confirming a quotation, marking postings reviewed, record
 | `lyceum_sources` | The user asks where the evidence came from, or for the postings behind a claim | Each kept source with its link, dates, review state and fingerprint; `reviewedOnly` gives the denominator |
 | `lyceum_evidence_report` | The user asks what employers ask for, how often, or what the course does about it | The counts with denominators and intervals, coverage against targets, and every quotation with its source |
 | `lyceum_course_outline` | The user asks what the course teaches today | The current version's outcomes, topics, hours and reason |
+| `lyceum_course_record` | The user asks for the course file, its matrix, its assessment plan, or what the course file holds and lacks | The course information in the course file's order and the manifest marking each item present, sample, not yet built or not included |
+| `lyceum_attainment` | The user asks how students did on an outcome, whether a KPI was met, or for the OBE report | Per outcome, the students at or above the pass mark over n with N, the KPI and an interval only below N, the survey's share beside it, the PLO listing and the CQI note; say whether the report was saved |
 | `lyceum_brief_draft` | The user wants a brief for a meeting | A draft brief with the evidence and a recommendation; the user prepares and sends the real one in the workspace |
 | `lyceum_teaching_pack` | The user wants the slides for a saved session | Writes the editable PPTX to a new absolute path the user names; it never overwrites a file |
 

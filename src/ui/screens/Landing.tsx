@@ -5,7 +5,7 @@
 // docs/claims.md; no synthetic figure appears, and the illustrative research
 // sandbox stays behind sign-in, labelled there.
 
-import { ArrowRight, BookOpen, CheckCircle2, GraduationCap, Globe, MessagesSquare, Monitor, Play, Plug, Puzzle, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, Footprints, GraduationCap, Globe, MessagesSquare, Monitor, Play, Plug, Puzzle, ShieldCheck, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ACCREDITOR_MAPPING } from "../../data/accreditors.ts";
 import { PAIN_STATS } from "../../data/painStats.ts";
@@ -14,6 +14,7 @@ import { tourMinutes } from "../../demo/script.ts";
 import { navigate } from "../../app/store.ts";
 import { Button, Tag } from "../primitives/index.tsx";
 import { Mark } from "../mascots/mark.tsx";
+import { HOST_NAME } from "../mascots/index.tsx";
 import { LoopGraphic } from "./LoopGraphic.tsx";
 
 /** The doors (plan Section 11.2): where a lecturer reaches the same core. The web workspace is built; the MCP
@@ -31,14 +32,15 @@ export const DOORS: Array<{ name: string; how: string; icon: LucideIcon; status:
 export function LandingScreen() {
   return <div className="landing dot-grid">
     <header className="landing-bar on-forest"><span className="wordmark"><Mark size={32} tone="white" leaf />Lyceum</span>
-      <div className="button-row"><Button variant="ghost" onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={14} /> Watch the tour</Button><Button variant="lime" data-demo-id="index-signin" onClick={() => navigate("login")}>Try it as a lecturer <ArrowRight size={15} /></Button></div></header>
+      <div className="button-row"><Button variant="ghost" data-demo-id="index-judge" onClick={() => navigate("judge")}><Footprints size={14} /> For judges: walk with {HOST_NAME}</Button><Button variant="ghost" onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={14} /> Watch the tour</Button><Button variant="lime" data-demo-id="index-signin" onClick={() => navigate("login")}>Try it as a lecturer <ArrowRight size={15} /></Button></div></header>
     <section className="landing-hero">
       <div className="landing-hero-card card-forest on-forest">
         <div>
           <p className="eyebrow">A lecturer's course workspace</p>
           <h1>Course decisions, with receipts.</h1>
           <p className="landing-lead">Lyceum turns real job postings into a course decision with receipts, every semester. Watch what employers ask for, report it with every quotation, decide with a reason on record, update the course, teach it, and see what came back. Nothing changes a course without you.</p>
-          <div className="button-row"><Button variant="lime" onClick={() => navigate("login")}>Try it as a lecturer <ArrowRight size={15} /></Button><Button variant="ghost" onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={14} /> Watch the tour, about {tourMinutes()} minutes</Button></div>
+          <div className="button-row"><Button variant="lime" onClick={() => navigate("login")}>Try it as a lecturer <ArrowRight size={15} /></Button><Button variant="ghost" onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={14} /> Watch the tour, about {tourMinutes()} minutes</Button>
+            <Button variant="ghost" data-demo-id="index-judge-hero" onClick={() => navigate("judge")}><Footprints size={14} /> For judges: walk with {HOST_NAME}</Button></div>
         </div>
         <div className="landing-hero-loop"><LoopGraphic surface="forest" compact /></div>
       </div>
@@ -101,7 +103,7 @@ export function LandingScreen() {
     </section>
     <section className="landing-section landing-ways" aria-labelledby="ways-title">
       <h2 id="ways-title">Two ways in</h2>
-      <div className="button-row"><Button variant="primary" onClick={() => navigate("login")}>Try it as a lecturer <ArrowRight size={15} /></Button><Button onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={14} /> Watch the tour, about {tourMinutes()} minutes</Button></div>
+      <div className="button-row"><Button variant="primary" onClick={() => navigate("login")}>Try it as a lecturer <ArrowRight size={15} /></Button><Button onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={14} /> Watch the tour, about {tourMinutes()} minutes</Button><Button onClick={() => navigate("judge")}><Footprints size={14} /> For judges: walk with {HOST_NAME}</Button></div>
     </section>
     <footer className="landing-footer">Local prototype. Workspace storage is local to this browser; file parsing and live collection go through the local API. Built by Hafiz Azman. <Button variant="quiet" onClick={() => navigate("login")}>Sign in</Button></footer>
   </div>;

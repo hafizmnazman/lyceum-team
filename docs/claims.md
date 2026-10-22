@@ -22,7 +22,7 @@ The 39% is the average that the employers in the Forum's survey expect for 2025 
 
 | Claim | Figure | Shown as | Record | Key | Checked on |
 |:--|:--|:--|:--|:--|:--|
-| `proof-checks` | 185 | 185 automated checks passed on 22 October 2026, plus four headless browser runs | `npm run prove:all` (seventeen suites, listed with their counts in `src/data/suites.ts` and on the Evaluation page) and the four smokes, the verification table of 22 October in [as-built.md](as-built.md), section 5 | M | 22 October 2026 |
+| `proof-checks` | 259 | 259 automated checks passed on 23 October 2026, plus four headless browser runs | `npm run prove:all` (twenty-four suites, listed with their counts in `src/data/suites.ts` and on the Evaluation page) and the four smokes, the verification table of 22 October in [as-built.md](as-built.md), section 5 | M | 22 October 2026 |
 | `proof-live-board` | 727 | 727 real postings fetched live from one employer's public board on request, 9 October 2026 | The Stripe board on Greenhouse through the local API: [the 9 October as-built report](history/lyceum-v3-as-built-2026-10-09.md) and the execution record in [lyceum-improvement-plan.md](lyceum-improvement-plan.md), Section 30 | M | 9 October 2026 |
 | `proof-no-keys` | 0 | 0 AI keys needed; the core is deterministic, and file parsing and live collection use the local API | Every proof and smoke runs with no key set; the agents default to fixture mode (`src/agents/mode.ts`) | M | 22 October 2026 |
 | `tour-length` | about 7 minutes | Watch the tour, about 7 minutes | `tourMinutes()` in `src/demo/script.ts`, computed from the tour's own pacing: 393 seconds at full speed after A6 set the term at the Course step and on the results file (382 after the A4 rewrite); a live fetch can add a little | M | 22 October 2026 |
@@ -41,7 +41,7 @@ The relevant environment says a sample course outline, not a real syllabus: the 
 
 ## The film
 
-Package A7. The film shows the same four rows as the deck, and only those: `deck-receipt` (1 of 9, counting up beside the receipt in both cuts), `world-skills-and-approval` (12 to 18 months and 39%, Afternoon's second scene), `deck-trl` (TRL 6) and `proof-checks` (185, counting up), both in Afternoon's proof scene. `video/remotion/scripts/sync.mjs` reads them from this file, checks the receipt's sentence, posting and denominator against `mcp/sample-workspace.json`, and fails on any digit in a caption that these rows do not hold. The app footage shows the app's own numbers from the dated saved sample, and its chip says "saved sample".
+Package A7. The film shows the same four rows as the deck, and only those: `deck-receipt` (1 of 9, counting up beside the receipt in both cuts), `world-skills-and-approval` (12 to 18 months and 39%, Afternoon's second scene), `deck-trl` (TRL 6) and `proof-checks` (the check total, counting up), both in Afternoon's proof scene. `video/remotion/scripts/sync.mjs` reads them from this file, checks the receipt's sentence, posting and denominator against `mcp/sample-workspace.json`, and fails on any digit in a caption that these rows do not hold. The app footage shows the app's own numbers from the dated saved sample, and its chip says "saved sample".
 
 ## The landing page: clauses quoted beside the loop
 
@@ -62,15 +62,15 @@ Each quotation is word for word from the note named, which quotes the document a
 
 | Claim | Landing page | Deck | Brief | Poster | Film | README | Checked by |
 |:--|:--|:--|:--|:--|:--|:--|:--|
-| `world-skills-and-approval` | yes | slide 2 | page 1 | yes | Afternoon, beat 2 | yes | `src/prove-journey.ts` (landing), `scripts/gen-deck.mjs` (slides and the PDF read back), `scripts/gen-brief-pdf.mjs`, `scripts/gen-poster.mjs`, `video/remotion/scripts/sync.mjs` (captions and the counting graphics) |
+| `world-skills-and-approval` | yes | slide 3 | page 1 | yes | Afternoon, beat 2 | yes | `src/prove-journey.ts` (landing), `scripts/gen-deck.mjs` (slides and the PDF read back), `scripts/gen-brief-pdf.mjs`, `scripts/gen-poster.mjs`, `video/remotion/scripts/sync.mjs` (captions and the counting graphics) |
 | `asia-talent-shortage` | yes | no | page 1 | no | no | no | `src/prove-journey.ts`, `scripts/gen-brief-pdf.mjs` |
 | `malaysia-underemployment` | yes | no | page 1 | no | no | no | `src/prove-journey.ts`, `scripts/gen-brief-pdf.mjs` |
-| `deck-receipt` | no | slide 1 | page 1 | yes | both cuts, beat 3 | no | `scripts/gen-deck.mjs` and `video/remotion/scripts/sync.mjs` check the sentence, its posting and the denominator against `mcp/sample-workspace.json` |
+| `deck-receipt` | no | slide 1 | page 1 | yes | both cuts, beat 3 | no | `scripts/gen-deck.mjs` and `video/remotion/scripts/sync.mjs` check the sentence, its posting and the denominator against `mcp/sample-workspace.json`; `scripts/gen-poster.mjs` checks the figure against this row |
 | `deck-trl` | no | slide 8 | page 2 | yes | Afternoon, beat 6 | no | `scripts/gen-deck.mjs`, `scripts/gen-brief-pdf.mjs`, `scripts/gen-poster.mjs`, `video/remotion/scripts/sync.mjs` |
 | `proof-checks` | yes | slide 8 | page 2 | yes | Afternoon, beat 6 | yes | `src/prove-journey.ts` (the figure equals the suites' total), the generators above |
-| `proof-live-board` | yes | no | no | no | no | no | `src/prove-journey.ts` |
-| `proof-no-keys` | yes | no | no | no | no | no | `src/prove-journey.ts` |
-| `proof-no-paraphrase` | yes | no | no | no | no | no | `src/prove-journey.ts` |
+| `proof-live-board` | yes | no | no | yes | no | no | `src/prove-journey.ts`, `scripts/gen-poster.mjs` |
+| `proof-no-keys` | yes | no | no | yes | no | no | `src/prove-journey.ts`, `scripts/gen-poster.mjs` |
+| `proof-no-paraphrase` | yes | no | no | yes | no | no | `src/prove-journey.ts`, `scripts/gen-poster.mjs` |
 | `tour-length` | yes | no | no | no | no | yes | `src/prove-journey.ts` (the figure equals `tourMinutes()`) |
 
-A digit on the deck, the brief or the poster that is not one of these figures sits in an element marked as a reference (a date, an id, a clause), and the generators fail on any other. The film's sync fails on any digit in a caption that the four film rows do not hold. Screenshots show the app's own numbers from the dated saved sample, labelled as the sample; they are records, not claims.
+A digit on the deck, the brief or the poster that is not one of these figures sits in an element marked as a reference (a date, an id, a clause, a product's name, the numbers of NASA's readiness scale), and the generators fail on any other. The film's sync fails on any digit in a caption that the four film rows do not hold. Screenshots show the app's own numbers from the dated saved sample, labelled as the sample; they are records, not claims.

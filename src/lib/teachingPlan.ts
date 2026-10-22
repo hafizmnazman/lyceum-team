@@ -1,4 +1,4 @@
-import type { CLO, Subject, TeachingPlan, TeachingSession } from "../types.ts";
+import type { CLO, CourseDefinition, Subject, TeachingPlan, TeachingSession } from "../types.ts";
 
 export type SessionInput = Omit<TeachingSession, "id" | "updatedAt" | "updatedBy"> & { id?: string };
 export type SaveResult = { ok: true } | { ok: false; error: string };
@@ -26,11 +26,15 @@ export function orderedSessions(plan?: TeachingPlan): TeachingSession[] {
   return [...(plan?.sessions ?? [])].sort((a, b) => a.week - b.week || a.id.localeCompare(b.id, undefined, { numeric: true }));
 }
 
+/** The lecturer's plan: the counts, the next class and the unlinked outcomes come from their own sessions. The term's sample
+ *  sessions (depth plan Section 5.1) are written for the prototype, so they are kept apart in `samples` and never counted. */
 export function planSummary(plan: TeachingPlan | undefined, clos: CLO[]) {
-  const sessions = orderedSessions(plan);
+  const all = orderedSessions(plan);
+  const sessions = all.filter((s) => !s.sample);
   const linked = new Set(sessions.flatMap((s) => s.cloIds));
   return {
     sessions,
+    samples: all.filter((s) => s.sample),
     minutes: sessions.reduce((sum, s) => sum + s.minutes, 0),
     ready: sessions.filter((s) => s.status === "ready" && !s.needsReview).length,
     needsReview: sessions.filter(s => s.needsReview).length,
@@ -66,7 +70,33 @@ export function teachingPlanMarkdown(subject: Subject, plan: TeachingPlan, clos:
   }
   lines.push("## Preparation check", "",
     summary.sessions.length + " sessions · " + summary.minutes + " planned minutes · " + summary.ready + " ready · " + summary.delivered + " delivered.",
+    ...(summary.samples.length ? [summary.samples.length + " sample sessions written for this prototype are not part of this plan; the course file carries them, labelled sample."] : []),
     "CLOs with no planned session: " + (summary.unmapped.map((c) => c.label ?? c.id).join(", ") || "None"), "",
     "Last saved: " + plan.updatedAt, "");
   return lines.join("\n");
+}
+
+/** The week a new session starts on: the first week that teaches an outcome the course's latest version changed (the session to
+ *  plan after a change), otherwise the week after the lecturer's own last session. Sample sessions are not the lecturer's. */
+export function suggestedWeek(sessions: TeachingSession[], current: CourseDefinition | null, previous: CourseDefinition | null): number {
+  const changed = current && previous ? changedOutcomeWeek(current, previous) : null;
+  if (changed !== null) return changed;
+  const own = sessions.filter((s) => !s.sample);
+  return Math.min(52, (own.length ? Math.max(...own.map((s) => s.week)) : 0) + 1);
+}
+
+/** The first week whose topic teaches an outcome that is new or reworded in `current`, or null when none is. */
+export function changedOutcomeWeek(current: CourseDefinition, previous: CourseDefinition): number | null {
+  const changed = new Set(current.outcomes.filter((o) => {
+    const before = previous.outcomes.find((p) => p.id === o.id);
+    return !before || before.text !== o.text || before.bloomLevel !== o.bloomLevel;
+  }).map((o) => o.id));
+  const weeks = current.topics.filter((t) => t.week !== null && t.cloIds.some((id) => changed.has(id))).map((t) => t.week!);
+  return weeks.length ? Math.min(...weeks) : null;
+}
+
+/** The session whose pack shows a change: the lecturer's own in that week first, otherwise the term's sample one. */
+export function sessionInWeek(sessions: TeachingSession[], week: number | null): TeachingSession | null {
+  if (week === null) return null;
+  return sessions.find((s) => s.week === week && !s.sample) ?? sessions.find((s) => s.week === week) ?? null;
 }

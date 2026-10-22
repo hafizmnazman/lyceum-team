@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { preview } from "vite";
 import puppeteer from "puppeteer-core";
+import { REMAINING_WORK } from "../src/app/sectionGuides.ts";
+import { PROOF } from "../src/data/proof.ts";
 
 const executablePath = [
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
@@ -53,6 +55,34 @@ try {
   assert.ok(await page.evaluate(() => document.body.innerText.includes("Not built yet")));
   await page.screenshot({ path: join(output, "landing.png"), fullPage: true });
   console.log("PASS public landing page: no synthetic figures, limits stated, no notice");
+
+  // The judge's page (depth plan Section 9.1), reached from the landing page signed out: one greeting, three ways in, the
+  // register's figures as written (the exact values for a screen reader at once, the shown ones once the count ends), and the
+  // not-built card word for word from the Guide's list, at 1440 and 320 px.
+  await click("index-judge");
+  await page.waitForSelector('[data-demo-id="judge-greeting"]');
+  const judge = await page.evaluate(() => ({
+    greeting: document.querySelector('[data-demo-id="judge-greeting"]').textContent,
+    buttons: ["judge-walk", "judge-compare", "judge-door"].map((id) => Boolean(document.querySelector(`[data-demo-id="${id}"]`))),
+    proof: [...document.querySelectorAll('[data-demo-id^="judge-proof-"] .stat-value > .sr-only')].map((e) => e.textContent),
+    remaining: [...document.querySelectorAll('[data-demo-id="judge-not-built"] dl > div')].map((d) => [d.querySelector("dt").textContent, d.querySelector("dd").textContent]),
+    notice: document.querySelectorAll('[aria-label="Prototype data limitations"]').length,
+  }));
+  assert.ok(judge.greeting.endsWith("Six steps, one course, one term. Walk with me, or watch."));
+  assert.deepEqual(judge.buttons, [true, true, true]);
+  assert.deepEqual(judge.proof, PROOF.map((p) => p.value));
+  await page.waitForFunction((values) => [...document.querySelectorAll('[data-demo-id^="judge-proof-"] .stat-value > [aria-hidden]')].map((e) => e.textContent).join("|") === values.join("|"),
+    { timeout: 5000 }, PROOF.map((p) => p.value));
+  assert.deepEqual(judge.remaining, REMAINING_WORK.map((r) => [r.title, r.detail]));
+  assert.equal(judge.notice, 0);
+  await page.screenshot({ path: join(output, "judge.png"), fullPage: true });
+  await page.setViewport({ width: 320, height: 800 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 0, "the judge's page fits 320 px");
+  await page.screenshot({ path: join(output, "judge-320.png"), fullPage: true });
+  await page.setViewport({ width: 1440, height: 1000 });
+  await page.goto(origin + "/#/index", { waitUntil: "networkidle0" });
+  await page.waitForFunction(() => document.body.innerText.includes("Course decisions, with receipts"));
+  console.log("PASS the judge's page: one greeting, three ways in, the register's figures and the not-built list word for word, at 1440 and 320 px");
 
   await click("index-signin");
   await click("login-P-SOBRI");

@@ -1,13 +1,18 @@
 import { useRef, useState, type InputHTMLAttributes } from "react";
 import { can } from "../../app/roles.ts";
-import { adoptCurriculumRevision, checkCurriculumRevision, definitionForCourse, discardCurriculumRevision,
+import { adoptCurriculumRevision, checkCurriculumRevision, definitionForCourse, discardCurriculumRevision, nowIso, openRecap,
   saveCurriculumRevision, startCurriculumRevision, type AppState } from "../../app/store.ts";
-import { BLOOM_LEVELS, curriculumChanges, curriculumImpact, curriculumMarkdown, validateCourseDefinition } from "../../lib/curriculum.ts";
+import { BLOOM_LEVELS, curriculumChanges, curriculumImpact, curriculumMarkdown, learningTime, nextFreeSlot, splitForSlot, topicHours, validateCourseDefinition, withDerivedFields } from "../../lib/curriculum.ts";
 import { downloadText } from "../../lib/download.ts";
-import type { BloomLevel, CourseDefinition, CourseOutcome, CourseTopic, CurriculumDraft, Person, Subject } from "../../types.ts";
+import type { BloomLevel, CourseDefinition, CourseOutcome, CourseTopic, CurriculumDraft, Person, PloLevel, Subject, TopicKind } from "../../types.ts";
 import { Button, Disclosure, Field, Input, Select, Tag, Textarea } from "../primitives/index.tsx";
 import { DecisionCard, Meter } from "../primitives/loop.tsx";
-import { briefDecisionState } from "../../lib/decisions.ts";
+import { authorisingDecision, briefDecisionState, OUTCOME_LABEL } from "../../lib/decisions.ts";
+import { changeSummary, deckDiff, versionChange, versionStops } from "../../lib/diff.ts";
+import { changedOutcomeWeek, sessionInWeek } from "../../lib/teachingPlan.ts";
+import { ChangeSummary, CountUpSummary, Dumbbell, OutcomeChanges, SlideDiffList, TwoColumn, VersionScrubber, type VersionStop } from "../primitives/compare.tsx";
+import { useMarkData } from "../primitives/DeckPreview.tsx";
+import { packMaker, previousVersion } from "./packCompare.ts";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
 
 type Props = { state: AppState; person: Person; subject: Subject };
@@ -24,6 +29,13 @@ export function CurriculumPanel({ state, person, subject }: Props) {
   const mayEdit = can(person, "draft-change", { subjectId: subject.id, assignments: state.assignments });
   const [error, setError] = useState("");
   const baseline = draft && state.subjectVersions.find(v => v.id === draft.baselineVersionId)?.definition || current;
+  // With no revision open, the change in use: the current version against the one it replaced (depth plan Section 6.2).
+  const inUse = state.subjectVersions.find(v => v.id === subject.currentVersionId);
+  const replaced = inUse ? previousVersion(state, inUse) : null;
+  const lastChange = !draft && inUse?.definition && replaced?.definition ? { from: replaced, to: inUse, before: replaced.definition, after: inUse.definition } : null;
+  const lastPack = lastChange ? sessionInWeek(state.teachingPlans.find(p => p.subjectId === subject.id)?.sessions ?? [], changedOutcomeWeek(lastChange.after, lastChange.before)) : null;
+  const makeLastPack = packMaker(state, subject, null, nowIso());
+  const lastSlides = lastChange && lastPack ? deckDiff(makeLastPack(lastPack, lastChange.from), makeLastPack(lastPack, lastChange.to)) : [];
   return <div>
     <div className="section-heading"><div><h2>Outcomes & topics</h2></div>
       <Button onClick={() => downloadText(subject.id + "-course-outline.md", curriculumMarkdown(subject, current, subject.currentVersionId))}>Export current outline</Button>
@@ -38,6 +50,16 @@ export function CurriculumPanel({ state, person, subject }: Props) {
           const result = startCurriculumRevision(subject.id); if (!result.ok) setError(result.error);
         }}>Start course revision</Button> : <p className="muted">Only assigned lecturers and coordinators can edit this course.</p>}
       </section>}
+    {lastChange ? <section className="workspace-panel revision-compare" aria-labelledby="update-last-change-title" data-demo-id="update-last-change">
+      <h3 id="update-last-change-title">The change in use: {lastChange.to.id} against {lastChange.from.id}</h3>
+      <ChangeSummary text={changeSummary(lastChange.before, lastChange.after, lastSlides)} />
+      <h4>Outcomes</h4>
+      <OutcomeChanges before={lastChange.before} after={lastChange.after} />
+      <h4>Topics and hours</h4>
+      <Dumbbell before={lastChange.before} after={lastChange.after} beforeLabel={lastChange.from.id} afterLabel={lastChange.to.id} />
+      <TwoColumn before={lastChange.before} after={lastChange.after} beforeLabel={lastChange.from.id} afterLabel={lastChange.to.id} />
+      <p className="muted">History has the decision behind this version{lastPack ? " and the week " + lastPack.week + " pack under both versions" : ""}.</p>
+    </section> : null}
   </div>;
 }
 
@@ -51,16 +73,21 @@ function HoursMeters({ definition }: { definition: CourseDefinition }) {
 }
 
 function DefinitionSummary({ definition }: { definition: CourseDefinition }) {
+  const time = learningTime(definition);
   return <div>
-    <dl className="context-list"><div><dt>Programme</dt><dd>{definition.brief.programmeTitle || "Not supplied"}</dd></div></dl>
+    <dl className="context-list"><div><dt>Programme</dt><dd>{definition.brief.programmeTitle || "Not supplied"}</dd></div>
+      {time ? <div><dt>Student learning time</dt><dd>{time.total} of {time.capacity ?? "an unstated number of"} hours{time.unallocated ? ", " + time.unallocated + " unallocated" : ""}</dd></div> : null}</dl>
     <HoursMeters definition={definition} />
     <h4>Course learning outcomes</h4>
-    {definition.outcomes.length ? <ol className="outcome-list">{definition.outcomes.map(c => <li key={c.id}><strong>{c.label}</strong> · {c.bloomLevel}<p>{c.text}</p>
+    {definition.outcomes.length ? <ol className="outcome-list">{definition.outcomes.map(c => <li key={c.id}><strong>{c.label}</strong> · {c.bloomLevel}{c.mqfCluster ? " · " + c.mqfCluster : ""}<p>{c.text}</p>
       <p className="muted">Achievement: {c.assessmentEvidence || "Not recorded"}</p></li>)}</ol> : <p>Add your course learning outcomes to begin.</p>}
     <h4>Topic sequence</h4>
-    {definition.topics.length ? <ol className="journey-list">{definition.topics.map(t => <li key={t.id}><strong>{t.title}</strong> · {t.contactHours} contact h · {t.selfStudyHours} self-study h · week {t.week ?? "not set"}</li>)}</ol> : <p>No topic outline is recorded yet.</p>}
+    {definition.topics.length ? <ol className="journey-list">{definition.topics.map(t => <li key={t.id}><strong>{t.title}</strong> · {topicHours(t)} · {t.selfStudyHours} self-study h · week {t.week ?? "not set"}</li>)}</ol> : <p>No topic outline is recorded yet.</p>}
   </div>;
 }
+
+const TOPIC_KINDS: Array<[TopicKind, string]> = [["lecture", "Lecture"], ["lab", "Lab"], ["mixed", "Lecture and lab"], ["quiz", "Quiz"], ["studio", "Studio"], ["review", "Review"]];
+const PLO_LEVELS: PloLevel[] = ["H", "M", "L"];
 
 function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
   draft: CurriculumDraft; baseline: CourseDefinition; mayEdit: boolean;
@@ -73,12 +100,23 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
   const [removing, setRemoving] = useState<string | null>(null);
   const [discarding, setDiscarding] = useState(false);
   const [discardNote, setDiscardNote] = useState("");
+  // A topic added in this revision into the schedule's free slot takes that slot's lecture hours first and the rest in the
+  // lab, until its hours are split by hand (lib/curriculum.ts nextFreeSlot).
+  const [autoSplit, setAutoSplit] = useState<Record<string, { lecture: number }>>({});
+  const baselineTopicIds = new Set(baseline.topics.map(t => t.id));
   const alertRef = useRef<HTMLDivElement>(null);
   const dirty = JSON.stringify(definition) !== JSON.stringify(draft.definition) || reason !== draft.reason || term !== draft.effectiveTerm;
   useUnsavedEditor(dirty);
-  const issues = validateCourseDefinition(definition, subject.id, baseline);
+  // Checked as it will be saved: the stored learning time follows the topics on save (lib/curriculum.ts withDerivedFields).
+  const issues = validateCourseDefinition(withDerivedFields(definition), subject.id, baseline);
   const changes = curriculumChanges(baseline, definition);
+  // Course-level changes keep the side-by-side cards; outcomes and topics have their own views above them.
+  const courseChanges = changes.filter(c => c.area === "Course");
   const impact = curriculumImpact(baseline, definition, state.teachingPlans.find(p => p.subjectId === subject.id), state.testDrafts.filter(t => t.subjectId === subject.id));
+  // The pack of the first week that teaches a changed outcome, under the baseline and the candidate, for the summary's slide count.
+  const packSession = sessionInWeek(state.teachingPlans.find(p => p.subjectId === subject.id)?.sessions ?? [], changedOutcomeWeek(definition, baseline));
+  const makePack = packMaker(state, subject, null, nowIso());
+  const packChanges = packSession ? deckDiff(makePack(packSession, { cloSnapshot: baseline.outcomes, definition: baseline }), makePack(packSession, { cloSnapshot: definition.outcomes, definition })) : [];
   const stale = subject.currentVersionId !== draft.baselineVersionId;
   const patchBrief = (patch: Partial<CourseDefinition["brief"]>) => setDefinition(d => ({ ...d, brief: { ...d.brief, ...patch } }));
   const patchOutcome = (id: string, patch: Partial<CourseOutcome>) => setDefinition(d => ({ ...d, outcomes: d.outcomes.map(c => c.id === id ? { ...c, ...patch } : c) }));
@@ -96,10 +134,20 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
   };
   const addTopic = () => {
     const id = subject.id + "-topic-" + crypto.randomUUID();
-    setDefinition(d => ({ ...d, topics: [...d.topics, { id, title: "", week: null, contactHours: 0, selfStudyHours: 0,
-      cloIds: [], prerequisiteTopicIds: [], protected: false, resources: "" }] }));
+    const slot = nextFreeSlot(definition);
+    setDefinition(d => ({ ...d, topics: [...d.topics, { id, title: "", week: slot?.week ?? null, contactHours: 0, selfStudyHours: 0,
+      cloIds: [], prerequisiteTopicIds: [], protected: false, resources: "", ...(slot ? { kind: "mixed" as const } : {}) }] }));
+    if (slot) setAutoSplit(a => ({ ...a, [id]: { lecture: slot.lecture } }));
     requestAnimationFrame(() => document.getElementById("topic-title-" + id)?.focus());
   };
+  const setContactHours = (t: CourseTopic, contact: number) => patchTopic(t.id, { contactHours: contact,
+    ...(autoSplit[t.id] ? splitForSlot(autoSplit[t.id], contact) : t.labHours !== undefined ? { lectureHours: contact - t.labHours } : {}) });
+  const setLabHours = (t: CourseTopic, text: string) => {
+    setAutoSplit(a => { const next = { ...a }; delete next[t.id]; return next; });
+    patchTopic(t.id, text === "" ? { lectureHours: undefined, labHours: undefined } : { labHours: Number(text), lectureHours: t.contactHours - Number(text) });
+  };
+  const setLevel = (c: CourseOutcome, ploId: string, level: PloLevel | "") => patchOutcome(c.id, { ploLinks: [
+    ...(c.ploLinks ?? []).filter(l => l.ploId !== ploId), ...(level ? [{ ploId, level }] : [])].sort((a, b) => c.ploIds.indexOf(a.ploId) - c.ploIds.indexOf(b.ploId)) });
   const move = (id: string, direction: number) => setDefinition(d => {
     const topics = [...d.topics], at = topics.findIndex(t => t.id === id), next = at + direction;
     if (next < 0 || next >= topics.length) return d;
@@ -137,10 +185,15 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
         {!definition.outcomes.length ? <p>No outcomes yet. Add the first outcome; you can save an incomplete draft.</p> : null}
         {definition.outcomes.map(c => <article className="curriculum-object" key={c.id}>
           <div className="form-grid"><Field label="Outcome label"><Input value={c.label} onChange={e => patchOutcome(c.id, { label: e.target.value })} /></Field>
-            <Field label={"Bloom level for " + c.label}><Select value={c.bloomLevel} onChange={e => patchOutcome(c.id, { bloomLevel: e.target.value as BloomLevel })}>{BLOOM_LEVELS.map(b => <option key={b}>{b}</option>)}</Select></Field></div>
-          <Field label={c.label + " wording"}><Textarea id={"outcome-text-" + c.id} data-demo-id="curriculum-outcome-text" value={c.text} onChange={e => patchOutcome(c.id, { text: e.target.value })} /></Field>
+            <Field label={"Bloom level for " + c.label}><Select value={c.bloomLevel} onChange={e => patchOutcome(c.id, { bloomLevel: e.target.value as BloomLevel })}>{BLOOM_LEVELS.map(b => <option key={b}>{b}</option>)}</Select></Field>
+            <Field label={"MQF cluster for " + c.label}><Input value={c.mqfCluster ?? ""} placeholder="e.g. Cognitive skills" onChange={e => patchOutcome(c.id, { mqfCluster: e.target.value || undefined })} /></Field></div>
+          <Field label={c.label + " wording"}><Textarea id={"outcome-text-" + c.id} data-demo-id={"curriculum-outcome-text-" + c.label} value={c.text} onChange={e => patchOutcome(c.id, { text: e.target.value })} /></Field>
           <Field label={c.label + " achievement evidence"} hint="An assessment task, rubric criterion or observable demonstration."><Textarea value={c.assessmentEvidence} onChange={e => patchOutcome(c.id, { assessmentEvidence: e.target.value })} /></Field>
-          <Field label={c.label + " programme mappings"} hint="Use the programme outcome labels recorded above."><CommaListInput values={c.ploIds} onValuesChange={values => patchOutcome(c.id, { ploIds: values })} /></Field>
+          <Field label={c.label + " programme mappings"} hint="Use the programme outcome labels recorded above."><CommaListInput values={c.ploIds} onValuesChange={values => patchOutcome(c.id, { ploIds: values, ...(c.ploLinks ? { ploLinks: c.ploLinks.filter(l => values.includes(l.ploId)) } : {}) })} /></Field>
+          {c.ploIds.length ? <fieldset className="clo-choices plo-levels"><legend>{c.label} in the CLO to PLO matrix: the strength of each link</legend>
+            {c.ploIds.map(ploId => <label key={ploId}><span>{ploId}</span><Select aria-label={c.label + " link to " + ploId} value={c.ploLinks?.find(l => l.ploId === ploId)?.level ?? ""} onChange={e => setLevel(c, ploId, e.target.value as PloLevel | "")}>
+              <option value="">No level</option>{PLO_LEVELS.map(l => <option key={l} value={l}>{l === "H" ? "H, high" : l === "M" ? "M, medium" : "L, low"}</option>)}</Select></label>)}
+          </fieldset> : null}
           {removing === c.id ? <div className="button-row"><span>Remove {c.label}? Topic links will need review.</span><Button variant="danger" onClick={() => { setDefinition(d => ({ ...d, outcomes: d.outcomes.filter(o => o.id !== c.id) })); setRemoving(null); }}>Confirm outcome removal</Button><Button onClick={() => setRemoving(null)}>Keep outcome</Button></div>
             : <Button variant="quiet" aria-label={"Remove " + c.label} onClick={() => setRemoving(c.id)}>Remove outcome</Button>}
         </article>)}
@@ -148,21 +201,35 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
       <section className="workspace-panel"><div className="section-heading"><h3>Topic sequence</h3><Button disabled={definition.topics.length >= 300} data-demo-id="curriculum-add-topic" onClick={addTopic}>Add topic</Button></div>
         <p className="muted">Declare time and dependencies. Adding a topic does not expand the available budget.</p>
         {!definition.topics.length ? <p>No topics recorded yet. Add your current outline before evaluating coverage.</p> : null}
-        {definition.topics.map((t, index) => <article className="curriculum-object" key={t.id}>
-          <div className="section-heading"><h4>Topic {index + 1}</h4><div className="button-row"><Button aria-label={"Move " + (t.title || "topic") + " earlier"} disabled={index === 0} onClick={() => move(t.id,-1)}>Move up</Button><Button aria-label={"Move " + (t.title || "topic") + " later"} disabled={index === definition.topics.length - 1} onClick={() => move(t.id,1)}>Move down</Button></div></div>
-          <Field label={"Topic " + (index + 1) + " title"}><Input id={"topic-title-" + t.id} data-demo-id="curriculum-topic-title" value={t.title} onChange={e => patchTopic(t.id, { title: e.target.value })} /></Field>
+        {definition.topics.map((t, index) => {
+          // A topic added in this revision carries the editor's plain ids and opens; a topic from the baseline is folded,
+          // with ids scoped to it, so a long outline stays readable and the tour's target is the topic it adds.
+          const isNew = !baselineTopicIds.has(t.id);
+          const target = (name: string) => (isNew ? name : name + "-" + t.id);
+          return <details className="curriculum-object topic-entry" key={t.id} open={isNew || undefined}>
+          <summary><span className="topic-entry-head"><strong>Topic {index + 1}{t.week ? " · week " + t.week : ""}</strong> <span>{t.title || "Untitled topic"}</span> <span className="muted">{topicHours(t)}{isNew ? " · added in this revision" : ""}</span></span></summary>
+          <div className="topic-entry-body">
+          <div className="button-row"><Button aria-label={"Move " + (t.title || "topic") + " earlier"} disabled={index === 0} onClick={() => move(t.id,-1)}>Move up</Button><Button aria-label={"Move " + (t.title || "topic") + " later"} disabled={index === definition.topics.length - 1} onClick={() => move(t.id,1)}>Move down</Button></div>
+          <Field label={"Topic " + (index + 1) + " title"}><Input id={"topic-title-" + t.id} data-demo-id={target("curriculum-topic-title")} value={t.title} onChange={e => patchTopic(t.id, { title: e.target.value })} /></Field>
           <div className="form-grid"><Field label="Week (optional)"><Input type="number" min={1} max={52} value={t.week ?? ""} onChange={e => patchTopic(t.id, { week: optionalNumber(e.target.value) })} /></Field>
-            <Field label="Contact hours"><Input type="number" min={0} step="any" data-demo-id="curriculum-topic-hours" value={t.contactHours} onChange={e => patchTopic(t.id, { contactHours: Number(e.target.value) })} /></Field>
+            <Field label="Kind of session"><Select value={t.kind ?? ""} onChange={e => patchTopic(t.id, { kind: (e.target.value || undefined) as TopicKind | undefined })}><option value="">Not recorded</option>{TOPIC_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select></Field>
+            <Field label="Contact hours"><Input type="number" min={0} step="any" data-demo-id={target("curriculum-topic-hours")} value={t.contactHours} onChange={e => setContactHours(t, Number(e.target.value))} /></Field>
+            <Field label="Of which lab hours" hint={t.labHours !== undefined ? (t.lectureHours ?? 0) + ((t.lectureHours ?? 0) === 1 ? " lecture hour" : " lecture hours") : "Blank when the split is not recorded."}><Input type="number" min={0} step="any" value={t.labHours ?? ""} onChange={e => setLabHours(t, e.target.value)} /></Field>
             <Field label="Self-study hours"><Input type="number" min={0} step="any" value={t.selfStudyHours} onChange={e => patchTopic(t.id, { selfStudyHours: Number(e.target.value) })} /></Field></div>
-          <fieldset className="clo-choices"><legend>Outcomes supported by this topic</legend>{definition.outcomes.map(c => <label key={c.id}><input type="checkbox" checked={t.cloIds.includes(c.id)} data-demo-id={"topic-outcome-" + c.label} onChange={e => patchTopic(t.id, { cloIds: e.target.checked ? [...t.cloIds,c.id] : t.cloIds.filter(id => id !== c.id) })} /><span>{c.label} · {c.text || "Wording to add"}</span></label>)}
+          <fieldset className="clo-choices"><legend>Outcomes supported by this topic</legend>{definition.outcomes.map(c => <label key={c.id}><input type="checkbox" checked={t.cloIds.includes(c.id)} data-demo-id={target("topic-outcome-" + c.label)} onChange={e => patchTopic(t.id, { cloIds: e.target.checked ? [...t.cloIds,c.id] : t.cloIds.filter(id => id !== c.id) })} /><span>{c.label} · {c.text || "Wording to add"}</span></label>)}
             {t.cloIds.filter(id => !definition.outcomes.some(c => c.id === id)).map(id => <div key={id} className="button-row"><span className="form-error">Removed outcome: {id}</span><Button onClick={() => patchTopic(t.id, { cloIds: t.cloIds.filter(x => x !== id) })}>Remove broken link</Button></div>)}</fieldset>
           <fieldset className="clo-choices"><legend>Prerequisite topics</legend>{definition.topics.filter(p => p.id !== t.id).map(p => <label key={p.id}><input type="checkbox" checked={t.prerequisiteTopicIds.includes(p.id)} onChange={e => patchTopic(t.id, { prerequisiteTopicIds: e.target.checked ? [...t.prerequisiteTopicIds,p.id] : t.prerequisiteTopicIds.filter(id => id !== p.id) })} /><span>{p.title || "Untitled topic"}</span></label>)}
             {t.prerequisiteTopicIds.filter(id => !definition.topics.some(p => p.id === id)).map(id => <div key={id} className="button-row"><span className="form-error">Removed prerequisite: {id}</span><Button onClick={() => patchTopic(t.id, { prerequisiteTopicIds: t.prerequisiteTopicIds.filter(x => x !== id) })}>Remove broken dependency</Button></div>)}</fieldset>
           <label className="checkbox-line"><input type="checkbox" checked={t.protected} disabled={baseline.topics.some(b => b.id === t.id && b.protected)} onChange={e => patchTopic(t.id, { protected: e.target.checked })} />Protect this foundational or mandatory topic from removal</label>
+          <Field label="Activities"><Textarea value={t.activities ?? ""} onChange={e => patchTopic(t.id, { activities: e.target.value })} /></Field>
+          <Field label="Readings"><Textarea value={t.readings ?? ""} onChange={e => patchTopic(t.id, { readings: e.target.value })} /></Field>
+          <Field label="Misconceptions to address" hint="One per line."><Textarea value={(t.misconceptions ?? []).join("\n")} onChange={e => patchTopic(t.id, { misconceptions: e.target.value.split("\n") })} /></Field>
           <Field label="References and resources"><Textarea value={t.resources} onChange={e => patchTopic(t.id, { resources: e.target.value })} /></Field>
           {removing === t.id ? <div className="button-row"><span>Remove {t.title || "this topic"}?</span><Button variant="danger" onClick={() => { setDefinition(d => ({ ...d, topics: d.topics.filter(x => x.id !== t.id) })); setRemoving(null); }}>Confirm topic removal</Button><Button onClick={() => setRemoving(null)}>Keep topic</Button></div>
             : <Button variant="quiet" disabled={baseline.topics.some(b => b.id === t.id && b.protected)} aria-label={"Remove topic " + (t.title || String(index + 1))} onClick={() => setRemoving(t.id)}>Remove topic</Button>}
-        </article>)}
+          </div>
+        </details>;
+        })}
       </section>
       <section className="workspace-panel"><h3>Decision context</h3>
         <Field label="Why make this revision?"><Textarea data-demo-id="curriculum-reason" value={reason} onChange={e => setReason(e.target.value)} placeholder="Record the evidence, educational reason and trade-offs you considered." /></Field>
@@ -178,14 +245,25 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
       {issues.length ? <ul className="revision-issues">{issues.map((i,n) => <li key={n}><Tag tone={i.severity === "error" ? "danger" : "warn"}>{i.severity === "error" ? "Fix" : "Review"}</Tag><span>{i.message}</span></li>)}</ul> : <p>No configured constraint issues found. The lecturer still reviews educational quality.</p>}
       <Disclosure summary={impact.sessions.length + " teaching sessions and " + impact.assessments.length + " assessments will be flagged for review"}>
         {impact.sessions.length || impact.assessments.length ? <ul className="impact-list">
-          {impact.sessions.map(s => <li key={s.id}>Week {s.week}: {s.topic}</li>)}
+          {impact.sessions.map(s => <li key={s.id}>Week {s.week}: {s.topic}{s.sample ? " (sample)" : ""}</li>)}
           {impact.assessments.map(a => <li key={a.id}>Assessment {a.id}, {a.items.length} template items</li>)}
         </ul> : <p className="muted">No saved session or assessment depends on what changed.</p>}
         <p className="muted">Existing work is retained; each flagged item asks for your review before reuse.</p>
       </Disclosure>
     </section>
-    <section className="workspace-panel"><h3>Before and after</h3>{changes.length ? <div className="revision-diff">{changes.map((c,i) => <article key={i}><div className="button-row"><Tag>{c.kind}</Tag><strong>{c.area}: {c.label}</strong></div>
-      <div className="session-content"><div><h4>Current version</h4><p className="preserve-lines">{c.before || "Not present"}</p></div><div><h4>Candidate</h4><p className="preserve-lines">{c.after || "Removed"}</p></div></div></article>)}</div> : <p>The candidate matches the current course. Make a change to compare it here.</p>}</section>
+    {/* Before and after (depth plan Section 6.2): the summary in words, the outcomes as a redline, the topics and hours as
+        current against proposed, and the rest of the course side by side. */}
+    <section className="workspace-panel revision-compare" aria-labelledby="revision-compare" data-demo-id="revision-compare"><h3 id="revision-compare">Before and after</h3>{changes.length ? <>
+      <ChangeSummary text={changeSummary(baseline, definition, packChanges)} />
+      {packChanges.length && packSession ? <p className="muted">The slides are counted in the week {packSession.week} pack{packSession.sample ? ", a sample session" : ""}; Teach shows them once the version is in use.</p> : null}
+      <h4>Outcomes</h4>
+      <OutcomeChanges before={baseline} after={definition} />
+      <h4>Topics and hours</h4>
+      <Dumbbell before={baseline} after={definition} beforeLabel={draft.baselineVersionId} afterLabel={"Candidate " + draft.revision} />
+      <TwoColumn before={baseline} after={definition} beforeLabel={draft.baselineVersionId} afterLabel={"Candidate " + draft.revision} />
+      {courseChanges.length ? <><h4>The rest of the course</h4><div className="revision-diff">{courseChanges.map((c,i) => <article key={i}><div className="button-row"><Tag>{c.kind}</Tag><strong>{c.label}</strong></div>
+        <div className="session-content"><div><h4>Current version</h4><p className="preserve-lines">{c.before || "Not present"}</p></div><div><h4>Candidate</h4><p className="preserve-lines">{c.after || "Removed"}</p></div></div></article>)}</div></> : null}
+    </> : <p>The candidate matches the current course. Make a change to compare it here.</p>}</section>
     {mayEdit && !stale ? <section className="workspace-panel"><h3>Lecturer decision</h3>
       <label className="checkbox-line"><input type="checkbox" data-demo-id="curriculum-ack" checked={acknowledgement} onChange={e => setAcknowledgement(e.target.checked)} />I reviewed the changes, warnings and affected teaching work. This saves my local course version; institutional approval remains in the university's process.</label>
       <div className="button-row"><Button variant="primary" data-demo-id="curriculum-adopt" disabled={dirty || draft.checkedRevision !== draft.revision || !acknowledgement} onClick={() => resultMessage(adoptCurriculumRevision(draft.id,draft.revision,acknowledgement),"New course version saved.")}>Use as my course version</Button><Button onClick={() => setDiscarding(true)}>Discard revision</Button></div>
@@ -210,23 +288,67 @@ export function CurriculumHistoryPanel({ state, subject }: { state: AppState; su
   const entries = [
     ...versions.map((v, i) => ({ at: v.changedAt, order: i, kind: "version" as const, seq: seq.get(v.id), v })),
     ...decisions.map((d, i) => ({ at: d.at, order: i, kind: "decision" as const, seq: seq.get(d.id), d })),
+    // The coordinator's record that a term's grades are released (depth plan Section 7.3), which opens its survey results.
+    ...state.events.filter(ev => ev.kind === "grades-released" && ev.refs.subjectId === subject.id).map((r, i) => ({ at: r.at, order: i, kind: "release" as const, seq: state.events.indexOf(r), r })),
+    // The lecturer's CQI notes (depth plan Section 8.3), each with its term, the version and the date.
+    ...state.cqiNotes.filter(n => n.subjectId === subject.id).map((n, i) => { const at = state.events.findIndex(ev => ev.kind === "cqi-noted" && ev.refs.noteId === n.id); return { at: n.at, order: i, kind: "cqi" as const, seq: at >= 0 ? at : undefined, n }; }),
   ].sort((a, b) => b.at.localeCompare(a.at)
     || (a.seq !== undefined && b.seq !== undefined ? b.seq - a.seq : a.kind !== b.kind ? (a.kind === "version" ? -1 : 1) : b.order - a.order));
+  // Before and after for each version against the one it replaced (depth plan Section 6.2), with the week's pack built
+  // under both from records; the decision that authorised it opens in place.
+  const markData = useMarkData(definitionForCourse(subject.id)?.sample && state.institution.showMark ? state.institution.mark.wide ?? state.institution.mark.png : null);
+  const makePack = packMaker(state, subject, markData, nowIso());
+  const sessions = state.teachingPlans.find(p => p.subjectId === subject.id)?.sessions ?? [];
+  const openDecision = (id: string) => { const el = document.getElementById("decision-" + id); el?.scrollIntoView({ block: "center" }); el?.focus({ preventScroll: true }); };
+  // Each version's change against the one it replaced, built once per version: the pack under both, then the summary.
+  const changes = new Map(versions.map(v => [v.id, versionChange(v, state.subjectVersions, state.events, state.curriculumDrafts, sessions, makePack)]));
+  const changeOf = (v: (typeof versions)[number]) => changes.get(v.id)!;
+  // The scrubber's named stops, oldest first (depth plan Section 6.2, pattern 7).
+  const stops: VersionStop[] = versionStops(versions, v => changeOf(v).summary).map(s => ({ id: s.id, name: s.id, who: name(s.by), when: s.when, summary: s.summary }));
+  const openVersion = (id: string) => { const el = document.getElementById("version-" + id); el?.querySelector("details")?.setAttribute("open", ""); el?.scrollIntoView({ block: "start" }); el?.focus({ preventScroll: true }); };
   return <div>
-    <section className="workspace-panel" aria-labelledby="history-title"><h2 id="history-title">Versions and decisions</h2>
+    <section className="workspace-panel" aria-labelledby="history-title"><div className="section-heading"><h2 id="history-title">Versions and decisions</h2>
+      <Button onClick={() => openRecap(subject.id)} data-demo-id="history-recap">The term recap</Button></div>
       <p className="muted">Newest first. A local version keeps the outline, the reason and the term; it does not attest university approval.</p>
-      {entries.length ? <ol className="history-timeline" data-demo-id="history-timeline">{entries.map(e => e.kind === "version"
-        ? <li key={"v" + e.v.id} className="history-entry">
+      <VersionScrubber stops={stops} onOpen={openVersion} />
+      {entries.length ? <ol className="history-timeline" data-demo-id="history-timeline">{entries.map(e => { if (e.kind === "version") {
+        const { prev, compare, packSession, packs, summary } = changeOf(e.v);
+        const decision = prev ? authorisingDecision(e.v.id, state.events, state.briefDecisions, state.curriculumDrafts) : null;
+        return <li key={"v" + e.v.id} id={"version-" + e.v.id} tabIndex={-1} className="history-entry">
           <span className="history-time mono">{e.at.slice(0, 16).replace("T", " ")}</span>
           <div className="history-body">
             <div className="button-row"><Tag tone="accent">Version</Tag><strong className="tabular">{e.v.id}</strong><span className="muted">{e.v.effectiveTerm || "Term not recorded"} · {name(e.v.changedBy)}</span><Tag>{e.v.id === subject.currentVersionId ? "Current" : "Previous"}</Tag></div>
             <p>{e.v.reason}</p>
+            {!prev ? <p className="muted">The first version on record.</p>
+              : decision ? <p className="history-authorised">Authorised by <button type="button" className="link-button" data-demo-id={"history-decision-link-" + e.v.id} onClick={() => openDecision(decision.id)}>{name(decision.byPersonId)}'s decision of {decision.at.slice(0, 10)}: {OUTCOME_LABEL[decision.outcome].toLowerCase()}</button></p>
+              : <p className="muted">No decision on record for this change.</p>}
+            {compare && summary ? <CountUpSummary text={summary} /> : null}
+            {compare ? <details className="history-open" open={e.v.id === subject.currentVersionId || undefined} data-demo-id={"history-compare-" + e.v.id}><summary>Compare with {prev!.id}</summary>
+              <h4>Outcomes</h4>
+              <OutcomeChanges before={compare.before} after={compare.after} />
+              <h4>Topics and hours</h4>
+              <Dumbbell before={compare.before} after={compare.after} beforeLabel={prev!.id} afterLabel={e.v.id} />
+              <TwoColumn before={compare.before} after={compare.after} beforeLabel={prev!.id} afterLabel={e.v.id} />
+              <h4>{packSession ? "The week " + packSession.week + " pack" + (packSession.sample ? ", a sample session" : "") : "The teaching pack"}</h4>
+              {packs ? <SlideDiffList before={packs.before} after={packs.after} beforeLabel={"Under " + prev!.id} afterLabel={"Under " + e.v.id} markSrc={state.institution.mark.wide ?? state.institution.mark.png} />
+                : <p className="muted">No saved session teaches the change, so no pack is compared.</p>}
+            </details> : null}
             <details className="history-open"><summary>Open</summary>
               {e.v.definition ? <><DefinitionSummary definition={e.v.definition} /><Button onClick={() => downloadText(subject.id + "-" + e.v.id + ".md",curriculumMarkdown(subject,e.v.definition!,e.v.id))}>Export this version</Button></> : <ul>{e.v.cloSnapshot.map(c => <li key={c.id}>{c.text}</li>)}</ul>}
             </details>
           </div>
-        </li>
-        : <li key={"d" + e.d.id} className="history-entry">
+        </li>; }
+        if (e.kind === "release") return <li key={"r" + e.r.id} className="history-entry" data-demo-id="history-release">
+          <span className="history-time mono">{e.at.slice(0, 16).replace("T", " ")}</span>
+          <div className="history-body"><div className="button-row"><Tag tone="ok">Grades released</Tag><span className="muted">{e.r.refs.term} · {name(e.r.byPersonId)}</span></div>
+            <p>The term's survey results open from this record, never before it.</p></div>
+        </li>;
+        if (e.kind === "cqi") return <li key={"c" + e.n.id} className="history-entry" data-demo-id="history-cqi">
+          <span className="history-time mono">{e.at.slice(0, 16).replace("T", " ")}</span>
+          <div className="history-body"><div className="button-row"><Tag tone="accent">CQI note</Tag><span className="muted">{e.n.term}{e.n.versionId ? " · on " + e.n.versionId : ""} · {name(e.n.byPersonId)}</span></div>
+            <p>{e.n.text}</p></div>
+        </li>;
+        return <li key={"d" + e.d.id} id={"decision-" + e.d.id} tabIndex={-1} className="history-entry">
           <span className="history-time mono">{e.at.slice(0, 16).replace("T", " ")}</span>
           <div className="history-body">
             <div className="button-row"><Tag tone="ok">Decision</Tag><span className="muted">on the brief of {state.evidenceBriefs.find(b => b.id === e.d.briefId)?.createdAt.slice(0, 10) ?? "an earlier date"}</span></div>
@@ -234,7 +356,7 @@ export function CurriculumHistoryPanel({ state, subject }: { state: AppState; su
               amended={decisions.some((x, i) => i > decisions.indexOf(e.d) && x.briefId === e.d.briefId && x.byPersonId === e.d.byPersonId)}
               superseded={(() => { const brief = state.evidenceBriefs.find(b => b.id === e.d.briefId); return brief ? Boolean(briefDecisionState(brief, state.evidenceBriefs, state.briefDecisions, Boolean(subject.workspaceOnly)).supersededBy) : false; })()} />
           </div>
-        </li>)}</ol> : <p>Start a revision to preserve the current baseline and record a version history. Decisions recorded in Decide appear here too.</p>}
+        </li>; })}</ol> : <p>Start a revision to preserve the current baseline and record a version history. Decisions recorded in Decide appear here too.</p>}
     </section>
     <section className="workspace-panel" aria-label="Revision decisions">
       <Disclosure summary="Revision decisions: each revision started, saved, checked, adopted or discarded" count={revisions.length}>

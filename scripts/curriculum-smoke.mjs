@@ -59,7 +59,7 @@ try {
   await fill(selector("curriculum-contact-budget"),"6");
   await fillLabel("Teaching weeks","12");await fillLabel("Programme outcome labels","PLO1, PLO2");
   assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll("label")].find(e=>e.textContent==="Programme outcome labels").nextElementSibling.value),"PLO1, PLO2");
-  await click("curriculum-add-outcome");await fill(selector("curriculum-outcome-text"),"Prepare and justify a cash-flow plan for a small business.");
+  await click("curriculum-add-outcome");await fill(selector("curriculum-outcome-text-CLO1"),"Prepare and justify a cash-flow plan for a small business.");
   await fillLabel("CLO1 achievement evidence","Worked case with an explanation rubric.");
   await fillLabel("CLO1 programme mappings","PLO1, PLO2");
   await click("curriculum-add-topic");await fill(selector("curriculum-topic-title"),"Cash-flow foundations");await fill(selector("curriculum-topic-hours"),"7");
@@ -154,7 +154,7 @@ try {
   assert.match(await packDeck.file("ppt/slides/slide4.xml").async("string"),/Build a cash-flow plan in pairs/);
   await openDisclosure("teach-assessment");await click("assessment-start");await click("assessment-generate");
   const assessmentItems=await state(()=>JSON.stringify(window.__lyceum.getState().testDrafts.find(t=>t.subjectId==="BUS205").items));
-  await click("rail-update");await click("curriculum-start");await fill(selector("curriculum-outcome-text"),"Prepare a cash-flow plan and evaluate its sensitivity.");
+  await click("rail-update");await click("curriculum-start");await fill(selector("curriculum-outcome-text-CLO1"),"Prepare a cash-flow plan and evaluate its sensitivity.");
   await fill(selector("curriculum-reason"),"Extend the outcome to include sensitivity analysis after reviewing the teaching activity.");await fill(selector("curriculum-term"),"2026-S2");
   await click("curriculum-save");await click("curriculum-check");await click("curriculum-ack");await click("curriculum-adopt");
   await page.waitForFunction(()=>window.__lyceum.getState().curriculumDrafts.filter(d=>d.subjectId==="BUS205").every(d=>d.status==="adopted"));
@@ -167,10 +167,16 @@ try {
   await click("assessment-course-change-ack");await click("assessment-course-change-review");
   await page.waitForFunction(()=>window.__lyceum.getState().testDrafts.find(t=>t.subjectId==="BUS205").needsReview===false);
   await click("rail-history");await text("Versions and decisions");await text("Previous");await text("Revision decisions");await text("Retain the course as it is");
-  console.log("PASS reload, linked teaching session, changed-outcome impact, explicit assessment review, version history and the decision on record");
+  // Before and after in History (depth plan Section 6.2): the new version against the one it replaced, as a redline, and no decision named,
+  // because the decision on record was retain; the comparison reflows at 390 and 320 px.
+  await page.waitForSelector('[data-demo-id^="history-compare-"][open]');await text("No decision on record for this change.");
+  assert.ok(await page.evaluate(()=>Boolean(document.querySelector('[data-demo-id="outcome-redline"] ins'))&&Boolean(document.querySelector('[data-demo-id="outcome-redline"] del'))),"the reworded outcome as a redline");
+  for(const width of [390,320]) {await page.setViewport({width,height:844});await noOverflow("History compare "+width);}
+  await page.setViewport({width:1440,height:1000});
+  console.log("PASS reload, linked teaching session, changed-outcome impact, explicit assessment review, version history, the before and after at 390 and 320 px, and the decision on record");
   await click("nav-guide");await click("backup-export");const backup=await waitDownload("lyceum-workspace-backup.json");
   const saved=JSON.parse(readFileSync(backup,"utf8"));assert.equal(saved.application,"Lyceum");assert.ok(saved.data.courseDefinitions.BUS205);
-  assert.equal(saved.schemaVersion,5);assert.equal(saved.data.briefDecisions.length,1);
+  assert.equal(saved.schemaVersion,6);assert.equal(saved.data.briefDecisions.length,1);
   await click("nav-courses");await click("course-create-open");await fill(selector("new-course-code"),"TEMP101");await fill(selector("new-course-title"),"Temporary recovery example");await click("new-course-create");
   await click("nav-guide");await (await page.$(selector("backup-file"))).uploadFile(backup);await page.waitForSelector(selector("backup-preview"),{visible:true});
   await click("backup-ack");await click("backup-restore");await text("Workspace restored");

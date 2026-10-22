@@ -7,13 +7,13 @@
 // deck shows the pack as PowerPoint draws it.
 //   node scripts/gen-sample-decks.mjs
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadWorkspace } from "../mcp/workspace.ts";
 import { SAMPLE_PATH } from "../mcp/sample.ts";
 import { PEOPLE } from "../src/data/seed.ts";
 import { evidenceReport } from "../src/lib/evidence.ts";
-import { briefDeck, deckBuffer, sessionDeck } from "../src/lib/slides.ts";
+import { brandFor, briefDeck, deckBuffer, sessionDeck } from "../src/lib/slides.ts";
 
 const OUT = new URL("../docs/presentation/", import.meta.url);
 const loaded = loadWorkspace(SAMPLE_PATH);
@@ -22,9 +22,14 @@ const { backup } = loaded, d = backup.data, at = backup.exportedAt; // the expor
 const subject = d.subjects.find((s) => s.id === "CS310"), clos = d.clos.filter((c) => c.subjectId === "CS310");
 const report = evidenceReport("CS310", d.evidenceSources, d.skillMentions, d.skillMappings, clos);
 const brief = d.evidenceBriefs.filter((b) => b.subjectId === "CS310").at(-1);
-const session = d.teachingPlans.find((p) => p.subjectId === "CS310").sessions[0];
+// The tour's own session, not one of the term's sample sessions (depth plan Section 5.1), branded the way the app brands it.
+const session = d.teachingPlans.find((p) => p.subjectId === "CS310").sessions.find((s) => !s.sample);
+const definition = d.courseDefinitions.CS310 ?? null;
+const markFile = new URL("../public" + (d.institution.mark.wide ?? d.institution.mark.png), import.meta.url);
+const markData = existsSync(markFile) ? readFileSync(markFile).toString("base64") : null;
 const briefSpec = briefDeck(subject, brief, report, d.evidenceSources, d.skillMentions, clos, PEOPLE, at);
-const packSpec = sessionDeck(subject, session, clos, report, d.skillMentions, d.evidenceSources, PEOPLE, at);
+const packSpec = sessionDeck(subject, session, clos, report, d.skillMentions, d.evidenceSources, PEOPLE, at,
+  { definition, brand: brandFor(d.institution, definition, subject, session.week, markData) });
 writeFileSync(new URL("sample-" + briefSpec.fileName, OUT), await deckBuffer(briefSpec));
 writeFileSync(new URL("sample-" + packSpec.fileName, OUT), await deckBuffer(packSpec));
 console.log("wrote sample-" + briefSpec.fileName + " (" + briefSpec.slides.length + " slides) and sample-" + packSpec.fileName + " (" + packSpec.slides.length + " slides)");

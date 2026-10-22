@@ -18,6 +18,7 @@ import {
   mayDecide,
   navigate,
   openNotification,
+  openRecap,
   openStep,
   personWithHat,
   selectBrief,
@@ -68,7 +69,8 @@ export function InboxScreen() {
     const bDate = state.teachingPlans.find((p) => p.subjectId === b.id)?.updatedAt ?? "";
     return bDate.localeCompare(aDate);
   })[0];
-  const recentPlan = recentCourse && state.teachingPlans.find((p) => p.subjectId === recentCourse.id);
+  // A plan holding only the term's sample sessions is not the lecturer's plan yet (depth plan Section 5.1).
+  const recentPlan = recentCourse && state.teachingPlans.find((p) => p.subjectId === recentCourse.id && p.sessions.some((s) => !s.sample));
   const nextSession = recentPlan && planSummary(recentPlan, state.clos.filter((c) => c.subjectId === recentCourse?.id)).next;
   const brief = state.evidenceBriefs.find((b) => b.id === state.selectedBriefId && (b.createdBy === person.id || b.recipients.includes(person.id)));
   // Briefs waiting for this person: received with the capability to decide and no decision of theirs yet,
@@ -97,7 +99,7 @@ export function InboxScreen() {
 
       {person.orgRole === "academic" && recentCourse ? <StartHere subjectId={recentCourse.id}
         resume={<Button onClick={() => openStep(recentCourse.id, recentPlan ? "teach" : "course")} data-demo-id="home-resume">{recentPlan ? "Continue teaching plan" : "Open course workspace"}</Button>}
-        resumeNote={nextSession ? "Next class: week " + nextSession.week + ", " + nextSession.topic + "." : recentPlan ? recentPlan.sessions.length + " saved sessions · " + (recentPlan.term || "teaching term not set") : undefined} />
+        resumeNote={nextSession ? "Next class: week " + nextSession.week + ", " + nextSession.topic + "." : recentPlan ? recentPlan.sessions.filter((s) => !s.sample).length + " saved sessions · " + (recentPlan.term || "teaching term not set") : undefined} />
         : <section className="workspace-panel home-focus" aria-labelledby="resume-heading">
           <span className="eyebrow">{person.orgRole === "academic" ? "Your teaching workspace" : "Your review workspace"}</span>
           <h2 id="resume-heading">{person.orgRole === "management" ? "The illustrative approval sandbox" : person.orgRole === "department" ? "Decide on the briefs your colleagues send" : "Start with an assigned course"}</h2>
@@ -182,7 +184,8 @@ function StartHere({ subjectId, resume, resumeNote }: { subjectId: string; resum
     <div className="start-here-host">{moods ? <Mascot who="host" mood={moods.host} size={88} /> : null}</div>
     <div className="start-here-body">
       <div className="section-heading"><div><span className="eyebrow">Start here · {subjectId}</span><h2 id="start-here-title">{loop.closed ? "The loop is closed for this term" : "Continue the loop on " + subjectId}</h2></div>
-        {loop.next ? <Button variant="primary" data-demo-id="journey-next" onClick={() => openStep(subjectId, loop.next!)}>Continue: {stepDef(loop.next).label} <ArrowRight size={15} /></Button> : null}</div>
+        {loop.next ? <Button variant="primary" data-demo-id="journey-next" onClick={() => openStep(subjectId, loop.next!)}>Continue: {stepDef(loop.next).label} <ArrowRight size={15} /></Button>
+          : loop.closed ? <Button data-demo-id="journey-recap" onClick={() => openRecap(subjectId)}>The term recap <ArrowRight size={15} /></Button> : null}</div>
       <RingPanel loop={loop} onStep={(step) => openStep(subjectId, step)} />
       {resume ? <div className="start-here-resume button-row">{resume}{resumeNote ? <span className="muted">{resumeNote}</span> : null}</div> : null}
     </div>

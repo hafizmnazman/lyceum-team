@@ -102,8 +102,8 @@ try {
         read: Boolean(notification?.read), currentPerson: s.currentPersonId,
         adopted: s.curriculumDrafts.filter((d) => d.subjectId === "CS310" && d.status === "adopted").length,
         versions: s.subjectVersions.filter((v) => v.subjectId === "CS310").length,
-        sessions: s.teachingPlans.find((p) => p.subjectId === "CS310")?.sessions.length ?? 0,
-        sessionVersion: s.teachingPlans.find((p) => p.subjectId === "CS310")?.sessions.at(-1)?.courseVersionId ?? null,
+        sessions: s.teachingPlans.find((p) => p.subjectId === "CS310")?.sessions.filter((x) => !x.sample).length ?? 0, // the lecturer's own, beside the term's sample sessions
+        sessionVersion: s.teachingPlans.find((p) => p.subjectId === "CS310")?.sessions.filter((x) => !x.sample).at(-1)?.courseVersionId ?? null,
         decisions: s.briefDecisions.filter((d) => d.subjectId === "CS310").map((d) => ({ by: d.byPersonId, outcome: d.outcome, note: d.note, briefId: d.briefId, version: d.courseVersionId })),
         briefId: brief?.id ?? null,
         firstVersion: s.subjectVersions.filter((v) => v.subjectId === "CS310")[0]?.id ?? null,

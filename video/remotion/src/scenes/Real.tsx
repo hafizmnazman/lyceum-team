@@ -80,7 +80,7 @@ export const Proof: React.FC<{ scene: Scene }> = ({ scene }) => {
       <div style={{ ...card, left: 1284, width: 540, background: C.warnSoft, color: C.ink, transform: "scale(" + pop(frame, amber - 6) + ")" }}>
         <div style={{ display: "inline-block", padding: "6px 16px", borderRadius: 999, background: C.white, fontFamily: F.mono, fontSize: 22, letterSpacing: "0.08em", color: C.warn }}>PLANNED</div>
         <div style={{ margin: "22px 0 18px", fontFamily: F.display, fontWeight: 600, fontSize: 52, color: C.warn }}>Not built yet</div>
-        {["Remote assistant doors", "The LMS door", "Learn's statistics", "The benchmark run"].map((x) => (
+        {["Remote assistant doors", "The LMS door", "Pooling and predictions", "The benchmark run"].map((x) => (
           <div key={x} style={{ display: "flex", alignItems: "center", gap: 16, margin: "14px 0", fontSize: 32 }}><span style={{ width: 12, height: 12, borderRadius: "50%", background: C.warn }} />{x}</div>
         ))}
       </div>

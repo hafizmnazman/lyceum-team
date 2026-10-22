@@ -8,6 +8,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "concurrently -n web,api -c blue,green \"vite\" \"node --watch server/index.ts\"",
+    "booth": "vite build && concurrently -n web,api -c blue,green \"vite preview --host\" \"node server/index.ts\"",
     "dev:web": "vite",
     "dev:api": "node --watch server/index.ts",
     "build": "vite build",
@@ -19,7 +20,7 @@
     "prove:signal": "node src/prove-signal.ts",
     "prove:intake": "node src/prove-intake.ts",
     "prove:integrity": "node --test src/prove-integrity.ts",
-    "prove:all": "node src/prove-acceptance.ts && node src/prove-backtest.ts && node src/prove-flow.ts && node src/prove-signal.ts && node src/prove-intake.ts && node --test src/prove-integrity.ts && node --test src/prove-teaching.ts && node --test src/prove-curriculum.ts && node --test src/prove-evidence.ts && node --test src/prove-collect.ts && node --test src/prove-research.ts && node --test src/prove-slides.ts && node --test src/prove-benchmark.ts && node --test src/prove-journey.ts && node --test src/prove-snapshots.ts && node --test src/prove-moods.ts && node --test src/prove-mcp.ts",
+    "prove:all": "node src/prove-acceptance.ts && node src/prove-backtest.ts && node src/prove-flow.ts && node src/prove-signal.ts && node src/prove-intake.ts && node --test src/prove-integrity.ts && node --test src/prove-teaching.ts && node --test src/prove-curriculum.ts && node --test src/prove-evidence.ts && node --test src/prove-collect.ts && node --test src/prove-research.ts && node --test src/prove-slides.ts && node --test src/prove-benchmark.ts && node --test src/prove-journey.ts && node --test src/prove-snapshots.ts && node --test src/prove-moods.ts && node --test src/prove-mcp.ts && node --test src/prove-course-record.ts && node --test src/prove-materials.ts && node --test src/prove-diff.ts && node --test src/prove-judge.ts && node --test src/prove-surveys.ts && node --test src/prove-attainment.ts && node --test src/prove-items.ts",
     "gen:demo": "node scripts/gen-demo-files.mjs",
     "gen:music": "node scripts/gen-music.mjs",
     "smoke": "node scripts/demo-smoke.mjs",
@@ -42,6 +43,13 @@
     "check:dashes": "node scripts/dash-scan.mjs",
     "prove:moods": "node --test src/prove-moods.ts",
     "prove:mcp": "node --test src/prove-mcp.ts",
+    "prove:course-record": "node --test src/prove-course-record.ts",
+    "prove:materials": "node --test src/prove-materials.ts",
+    "prove:diff": "node --test src/prove-diff.ts",
+    "prove:judge": "node --test src/prove-judge.ts",
+    "prove:surveys": "node --test src/prove-surveys.ts",
+    "prove:attainment": "node --test src/prove-attainment.ts",
+    "prove:items": "node --test src/prove-items.ts",
     "mcp": "node mcp/server.ts",
     "mcp:sample": "node mcp/sample.ts",
     "mcp:try": "node mcp/try.ts",
@@ -50,16 +58,20 @@
     "gen:architecture": "node scripts/gen-architecture.mjs",
     "gen:brief": "node scripts/gen-brief-pdf.mjs",
     "gen:poster": "node scripts/gen-poster.mjs",
-    "gen:sample-decks": "node scripts/gen-sample-decks.mjs"
+    "gen:sample-decks": "node scripts/gen-sample-decks.mjs",
+    "gen:partner-marks": "node scripts/gen-partner-marks.mjs",
+    "gen:partner-logos": "node scripts/gen-partner-logos.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@hono/node-server": "^1.13.7",
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "hono": "^4.6.14",
+    "hono": "^4.13.13",
     "jszip": "^3.10.1",
     "lucide-react": "^0.469.0",
+    "lz-string": "^1.5.0",
     "pptxgenjs": "^4.0.1",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "unpdf": "^0.12.1",
@@ -71,6 +83,7 @@
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@types/node": "^22.10.2",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
@@ -78,6 +91,6 @@
     "puppeteer-core": "^23.11.1",
     "simple-icons": "^16.35.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.5"
+    "vite": "^6.4.5"
   }
 }

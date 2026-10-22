@@ -32,29 +32,33 @@ export function moodsFor(state: AppState, requests: readonly InFlightRequest[], 
   const mappings = state.skillMappings.filter((m) => m.subjectId === subjectId);
   const briefs = state.evidenceBriefs.filter((b) => b.subjectId === subjectId);
   const drafts = state.curriculumDrafts.filter((d) => d.subjectId === subjectId);
-  const sessions = state.teachingPlans.find((p) => p.subjectId === subjectId)?.sessions ?? [];
+  const sessions = (state.teachingPlans.find((p) => p.subjectId === subjectId)?.sessions ?? []).filter((s) => !s.sample); // the term's samples were never saved here
   const uploads = state.resultUploads.filter((u) => u.subjectId === subjectId);
   const filed = state.dataSources.filter((d) => d.subjectId === subjectId);
   const pending = state.pendingIntake?.interp;
   const pendingResults = Boolean(pending && (pending.docType === "results" || pending.docType === "clo-survey"));
   const pendingCourseDocs = Boolean(pending && (pending.docType === "syllabus" || pending.docType === "slides"));
   const courseSourceIds = new Set(sources.map((s) => s.id));
+  const surveyAwaiting = state.surveys.some((f) => f.subjectId === subjectId && !f.sample && f.formToken
+    && !state.events.some((e) => e.kind === "survey-collected" && e.refs.formId === f.id));
 
   const mood = (working: boolean, waiting: boolean, done: boolean, stuck = false): HelperMood =>
     stuck ? "stuck" : working ? "working" : waiting ? "waiting" : done ? "done" : "resting";
 
   const helpers: Record<HelperRole, HelperMood> = {
-    // Folio reads the course: uploaded syllabi and slides.
-    folio: mood(forCourse("parse") && !pendingResults, pendingCourseDocs, filed.some((d) => (d.kind === "syllabus" || d.kind === "material") && within(d.ingestedAt, now))),
+    // Folio reads the course (uploaded syllabi and slides) and keeps its file: working while the course file builds.
+    folio: mood((forCourse("parse") && !pendingResults) || forCourse("course-file"), pendingCourseDocs, filed.some((d) => (d.kind === "syllabus" || d.kind === "material") && within(d.ingestedAt, now))),
     // Scout collects: working while a fetch runs, waiting while fetched postings are not yet kept.
     scout: mood(forCourse("collect"), Boolean(run && run.status === "done" && run.postings.some((p) => !keptIds.has(p.id))),
       sources.some((s) => within(s.addedAt, now)), Boolean(run && run.status === "failed")),
     // Atlas maps: waiting while proposed quotations await confirmation.
     atlas: mood(false, state.scanProposals.some((p) => courseSourceIds.has(p.sourceId)), mappings.some((m) => within(m.updatedAt, now))),
-    // Lens counts and, in Learn, reads results: waiting while a results file awaits confirmation.
-    // (No request of its own yet, so never "working": counting and filing are instant.)
-    lens: mood(false, pendingResults,
-      uploads.some((u) => within(u.filedAt, now)) || filed.some((d) => (d.kind === "results" || d.kind === "clo-survey" || d.kind === "ssrt") && within(d.ingestedAt, now))),
+    // Lens counts and, in Learn, reads results: waiting while a results file awaits confirmation, or while a survey of the
+    // course is open for the collector with nothing collected since (depth plan Section 11); done after a filing, a saved
+    // OBE report or a CQI note. (No request of its own yet, so never "working": counting and filing are instant.)
+    lens: mood(false, pendingResults || surveyAwaiting,
+      uploads.some((u) => within(u.filedAt, now)) || filed.some((d) => (d.kind === "results" || d.kind === "clo-survey" || d.kind === "ssrt") && within(d.ingestedAt, now))
+        || state.obeReports.some((r) => r.subjectId === subjectId && within(r.printedAt, now)) || state.cqiNotes.some((n) => n.subjectId === subjectId && within(n.at, now))),
     // Quill drafts the revision: waiting while a checked revision awaits adoption.
     quill: mood(false, drafts.some((d) => d.status === "drafting" && d.checkedRevision === d.revision),
       drafts.some((d) => d.history.some((h) => h.action === "adopted" && within(h.at, now)))),

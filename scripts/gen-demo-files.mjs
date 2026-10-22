@@ -1,8 +1,13 @@
 // Generate the sample intake files (spec Section 10) into public/demo/:
-//   results.xlsx          CS310 term results, slightly messy real-world headers
+//   results.xlsx          CS310 term results for 38 students, five outcomes, three
+//                         without a mark on CLO3: sample, synthetic (depth plan 8.4)
+//   results-prior.xlsx    CS310's results for the prior term, the same shape
 //   clo-survey.csv        CS220 per-student CLO mastery survey export
 //   syllabus.pdf          the CS220 official syllabus (supply-side truth)
 //   lecture-slides.pptx   five slides of CS220 lecture content
+//   course-outcome-survey-forms.xlsx  CS310's prior-term Course Outcome Survey as
+//                         a Microsoft Forms export: sample, synthetic (depth plan 7.4)
+//   course-outcome-survey-google.csv  the same survey as Google Forms downloads it
 //
 // All four are real files built with Node built-ins only: the OOXML zips are
 // STORED archives with genuine CRC32s (zlib.crc32, Node 22.2+); the pdf is
@@ -13,6 +18,9 @@
 
 import { writeFileSync, mkdirSync } from "node:fs";
 import { crc32 } from "node:zlib";
+import { PRIOR_COS, PRIOR_SURVEY_RESPONSES } from "../src/data/sample-course/surveys.ts";
+import { SCALE_LABELS } from "../src/lib/surveys.ts";
+import { RESULTS_HEADER, RESULTS_NOW, RESULTS_PRIOR } from "../src/data/sample-course/results.ts";
 
 const OUT = "public/demo";
 mkdirSync(OUT, { recursive: true });
@@ -80,31 +88,21 @@ function storedZip(files) {
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// ---------------------------------------------------------------- results.xlsx
-// CS310 Data Visualisation, one row per student, headers a lecturer would
-// actually write (percent scores, a remarks column the agent must ignore).
-{
-  const header = ["Student ID", "CLO5 mark (%)", "Remarks"];
-  const students = [
-    ["A19001", 62, ""], ["A19004", 71, "late submission"], ["A19011", 55, ""],
-    ["A19013", 68, ""], ["A19017", 47, "resit"], ["A19020", 74, ""],
-    ["A19022", 59, ""], ["A19025", 66, ""], ["A19031", 52, ""],
-    ["A19034", 70, ""], ["A19036", 63, ""], ["A19040", 58, ""],
-    ["A19041", 76, ""], ["A19047", 49, ""], ["A19052", 65, ""],
-    ["A19055", 61, ""], ["A19058", 69, ""], ["A19060", 54, ""],
-    ["A19063", 72, ""], ["A19067", 60, ""], ["A19070", 57, ""],
-    ["A19074", 64, ""], ["A19077", 51, ""], ["A19081", 67, ""],
-  ];
+// ---------------------------------------------------------------- results.xlsx, results-prior.xlsx
+// CS310 Data Visualisation, one row per student, headers a lecturer would actually write (percent marks, a remarks column
+// the intake ignores), from src/data/sample-course/results.ts. A student without a mark has a blank or "ABS" in the cell;
+// a blank is written as no cell at all, as a spreadsheet saves it.
+function resultsWorkbook(sheetName, header, rows) {
   const colRef = (c) => String.fromCharCode(65 + c);
   const cell = (c, r, v) =>
     typeof v === "number"
       ? `<c r="${colRef(c)}${r}"><v>${v}</v></c>`
-      : `<c r="${colRef(c)}${r}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`;
+      : v === "" ? "" : `<c r="${colRef(c)}${r}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`;
   const row = (vals, r) => `<row r="${r}">${vals.map((v, i) => cell(i, r, v)).join("")}</row>`;
-  const sheetRows = [row(header, 1), ...students.map((s, i) => row(s, i + 2))].join("");
+  const sheetRows = [row(header, 1), ...rows.map((v, i) => row(v, i + 2))].join("");
   const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheetRows}</sheetData></worksheet>`;
-  const zip = storedZip([
+  return storedZip([
     {
       name: "[Content_Types].xml",
       data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -118,7 +116,7 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
     {
       name: "xl/workbook.xml",
       data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="CS310 results 2025 S1" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${esc(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
     },
     {
       name: "xl/_rels/workbook.xml.rels",
@@ -127,8 +125,64 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
     },
     { name: "xl/worksheets/sheet1.xml", data: sheetXml },
   ]);
-  writeFileSync(`${OUT}/results.xlsx`, zip);
-  console.log(`Wrote ${OUT}/results.xlsx (${zip.length} bytes)`);
+}
+for (const file of [RESULTS_NOW, RESULTS_PRIOR]) {
+  const zip = resultsWorkbook(file.sheetName, RESULTS_HEADER, file.rows);
+  writeFileSync(`${OUT}/${file.fileName}`, zip);
+  console.log(`Wrote ${OUT}/${file.fileName} (${zip.length} bytes, ${file.rows.length} students)`);
+}
+
+// ---------------------------------------------------------------- course-outcome-survey-forms.xlsx
+// The prior term's Course Outcome Survey for CS310 (sample, synthetic) as Microsoft Forms exports it: ID, Start time,
+// Completion time, Email and Name, then one column per question, headed by the question's text with its id ("Q1.").
+// Email and Name are blank, as an anonymous form leaves them; one row is repeated, as a double submission would be, so
+// the importer's duplicate rule has something to drop.
+{
+  const questions = PRIOR_COS.questions;
+  const header = ["ID", "Start time", "Completion time", "Email", "Name", ...questions.map((q) => q.text)];
+  const answer = (v) => v === undefined ? "" : v === "cannot-say" ? "Cannot say" : typeof v === "number" ? SCALE_LABELS[v - 1] : v;
+  const responses = PRIOR_SURVEY_RESPONSES.filter((r) => r.formId === PRIOR_COS.id);
+  const time = (k, extra) => "2026-06-0" + (1 + (k % 5)) + " " + String(9 + (k % 8)).padStart(2, "0") + ":" + String((k * 7) % 60).padStart(2, "0") + ":" + String(extra).padStart(2, "0");
+  const rows = responses.map((r, k) => [k + 1, time(k, 0), time(k, 41), "", "", ...questions.map((q) => answer(r.answers[q.id]))]);
+  rows.push([rows.length + 1, ...rows[4].slice(1)]); // a double submission: the same times and answers, a new ID
+  const colRef = (c) => String.fromCharCode(65 + c);
+  const cell = (c, r, v) =>
+    typeof v === "number"
+      ? `<c r="${colRef(c)}${r}"><v>${v}</v></c>`
+      : v === "" ? "" : `<c r="${colRef(c)}${r}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`;
+  const row = (vals, r) => `<row r="${r}">${vals.map((v, i) => cell(i, r, v)).join("")}</row>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${[row(header, 1), ...rows.map((v, i) => row(v, i + 2))].join("")}</sheetData></worksheet>`;
+  const zip = storedZip([
+    { name: "[Content_Types].xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>` },
+    { name: "_rels/.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { name: "xl/workbook.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+    { name: "xl/_rels/workbook.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>` },
+    { name: "xl/worksheets/sheet1.xml", data: sheetXml },
+  ]);
+  writeFileSync(`${OUT}/course-outcome-survey-forms.xlsx`, zip);
+  console.log(`Wrote ${OUT}/course-outcome-survey-forms.xlsx (${zip.length} bytes, ${rows.length} rows, one of them repeated)`);
+}
+
+// ---------------------------------------------------------------- course-outcome-survey-google.csv
+// The same prior-term survey as Google Forms downloads its responses (depth plan Section 7.4, D3b): Timestamp first, no
+// Email Address column since the form collected none, each header the question's text with its id, a linear scale's number
+// as the answer, and one row repeated, as a double submission would be.
+{
+  const questions = PRIOR_COS.questions;
+  const responses = PRIOR_SURVEY_RESPONSES.filter((r) => r.formId === PRIOR_COS.id);
+  const csvCell = (v) => { const s = String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const stamp = (k) => String(1 + (k % 5)).padStart(2, "0") + "/06/2026 " + String(9 + (k % 8)).padStart(2, "0") + ":" + String((k * 7) % 60).padStart(2, "0") + ":41";
+  const answer = (v) => v === undefined ? "" : v === "cannot-say" ? "Cannot say" : v;
+  const rows = responses.map((r, k) => [stamp(k), ...questions.map((q) => answer(r.answers[q.id]))]);
+  rows.push(rows[7].slice()); // a double submission: the same timestamp and answers
+  const csv = [["Timestamp", ...questions.map((q) => q.text)], ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
+  writeFileSync(`${OUT}/course-outcome-survey-google.csv`, csv);
+  console.log(`Wrote ${OUT}/course-outcome-survey-google.csv (${csv.length} bytes, ${rows.length} rows, one of them repeated)`);
 }
 
 // ---------------------------------------------------------------- clo-survey.csv

@@ -7,7 +7,7 @@
 // the same course supersedes the decisions on an older one, and a decision taken
 // before the evidence changed is shown with that fact rather than deleted.
 
-import type { BriefDecision, DecisionOutcome, EvidenceBrief, EvidenceSource, SkillMapping, SkillMention } from "../types.ts";
+import type { BriefDecision, CurriculumDraft, DecisionOutcome, EvidenceBrief, EvidenceSource, LoopEvent, SkillMapping, SkillMention, SubjectVersion } from "../types.ts";
 
 export const DECISION_OUTCOMES: DecisionOutcome[] = ["adopt", "retain", "defer", "return"];
 export const OUTCOME_LABEL: Record<DecisionOutcome, string> = {
@@ -74,4 +74,35 @@ export function decisionStatusText(s: BriefDecisionState, name: (id: string) => 
   if (singleOwner && g.byPersonId === s.brief.createdBy) return OUTCOME_LABEL[g.outcome] + ", recorded by the author on a single-owner course.";
   const confirms = s.byAuthor && s.byAuthor.outcome === g.outcome ? ", confirming the author's own decision" : s.byAuthor ? "; the author's self-recorded " + s.byAuthor.outcome + " stays on record" : "";
   return OUTCOME_LABEL[g.outcome] + ", recorded by " + name(g.byPersonId) + confirms + ".";
+}
+
+/** The decision that authorised a course version (depth plan Section 6.2), read from the event log: among the decisions
+ *  recorded on the course before the version was adopted, each person's standing decision on each brief, the latest one
+ *  to adopt a change, bound to the version the revision started from. Null when there is none, and the screen says so. */
+export function authorisingDecision(versionId: string, events: LoopEvent[], decisions: BriefDecision[], drafts: CurriculumDraft[]): BriefDecision | null {
+  const adoptedAt = events.findIndex((e) => e.kind === "version-adopted" && e.refs.versionId === versionId);
+  if (adoptedAt < 0) return null;
+  const adopted = events[adoptedAt];
+  const baseline = drafts.find((d) => d.id === adopted.refs.draftId)?.baselineVersionId;
+  if (!baseline) return null;
+  const standing = new Map<string, { decision: BriefDecision; order: number }>();
+  events.slice(0, adoptedAt).forEach((e, order) => {
+    if (e.kind !== "decision-recorded" || e.refs.subjectId !== adopted.refs.subjectId) return;
+    const decision = decisions.find((d) => d.id === e.refs.decisionId);
+    if (decision) standing.set(decision.briefId + "|" + decision.byPersonId, { decision, order });
+  });
+  const adopting = [...standing.values()].filter((s) => s.decision.outcome === "adopt" && s.decision.courseVersionId === baseline).sort((x, y) => x.order - y.order);
+  return adopting.at(-1)?.decision ?? null;
+}
+
+/** The version a version replaced: the baseline its revision started from (through the version-adopted event), otherwise the
+ *  one before it in time; null for the first version on record. */
+export function previousVersionOf(version: SubjectVersion, versions: SubjectVersion[], events: LoopEvent[], drafts: CurriculumDraft[]): SubjectVersion | null {
+  const adopted = events.find((e) => e.kind === "version-adopted" && e.refs.versionId === version.id);
+  const baseline = adopted && drafts.find((d) => d.id === adopted.refs.draftId)?.baselineVersionId;
+  const byId = baseline ? versions.find((v) => v.id === baseline) : undefined;
+  if (byId) return byId;
+  const ordered = versions.filter((v) => v.subjectId === version.subjectId).sort((a, b) => a.changedAt.localeCompare(b.changedAt));
+  const at = ordered.findIndex((v) => v.id === version.id);
+  return at > 0 ? ordered[at - 1] : null;
 }

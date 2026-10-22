@@ -55,7 +55,10 @@ export interface Programme {
   title: string; // "Bachelor of Computer Science"
   departmentOwnerId: PersonId;
   subjectIds: SubjectId[];
+  // Track C (depth plan Section 4.2): the programme learning outcomes, each with its MQF cluster.
+  plos?: ProgrammeOutcome[];
 }
+export interface ProgrammeOutcome { id: string; text: string; cluster: string }
 
 export interface Subject {
   id: SubjectId; // "CS220"
@@ -109,7 +112,10 @@ export interface ResultUpload {
   subjectId: SubjectId;
   uploadedBy: PersonId;
   term: string;
-  rows: Array<{ cloId: CLOId; meanScore: number; sd: number; n: number }>;
+  rows: Array<{ cloId: CLOId; meanScore: number; sd: number; n: number;
+    // D4a (depth plan Section 8.2): the valid marks out of 100, sorted and never with an identifier, the listed students
+    // without a mark, and the pass mark the profile held at filing. A row from an older backup or an aggregated file has none.
+    marks?: number[]; missing?: number; passMarkAtFiling?: number }>;
   filedAt: string; // ISO
   // v3: which file this came from, for provenance in the Data room.
   sourceFileName?: string;
@@ -261,6 +267,37 @@ export interface TeachingSession {
   status: "draft" | "ready" | "delivered";
   updatedAt: string;
   updatedBy: PersonId;
+  // Track C (depth plan Section 5.1), optional so older records load:
+  slides?: SlideDraft[]; // the session's own slides; without them the pack is built from the records
+  labSheet?: string; // markdown
+  projectBrief?: string; // markdown
+  topicId?: string; // the course topic this session teaches
+  sample?: boolean; // a labelled fixture written for the prototype; never counted as this term's teaching
+  items?: DraftItem[]; // D7 (depth plan Section 10): the check for understanding as items, drafted for the lecturer's review
+}
+
+// ---------- assessment items (depth plan Section 10) ----------
+export type ItemKind = "multichoice" | "shortanswer" | "essay";
+export interface ItemOption { text: string; correct: boolean; feedback?: string }
+/** An item drafted for a lecturer's review. The app never marks one approved; a person's review is a record, cleared when
+ *  the item changes. A verb in a stem does not make an item test that level. */
+export interface DraftItem {
+  id: string; kind: ItemKind; cloId: string; bloomLevel: BloomLevel; stem: string; marks: number;
+  options?: ItemOption[]; // multichoice: three or four, one keyed
+  answers?: string[]; // shortanswer: the accepted answers
+  graderInfo?: string; // essay: what the marker looks for
+  responseLines?: number; // essay: the answer box's height
+  source: "template" | "sample"; // drafted by Lyceum's templates, or a sample written for this prototype
+  reviewedBy: PersonId | null; reviewedAt: string | null;
+}
+/** One slide a lecturer wrote: a title, bullets and speaker notes, with an optional second column or figure. */
+export interface SlideDraft {
+  title: string;
+  bullets: string[];
+  notes: string;
+  right?: string[]; // a second column: the slide uses the two-column master
+  section?: boolean; // a section divider
+  figure?: { kind: "table"; header: string[]; rows: string[][]; alt: string } | { kind: "placeholder"; label: string };
 }
 
 export interface TeachingPlan {
@@ -459,27 +496,68 @@ export interface CourseBrief {
   programmeOutcomes: string[];
   notes: string;
 }
+export type PloLevel = "H" | "M" | "L";
 export interface CourseOutcome extends CLO {
   label: string;
   assessmentEvidence: string;
-  ploIds: string[];
+  ploIds: string[]; // kept for compatibility; derived from ploLinks when they exist
+  // Track C (depth plan Section 4.2), optional so older records load:
+  mqfCluster?: string;
+  ploLinks?: Array<{ ploId: string; level: PloLevel }>; // the CLO to PLO matrix, a level in every linked cell
 }
+export type TopicKind = "lecture" | "lab" | "mixed" | "quiz" | "studio" | "review";
 export interface CourseTopic {
   id: string;
   title: string;
   week: number | null;
-  contactHours: number;
+  contactHours: number; // the sum the Meter and the constraint check use; lectureHours + labHours when both are recorded
   selfStudyHours: number;
   cloIds: string[];
   prerequisiteTopicIds: string[];
   protected: boolean;
   resources: string;
+  // Track C, optional:
+  kind?: TopicKind;
+  lectureHours?: number;
+  labHours?: number;
+  activities?: string;
+  readings?: string;
+  misconceptions?: string[];
+}
+export interface Reference { citation: string; year: number | null; note?: string }
+/** Student learning time in hours (depth plan Section 4.3): lecture and lab follow the topics; the total is checked against credits times 40. */
+export interface StudentLearningTime {
+  lecture: number; lab: number; selfStudy: number;
+  assessmentWork: { quizzes: number; labs: number; essay: number; project: number };
+  exam: number;
+}
+/** One assessed component, with its marks allocated by outcome and Bloom level, so the table of specifications is a sum. */
+export interface AssessmentComponent {
+  id: string; title: string; kind: "quiz" | "lab" | "project" | "defence" | "essay" | "exam"; weight: number; week: string;
+  description: string; individual: boolean;
+  allocation: Array<{ cloId: string; bloomLevel: BloomLevel; marks: number }>;
+  rubricId?: string;
 }
 export interface CourseDefinition {
   title: string;
   brief: CourseBrief;
   outcomes: CourseOutcome[];
   topics: CourseTopic[];
+  // Track C (depth plan Section 4.2), optional so older records load:
+  synopsis?: string;
+  methods?: string[];
+  references?: Reference[];
+  referencesGap?: string; // what the reference list still lacks, said rather than hidden
+  assessment?: AssessmentComponent[];
+  slt?: StudentLearningTime;
+  source?: string; // where a sample record's content was modelled from
+  sample?: boolean; // a labelled fixture written for the prototype
+}
+/** A rubric: four levels in the VALUE rubrics' grid shape, with our own descriptors (depth plan Section 4.2). */
+export interface Rubric {
+  id: string; subjectId: SubjectId; componentId: string; title: string;
+  criteria: Array<{ name: string; marks: number; cloIds: string[]; levels: [string, string, string, string] }>; // capstone, milestone 2, milestone 1, benchmark
+  sample?: boolean;
 }
 export interface CurriculumDecision {
   at: string;
@@ -590,9 +668,78 @@ export interface BriefDecision {
   id: string; briefId: string; subjectId: SubjectId; courseVersionId: string; term: string;
   byPersonId: PersonId; at: string; outcome: DecisionOutcome; note: string;
 }
-export type LoopEventKind = "brief-prepared" | "brief-sent" | "brief-read" | "decision-recorded" | "snapshot-frozen" | "version-adopted" | "term-set";
+export type LoopEventKind = "brief-prepared" | "brief-sent" | "brief-read" | "decision-recorded" | "snapshot-frozen" | "version-adopted" | "term-set"
+  | "grades-released" | "survey-opened" | "survey-collected" | "cqi-noted"; // Track C (depth plan Sections 7, 8 and 11)
 /** An append-only record of what happened and when. The How it works timeline reads these first. */
 export interface LoopEvent {
   id: string; at: string; byPersonId: PersonId; kind: LoopEventKind;
-  refs: { subjectId: SubjectId; briefId?: string; decisionId?: string; snapshotId?: string; versionId?: string; draftId?: string; term?: string; previousTerm?: string };
+  refs: { subjectId: SubjectId; briefId?: string; decisionId?: string; snapshotId?: string; versionId?: string; draftId?: string; term?: string; previousTerm?: string; formId?: string; count?: number; noteId?: string; source?: "booth" | "imported" | "pasted" };
+}
+
+// ---------- attainment against a stated threshold (depth plan Section 8) ----------
+/** The lecturer's continuous quality improvement note for a course and term, a saved record History shows. */
+export interface CqiNote { id: string; subjectId: SubjectId; term: string; versionId: string | null; text: string; at: string; byPersonId: PersonId }
+/** One outcome's direct line as printed: n of N, the mean, the count and share at or above the pass mark, the KPI. */
+export interface ObeDirectRow {
+  cloId: CLOId; label: string; text: string; N: number; n: number; missing: number; filed: boolean;
+  mean: number | null; sd: number | null; atOrAbove: number | null; share: number | null; kpiMet: boolean | null;
+  interval: { low: number; high: number } | null;
+}
+/** The Course Outcome Survey's line for an outcome: the share at the target or higher over those who chose a point. */
+export interface ObeIndirectRow { cloId: CLOId; n: number; atTarget: number; share: number | null }
+/** Per programme outcome, the linked course outcomes with their strength and direct share, listed: no index. */
+export interface ObePloRow { ploId: string; text: string; links: Array<{ cloId: CLOId; label: string; level: "H" | "M" | "L"; share: number | null }> }
+/** The OBE course report as printed (depth plan Section 8.3): a snapshot of the figures and of the settings that shaped them,
+ *  so a later change to the profile cannot relabel it. */
+export interface ObeReport {
+  id: string; subjectId: SubjectId; term: string; versionId: string | null; uploadId: string; sourceFileName: string | null; sample: boolean;
+  passMark: number; studentShare: number; method: "share-above-mark";
+  surveyId: string | null; surveyTitle: string | null; surveyVersionId: string | null; surveyTarget: number | null;
+  respondents: number | null; classSize: number | null; rate: string | null; floorRequired: number | null; surveyOpen: boolean; surveyNote: string | null;
+  direct: ObeDirectRow[]; indirect: ObeIndirectRow[]; plos: ObePloRow[];
+  cqiNoteId: string | null; printedAt: string; printedBy: PersonId;
+}
+
+// ---------- the two student surveys (depth plan Section 7) ----------
+export type SurveyKind = "course-outcome" | "ssrt";
+/** One question. Its id is also printed at the start of its text ("Q3."), so an import matches on the id, not the wording. */
+export interface SurveyQuestion { id: string; text: string; kind: "scale" | "comment"; cloId?: string; dimension?: string }
+/** A scale point, "cannot-say" (excluded from means, counted), or a comment's text. A missing key is an unanswered item. */
+export type SurveyAnswer = number | "cannot-say" | string;
+export interface SurveyDefinition {
+  id: string; subjectId: SubjectId; kind: SurveyKind; title: string; term: string; versionId: string | null;
+  scale: { min: number; max: number; target: number; labels: string[] };
+  questions: SurveyQuestion[];
+  instrumentNote: string | null; // the SSRT's label: a demo instrument, unvalidated
+  classSize: number | null;      // the class the floor's share and the response rate are over, when it is known
+  formToken: string | null;      // set when the form opens for the booth collector: it can post, never read
+  readerSecret: string | null;   // held only here; the token is the first 22 characters of its SHA-256
+  createdAt: string; createdBy: PersonId; sample?: boolean;
+  sampleReleasedAt?: string;     // a sample term's grades, recorded as released with the sample; a real term's release is an event
+}
+/** One student's answers, keyed by question id. Nothing in it identifies a student: a booth response keeps the random id
+ *  its device drew, so one device answers once; an imported one keeps nothing of the export's identity columns. */
+export interface SurveyResponse {
+  id: string; formId: string; term: string; answers: Record<string, SurveyAnswer>;
+  collectedAt: string; clientId: string | null; source: "booth" | "pasted" | "imported" | "sample";
+}
+
+// ---------- the institution profile (depth plan Section 3.1) ----------
+/** The campus the workspace runs for, and every setting that shapes a figure. Each value is printed beside the
+ *  figure it shapes, because attainment and survey conventions differ by institution and no national method exists. */
+export interface InstitutionProfile {
+  name: string; // "Universiti Teknologi PETRONAS (demo)": a demo profile keeps the word demo in its name
+  shortName: string;
+  showMark: boolean; // false for a campus that must not show its mark on sample material
+  mark: { svg: string; png: string; pngSmall: string; wide?: string; alt: string }; // served from public/brand/partners/; wide fits a slide corner
+  kpi: { passMark: number; studentShare: number; method: "share-above-mark" }; // a mark out of 100; a share from 0 to 1
+  surveyScale: { min: number; max: number; target: number }; // the agreement scale and the "target or higher" point
+  surveyFloor: number; // the fewest responses before any aggregate is shown
+  surveyFloorShare: number; // and the smallest share of the class; the stricter of the two applies
+  releaseRule: "all-results-after-grades";
+  lms: string;
+  controller: string; // the privacy line the student page shows
+  privacyNoticeUrl: string; // linked as the demo's example, never as the operator's notice
+  termPattern: string;
+  demo: boolean;
 }

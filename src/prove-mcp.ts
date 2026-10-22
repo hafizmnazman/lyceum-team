@@ -2,7 +2,7 @@
 // real MCP protocol (the SDK's client over an in-memory transport) against the
 // sample workspace, which is the tour's end state built from public/demo. The
 // door answers from the export with receipts and says when it was exported,
-// five tools are read-only and annotated so, the pack tool writes one new file
+// seven tools are read-only and annotated so (the course record and attainment among them), the pack tool writes one new file
 // and never overwrites, nothing touches the workspace file, broken exports and
 // unknown courses are refused, and every call is logged. Run with `node --test`.
 
@@ -22,7 +22,7 @@ import { PEOPLE } from "./data/seed.ts";
 import type { AppState } from "./app/store.ts";
 import type { WorkspaceBackup } from "./lib/workspaceBackup.ts";
 
-const READ_TOOLS = ["lyceum_courses", "lyceum_sources", "lyceum_evidence_report", "lyceum_course_outline", "lyceum_brief_draft"];
+const READ_TOOLS = ["lyceum_courses", "lyceum_sources", "lyceum_evidence_report", "lyceum_course_outline", "lyceum_course_record", "lyceum_attainment", "lyceum_brief_draft"];
 
 /** A client connected to the door over an in-memory transport, reading the workspace at `path`. */
 async function door(path: string, log: string[] = []) {
@@ -50,14 +50,14 @@ test("the sample workspace is the tour's end state, built from public/demo, curr
   assert.equal(readFileSync(SAMPLE_PATH, "utf8").replace(/\r\n/g, "\n"), await buildSampleBackup(), "mcp/sample-workspace.json matches a fresh build; run node mcp/sample.ts if not");
   const { backup } = sampleCopy();
   const d = backup.data;
-  assert.equal(backup.schemaVersion, 5);
+  assert.equal(backup.schemaVersion, 6);
   assert.ok(d.evidenceSources.filter((s) => s.subjectId === "CS310" && s.provenance === "collected").length >= 3, "postings from the saved sample of the Stripe board");
   assert.ok(d.briefDecisions.some((x) => x.byPersonId === "P-RAHMAN" && x.outcome === "adopt" && x.note.trim()), "the programme owner's decision with its reason");
   assert.ok(d.resultUploads.some((u) => u.subjectId === "CS310" && u.sourceFileName === "results.xlsx" && u.courseVersionId && u.sample === true), "the sample results, matched to a version and labelled a sample");
   assert.equal(loopState({ ...d, people: PEOPLE } as unknown as AppState, "CS310").closed, true, "the loop is closed for the term, as at the end of the tour");
 });
 
-test("the door offers six tools: five annotated read-only, the teaching pack as writing a new file", async () => {
+test("the door offers eight tools: seven annotated read-only, the teaching pack as writing a new file", async () => {
   const { path } = sampleCopy();
   const { client, close } = await door(path);
   const { tools } = await client.listTools();
@@ -109,10 +109,29 @@ test("each read tool answers from the export with its receipts and says when the
   await close();
 });
 
+test("the course record and attainment answer from the export: the course file's information and manifest, and the OBE report as the records stand", async () => {
+  const { path, backup } = sampleCopy();
+  const { call, close } = await door(path);
+  const record = await call("lyceum_course_record", { course: "cs310" });
+  assert.ok(!record.isError && record.text.startsWith("From the Lyceum workspace exported at " + backup.exportedAt + "."), "stamped with the export time");
+  assert.ok(record.text.includes("# Course file manifest: CS310") && record.text.includes("the quiz items | sample |") && record.text.includes("The OBE course report with its CQI note | not included |"),
+    "the manifest as the app's zip carries it: the sample quiz's items, no report saved in the sample");
+  assert.ok(record.text.includes("-sample-teaching-pack.pptx") && record.text.includes("A demo course at UTP"), "the packs named as the zip names them, and the honesty line");
+  const now = await call("lyceum_attainment", { course: "CS310" });
+  assert.ok(!now.isError && now.text.includes("The report as the records stand; nobody has saved it.") && now.text.includes("Not saved"), "an unsaved report says so");
+  assert.ok(now.text.includes("| CLO2 | 38 of 38 | 65.6 | 29, 76% | met | not open |"), "CLO2 as the app shows it: 29 of 38 at 55 or above, 76%, KPI met, the survey not open");
+  assert.ok(now.text.includes("(3 without a mark)") && now.text.includes("sampling noise from non-response only; nothing else"), "CLO3's interval, with its label");
+  assert.ok(now.text.includes("No learning gain is claimed") && now.text.includes("never averaged"), "the sentence that stays, and the two constructs kept apart");
+  const prior = await call("lyceum_attainment", { course: "CS310", term: "2025/2026 semester 2" });
+  assert.ok(!prior.isError && prior.text.includes("A seeded example is never counted"), "last term's seeded file is never counted");
+  assert.equal(readFileSync(path, "utf8"), readFileSync(SAMPLE_PATH, "utf8"), "and nothing is written to the export");
+  await close();
+});
+
 test("the pack tool writes one new PPTX, the same deck the app builds, and refuses to overwrite or to write anywhere vague", async () => {
   const { dir, path, backup } = sampleCopy();
   const { call, close } = await door(path);
-  const session = backup.data.teachingPlans.find((p) => p.subjectId === "CS310")!.sessions[0];
+  const session = backup.data.teachingPlans.find((p) => p.subjectId === "CS310")!.sessions.find((s) => !s.sample)!; // the tour's own session, beside the sample ones
   const out = join(dir, "pack.pptx");
   const written = await call("lyceum_teaching_pack", { course: "CS310", session: String(session.week), path: out });
   assert.ok(!written.isError, written.text);
@@ -143,7 +162,7 @@ test("no tool changes the workspace; unknown courses and broken exports are refu
   assert.equal(statSync(path).mtimeMs, modified, "and untouched");
   const unknown = await call("lyceum_evidence_report", { course: "XX999" });
   assert.ok(unknown.isError && unknown.text.includes("CS310"), "an unknown course is refused and the known ones are listed");
-  assert.equal(log.length, 7, "one log line per call");
+  assert.equal(log.length, READ_TOOLS.length + 2, "one log line per call");
   const lines = log.map((l) => JSON.parse(l) as { tool: string; host: string; records: string[]; ok: boolean });
   assert.ok(lines.every((l) => l.host === "lyceum-proof 1.0.0"), "the host that called is named");
   assert.ok(lines.find((l) => l.tool === "lyceum_evidence_report")!.records.length > 0, "with the record ids the call touched");

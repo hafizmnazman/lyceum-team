@@ -10,7 +10,7 @@ import { estimateTotalMs, INTRO_HOLDS } from "./script.ts";
 import { runDemo } from "./runner.ts";
 import { demoAudio } from "./audio.ts";
 import { scaleMs } from "./timing.ts";
-import { CANONICAL_PROPOSAL, ROLE_ASSIGNMENTS } from "../data/seed.ts";
+import { hasSavedWork } from "./savedWork.ts";
 
 type Phase = "idle" | "intro" | "walkthrough" | "done";
 
@@ -69,12 +69,7 @@ export function DemoOverlay() {
 
   async function play() {
     if (phase !== "idle") return;
-    const hasSavedWork = state.teachingPlans.length > 0 || state.testDrafts.length > 0
-      || state.evidenceSources.length > 0 || state.skillMentions.length > 0 || state.skillMappings.length > 0 || state.evidenceBriefs.length > 0 || state.curriculumDrafts.length > 0
-      || JSON.stringify(state.proposals) !== JSON.stringify([CANONICAL_PROPOSAL])
-      || JSON.stringify(state.assignments) !== JSON.stringify(ROLE_ASSIGNMENTS)
-      || state.dataSources.some((source) => source.sourceFileName);
-    if (hasSavedWork && !window.confirm("Playing the demo resets this browser's workspace, including saved plans, drafts and uploads. Export any plan you want to keep first. Continue?")) return;
+    if (hasSavedWork(state) && !window.confirm("Playing the demo resets this browser's workspace, including saved plans, drafts and uploads. Export any plan you want to keep first. Continue?")) return;
     abortRef.current = false;
     setClockPinned(true);
     resetDemoState();
@@ -116,8 +111,8 @@ export function DemoOverlay() {
 
   if (phase === "idle") {
     // Keep the signed-in workspace free of a floating control that could cover content or a
-    // focused element (WCAG 2.4.11); signed in, the Guide page offers the tour inline.
-    if (state.currentPersonId) return null;
+    // focused element (WCAG 2.4.11); signed in, the Guide page offers the tour inline. The kiosk offers the walk alone.
+    if (state.currentPersonId || state.screen === "kiosk") return null;
     return (
       <button
         data-demo-id="play-demo"

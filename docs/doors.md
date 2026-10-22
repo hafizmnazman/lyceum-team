@@ -10,6 +10,8 @@ One core, many doors (plan Section 11): the same deterministic engines, reached 
 | `lyceum_sources` | No (read-only) | The kept sources for a course, each with its link, publication date, retrieval time, review state and fingerprint |
 | `lyceum_evidence_report` | No (read-only) | Each skill's share of reviewed postings with its 95% Wilson interval, coverage against targets, and every quotation with its source |
 | `lyceum_course_outline` | No (read-only) | The current version's outcomes, topics, hours and reason |
+| `lyceum_course_record` | No (read-only) | The course record in the shape of a course file, then the manifest of the zip the app exports: each item present, sample, not yet built or not included |
+| `lyceum_attainment` | No (read-only) | The OBE course report for a course and term: the share at the institution's pass mark with n of N, the KPI, an interval only when some students have no mark, the survey beside the marks and never averaged with them, the programme outcomes listed with no index, the CQI note; the saved report if there is one, otherwise as the records stand |
 | `lyceum_brief_draft` | No (read-only) | A meeting brief drafted from the evidence; not saved, not sent, not a decision |
 | `lyceum_teaching_pack` | Writes one new file | The editable teaching pack (.pptx) for a saved session, written to a new absolute path; it never overwrites a file |
 
@@ -25,7 +27,7 @@ Node 24 or later runs the server directly (it strips the TypeScript types), afte
 
 ## Claude Desktop
 
-Open Settings, then Developer, then Edit Config, and add the server to `claude_desktop_config.json` (on Windows `%APPDATA%\Claude\claude_desktop_config.json`, on macOS `~/Library/Application Support/Claude/claude_desktop_config.json`). Use absolute paths; the server does not know the repository's folder.
+Open Settings, then Developer, then Edit Config, and add the server to `claude_desktop_config.json` (on Windows `%APPDATA%\Claude\claude_desktop_config.json`, on macOS `~/Library/Application Support/Claude/claude_desktop_config.json`). The Microsoft Store version keeps its files elsewhere, so open the file through Edit Config rather than by its path. Use absolute paths, the node binary's included if the app does not find `node` on its own; the server does not know the repository's folder.
 
 ```json
 {
@@ -39,7 +41,7 @@ Open Settings, then Developer, then Edit Config, and add the server to `claude_d
 }
 ```
 
-Restart Claude Desktop. The six tools appear under the lyceum server; Claude asks before each call.
+Restart Claude Desktop. The eight tools appear under the lyceum server; Claude asks before each call.
 
 ## Claude Code
 
@@ -53,11 +55,11 @@ To use the skill as well, copy `skills/lyceum/` into a skills folder the assista
 
 ## Try it without a host
 
-`node mcp/try.ts [path/to/workspace.json]` starts the server as a child process and speaks MCP to it over stdio with the official SDK's client, as a desktop host does: it lists the tools and asks for CS310's evidence report. The run on 22 October 2026 against the sample workspace, first lines:
+`node mcp/try.ts [path/to/workspace.json]` starts the server as a child process and speaks MCP to it over stdio with the official SDK's client, as a desktop host does: it lists the tools and asks for CS310's evidence report. The run on 22 October 2026 against the sample workspace, after the door gained its course record and attainment tools (23:15), first lines:
 
 ```text
 Connected over stdio to lyceum 3.0.0, reading mcp\sample-workspace.json.
-Tools: lyceum_courses (read-only), lyceum_sources (read-only), lyceum_evidence_report (read-only), lyceum_course_outline (read-only), lyceum_brief_draft (read-only), lyceum_teaching_pack (writes a new file).
+Tools: lyceum_courses (read-only), lyceum_sources (read-only), lyceum_evidence_report (read-only), lyceum_course_outline (read-only), lyceum_course_record (read-only), lyceum_attainment (read-only), lyceum_brief_draft (read-only), lyceum_teaching_pack (writes a new file).
 
 lyceum_evidence_report { course: CS310 }, the first lines:
 
@@ -93,4 +95,4 @@ Recorded runs: none yet.
 
 ## Verification
 
-`node --test src/prove-mcp.ts` calls every tool through the MCP protocol against the sample workspace: the sample is current and validates; six tools, five annotated read-only; each read tool answers with its receipts and the export time; the pack tool writes one new PPTX, the same deck the app builds, and refuses to overwrite or to write to a relative path, a wrong extension or a missing folder; no tool changes the workspace file; unknown courses, tampered exports and missing exports are refused; every call is logged with the host and the records it touched. `node mcp/sample.ts --check` confirms the sample matches the tour's end state.
+`node --test src/prove-mcp.ts` calls every tool through the MCP protocol against the sample workspace: the sample is current and validates; eight tools, seven annotated read-only; each read tool answers with its receipts and the export time; the course record carries the manifest the app's zip does, and attainment matches the app, never counts a seeded file and says when a report is not saved; the pack tool writes one new PPTX, the same deck the app builds, and refuses to overwrite or to write to a relative path, a wrong extension or a missing folder; no tool changes the workspace file; unknown courses, tampered exports and missing exports are refused; every call is logged with the host and the records it touched. `node mcp/sample.ts --check` confirms the sample matches the tour's end state.

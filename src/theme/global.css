@@ -1858,3 +1858,377 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
   .form-grid-wide-first { grid-template-columns: minmax(0, 1fr); }
   .landing-bar .btn-ghost { display: none; } /* the hero repeats it just below */
 }
+
+/* ---------- Track C: the depth plan's screens (docs/lyceum-depth-plan.md) ---------- */
+/* The institution's settings on the Guide page: where each default comes from. */
+.institution-form { display: grid; gap: 16px; margin-top: 12px; }
+.institution-help { margin: 0; }
+.institution-help > div { display: grid; grid-template-columns: minmax(120px, 1fr) 4fr; gap: 16px; border-top: 1px solid var(--border); padding: 12px 0; font-size: 13px; }
+.institution-help dt { font-weight: 600; color: var(--ink); }
+.institution-help dd { margin: 0; color: var(--ink-2); }
+@media (max-width: 760px) {
+  .institution-help > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+/* The course record on the Course step (depth plan Section 4.4). */
+.sample-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; color: var(--ink-2); }
+.record-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; }
+.record-facts > div { border: 1px solid var(--border); border-radius: var(--radius-input); padding: 10px 12px; background: var(--tint-1); }
+.record-facts dt { font-size: 12px; color: var(--ink-2); }
+.record-facts dd { margin: 2px 0 0; font-weight: 600; color: var(--ink); }
+.record-synopsis { max-width: 72ch; line-height: 1.6; }
+.slt { margin: 20px 0 0; }
+.slt figcaption { margin-bottom: 8px; font-size: 14px; }
+.slt-bar { display: flex; height: 22px; border: 2px solid var(--forest); border-radius: 8px; overflow: hidden; background: var(--white); }
+.slt-part { height: 100%; border-right: 2px solid var(--white); }
+.slt-part:last-child { border-right: 0; }
+.slt-lecture { background: var(--forest); }
+.slt-lab { background: var(--emerald); }
+.slt-unsplit { background: var(--ink-2); }
+.slt-self { background: var(--moods); }
+.slt-assessment { background: var(--tint-2); }
+.slt-exam { background: var(--border); }
+.slt-unallocated { background: var(--white); outline: 2px dashed var(--next-dashed); outline-offset: -4px; }
+.slt-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin: 10px 0 0; padding: 0; font-size: 13px; color: var(--ink-2); }
+.slt-legend li { display: flex; align-items: center; gap: 6px; }
+.slt-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--control-border); }
+.record-outcomes { margin-bottom: 20px; }
+.record-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+.record-table caption { text-align: left; font-size: 13px; color: var(--ink-2); padding-bottom: 8px; }
+.record-table th, .record-table td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.record-table thead th { font-size: 12px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--emerald-text); border-bottom: 2px solid var(--forest); }
+.record-table tbody th { font-weight: 600; color: var(--ink); }
+.plo-table td { text-align: center; font-weight: 700; min-width: 44px; }
+.plo-H { background: var(--emerald); color: var(--white); }
+.plo-M { background: var(--moods); color: var(--ink-3); }
+.plo-L { background: var(--tint-1); color: var(--ink-2); }
+.plo-unset { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+.plo-none { background: var(--white); }
+.plo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.plo-list p { margin: 2px 0 0; color: var(--ink-2); }
+.rubric-table td { font-size: 13px; color: var(--ink-2); }
+.reference-list { margin: 0 0 12px; padding-left: 20px; }
+.schedule-detail { margin: 0; padding-left: 20px; display: grid; gap: 12px; }
+.schedule-detail p { margin: 4px 0 0; }
+.course-file-export { margin-top: 16px; display: grid; gap: 8px; justify-items: start; }
+@media (max-width: 760px) {
+  .record-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .record-table:not(.plo-table), .record-table:not(.plo-table) tbody, .record-table:not(.plo-table) tr, .record-table:not(.plo-table) th, .record-table:not(.plo-table) td { display: block; width: 100%; }
+  /* A caption left as a table caption inside a table shown as a block shrinks to a letter a line. */
+  .record-table:not(.plo-table) caption { display: block; width: 100%; }
+  .record-table:not(.plo-table) thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .record-table:not(.plo-table) tr { border: 1px solid var(--border); border-radius: var(--radius-input); margin-bottom: 10px; padding: 6px 0; }
+  .record-table:not(.plo-table) th, .record-table:not(.plo-table) td { border-bottom: 0; padding: 4px 12px; }
+  .record-table:not(.plo-table) td[data-label]::before { content: attr(data-label) ": "; font-weight: 600; color: var(--ink); }
+  .plo-table th, .plo-table td { padding: 6px 4px; min-width: 0; }
+}
+/* The revision editor's topics: a topic from the baseline folds to one line; a topic added in this revision opens. */
+.topic-entry > summary { cursor: pointer; list-style: none; padding: 4px 0; }
+.topic-entry > summary::-webkit-details-marker { display: none; }
+.topic-entry-head { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.topic-entry-body { display: grid; gap: 12px; margin-top: 12px; }
+.plo-levels label { display: inline-flex; align-items: center; gap: 8px; margin-right: 16px; }
+/* The teaching pack on screen (depth plan Section 5.3): a thumbnail on each session card and the filmstrip. */
+.slide-svg { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--white); }
+.slide-svg-text { font-family: Calibri, var(--font-body); }
+/* The cards sit three across, so the thumbnail stands above the text rather than beside it. */
+.session-card-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; margin: 4px 0; }
+.deck-thumb { width: 100%; max-width: 360px; }
+.deck-filmstrip ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.deck-filmstrip li { position: relative; }
+.deck-filmstrip-num { position: absolute; left: 6px; bottom: 6px; font-size: 12px; font-family: var(--font-mono); background: var(--white); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; color: var(--ink-2); }
+.sample-sessions { margin-top: 28px; }
+.session-card.is-sample { background: var(--tint-1); }
+/* The schedule's material column: the pack's thumbnail and what the week holds. */
+.schedule-material { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.schedule-thumb { width: 96px; flex: none; }
+.schedule-thumb .deck-thumb { width: 96px; }
+@media (min-width: 761px) { .record-hours { white-space: nowrap; } }
+@media (max-width: 760px) { .schedule-material { justify-content: flex-start; } }
+/* Before and after (depth plan Section 6.2): the redline keeps strikethrough and underline beside the colour, the table
+   outlines what changed and says the delta in words, and the slide diff outlines regions on the previews. Nothing moves. */
+.redline del, .redline-del, .slide-diff-part del { color: var(--danger); text-decoration: line-through; text-decoration-thickness: 2px; }
+.redline ins, .redline-ins, .slide-diff-part ins { color: var(--emerald-text); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.redline-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 4px 0 8px; }
+.redline-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font-size: 13px; color: var(--ink-2); }
+.redline-legend > span { display: inline-flex; align-items: center; gap: 4px; }
+.redline-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.redline-list li { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-input); background: var(--white); }
+.redline-list p { margin: 4px 0 0; }
+.diff-table td.diff-cell, .diff-table th.diff-cell { outline: 2px solid var(--emerald); outline-offset: -3px; }
+.diff-table tbody tr.diff-row-added, .diff-table tbody tr.diff-row-removed { background: var(--tint-1); }
+.diff-table tfoot th, .diff-table tfoot td { font-weight: 600; border-top: 2px solid var(--forest); border-bottom: 0; }
+.change-summary { margin: 4px 0 12px; padding: 10px 12px; border-left: 4px solid var(--emerald); background: var(--tint-1); border-radius: 0 var(--radius-input) var(--radius-input) 0; }
+.slide-diff { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 16px; }
+.slide-diff-item { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
+.slide-diff-head { margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.slide-diff-thumbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 320px)); gap: 12px; margin-bottom: 8px; }
+.slide-diff-thumbs figure { margin: 0; }
+.slide-diff-thumbs figcaption { font-size: 12px; font-family: var(--font-mono); color: var(--ink-2); margin-bottom: 4px; }
+.slide-diff-part { margin-top: 6px; }
+.slide-diff-part ul { margin: 2px 0 0; padding-left: 18px; }
+.link-button { border: 0; padding: 0; background: none; font: inherit; color: var(--emerald-text); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; text-align: left; }
+.link-button:hover { color: var(--forest); }
+.history-authorised { margin: 4px 0; }
+.history-open > h4, .revision-compare > h4 { margin: 20px 0 6px; }
+.history-open > h4:first-of-type { margin-top: 12px; }
+.history-entry:focus { outline: 2px solid var(--focus-light); outline-offset: 4px; }
+@media (max-width: 760px) {
+  /* The stacked record table makes rows blocks; the comparison's caption and totals follow, or they shrink to one letter. */
+  .diff-table caption, .diff-table tfoot { display: block; width: 100%; }
+  .diff-table tfoot tr { border: 2px solid var(--forest); }
+  .diff-table tfoot th, .diff-table tfoot td { border-top: 0; }
+}
+/* The judge's page (depth plan Section 9.1): the host greets once beside the three ways in; the card of what is not built. */
+.judge-hero { grid-template-columns: auto minmax(0, 1fr); }
+.judge-hero h1 { font-size: 34px; line-height: 1.2; margin: 6px 0 20px; }
+.judge-actions { gap: 10px; }
+.judge-watch { margin: 16px 0 0; color: var(--on-forest); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.judge-note { margin: 14px 0 0; font-size: 14px; line-height: 1.55; color: var(--on-forest); max-width: 620px; }
+.judge-not-built { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: start; padding: 24px; border: 2px solid var(--forest); border-radius: var(--radius-card); background: var(--white); box-shadow: 0 6px 0 var(--forest); }
+.judge-remaining > div { display: grid; grid-template-columns: minmax(150px, 1fr) 3fr; gap: 20px; border-top: 1px solid var(--border); padding: 14px 0; }
+.judge-remaining dt { font-weight: 600; }
+.judge-remaining dd { margin: 0; color: var(--ink-2); }
+.judge-door q { font-style: italic; }
+@media (max-width: 760px) {
+  .judge-hero { grid-template-columns: minmax(0, 1fr); }
+  .judge-hero h1 { font-size: 26px; }
+  .judge-not-built { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .judge-remaining > div { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
+/* The guided walk: a spotlight that leaves the page usable, the app's caption, and the host's corner card with the controls. */
+.walk-spotlight { position: fixed; z-index: 110; border-radius: 12px; box-shadow: 0 0 0 9999px var(--scrim); outline: 3px solid var(--emerald); pointer-events: none; }
+.walk-dock { position: fixed; z-index: 112; left: 16px; right: 16px; bottom: 16px; display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; pointer-events: none; }
+.walk-dock > * { pointer-events: auto; }
+.walk-caption { flex: 0 1 720px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; border-radius: var(--radius-card); background: var(--scrim-strong); color: var(--white); font-size: 15px; line-height: 1.5; box-shadow: var(--depth-menu); }
+.walk-caption .muted { color: var(--on-forest); }
+.walk-card { position: relative; flex: 0 0 300px; display: grid; gap: 8px; padding: 12px 14px; border: 2px solid var(--forest); border-radius: var(--radius-card); background: var(--white); box-shadow: var(--depth-menu); }
+.walk-card-alone { position: fixed; z-index: 112; right: 16px; bottom: 16px; width: min(360px, calc(100vw - 32px)); }
+.walk-card-host { display: flex; align-items: center; gap: 10px; padding-right: 32px; }
+.walk-leave { position: absolute; top: 6px; right: 6px; min-height: 32px; padding: 4px 8px; }
+.walk-host-line { margin: 0; font-weight: 600; color: var(--ink); }
+.walk-count { margin: 0; font-family: var(--font-mono); font-size: 13px; color: var(--emerald-text); }
+.walk-keys { margin: 0; font-size: 12px; }
+@media (max-width: 760px) {
+  .walk-dock { left: 8px; right: 8px; bottom: 8px; flex-direction: column; align-items: stretch; gap: 8px; }
+  .walk-caption { flex: none; font-size: 14px; }
+  .walk-card { flex: none; padding: 10px 12px; }
+  .walk-keys { display: none; }
+}
+/* The term recap: one A4 page per course and term (depth plan Section 9.1 item 4). */
+.recap { max-width: 860px; margin: 0 auto; padding: 32px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
+.recap-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center; margin-bottom: 12px; }
+.recap-head h1 { margin: 4px 0; font-size: 28px; }
+.recap-mark { display: grid; justify-items: end; gap: 4px; font-size: 12px; color: var(--ink-2); }
+.recap-mark img { height: 44px; width: auto; }
+.recap-part { margin-top: 20px; }
+.recap-part h2 { font-size: 18px; margin: 0 0 6px; }
+.recap-list { margin: 6px 0; padding-left: 20px; }
+.recap-foot { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--ink-2); }
+@media (max-width: 760px) {
+  .recap { padding: 16px; }
+  .recap-head { grid-template-columns: minmax(0, 1fr); }
+  .recap-mark { justify-items: start; }
+}
+@media print {
+  @page { size: A4; margin: 14mm; }
+  .app-header, .app-sidebar, .skip-link, .no-print, .walk-dock, .walk-spotlight, .redline-controls button, [data-demo-part], [data-demo-id="play-demo"] { display: none !important; }
+  /* The shell fixes the page to the window and scrolls inside; on paper every level grows with its content. */
+  html, body, #root, #root > div, .app-shell, .app-body, .app-main { display: block !important; overflow: visible !important; height: auto !important; min-height: 0 !important; background: var(--white) !important; }
+  .section-help { display: none !important; }
+  /* One A4 sheet: smaller type and tighter tables than on screen, the same content. */
+  .recap { border: 0; padding: 0; max-width: none; font-size: 11.5px; line-height: 1.4; }
+  .recap-head { margin-bottom: 6px; gap: 12px; }
+  .recap-head h1 { font-size: 21px; }
+  .recap-host svg { width: 48px; height: 48px; }
+  .recap-mark img { height: 32px; }
+  .recap .sample-line { margin: 4px 0; }
+  .recap-part { margin-top: 10px; break-inside: avoid; }
+  .recap-part h2 { font-size: 14px; margin-bottom: 4px; }
+  .recap .muted { font-size: 10.5px; }
+  .recap .record-table { margin: 4px 0; font-size: 11px; }
+  .recap .record-table th, .recap .record-table td { padding: 3px 8px; }
+  .recap .change-summary { padding: 5px 10px; margin: 4px 0; }
+  .recap .redline-legend { font-size: 10.5px; }
+  .recap .redline-list li { padding: 5px 8px; }
+  .recap-foot { margin-top: 12px; padding-top: 6px; font-size: 10px; }
+}
+/* The student's survey page (depth plan Section 7.2): one column, large targets, readable at 320 px on a phone. */
+.survey-page { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; background: var(--white); min-height: 100%; box-sizing: border-box; }
+.survey-head { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }
+.survey-head h1 { font-size: 24px; margin: 2px 0; }
+.survey-mark { height: 48px; width: auto; flex: none; }
+.survey-q { margin: 18px 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-input); }
+.survey-q legend, .survey-q > label { font-weight: 600; padding: 0 4px; }
+/* A long question as a legend would sit on the box's top edge; floated, it reads inside the box like the comment's label. */
+.survey-q legend { float: left; width: 100%; box-sizing: border-box; padding: 0; margin: 0; }
+.survey-q legend + * { clear: both; }
+.survey-scale { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin-top: 8px; }
+.survey-scale label { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-input); cursor: pointer; }
+.survey-scale label:has(input:checked) { border-color: var(--emerald); background: var(--tint-1); }
+.survey-q textarea { width: 100%; min-height: 96px; box-sizing: border-box; font: inherit; padding: 8px; border: 1px solid var(--control-border); border-radius: var(--radius-input); }
+.survey-done { margin-top: 18px; padding: 16px; border: 2px solid var(--emerald); border-radius: var(--radius-card); background: var(--tint-1); }
+@media (max-width: 480px) { .survey-scale { grid-template-columns: minmax(0, 1fr); } }
+/* The surveys on Learn: each survey a card; the booth's link and QR; last term's samples tinted. */
+.survey-card { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
+.survey-card.is-sample { background: var(--tint-1); }
+.survey-card h4 { margin: 0 0 2px; }
+.sample-surveys { margin-top: 22px; }
+.booth-open { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.booth-link { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 8px; }
+.booth-qr { width: 200px; height: 200px; image-rendering: pixelated; border: 1px solid var(--border); border-radius: 8px; }
+.booth-url { word-break: break-all; font-size: 13px; }
+.booth-responses { padding: 10px 12px; border-left: 4px solid var(--warn); background: var(--warn-soft); border-radius: 0 var(--radius-input) var(--radius-input) 0; }
+.survey-comments h5 { margin: 12px 0 2px; font-size: 14px; }
+.survey-comments ul { margin: 6px 0; padding-left: 20px; }
+.forms-import { margin-top: 10px; }
+/* D3b (depth plan Section 7.2): a campus's other ways in, under the booth collector, and the paste way's code on the student page. */
+.campus-ways { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: grid; gap: 10px; }
+.campus-ways h5 { margin: 0; font-size: 14px; }
+.forms-document p { margin: 6px 0 0; }
+.paste-way summary { cursor: pointer; font-weight: 600; }
+.paste-way[open] { padding-bottom: 4px; }
+.paste-warning { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-left: 4px solid var(--warn); background: var(--warn-soft); }
+.paste-warning svg { flex: none; margin-top: 2px; }
+.paste-code { display: block; width: 100%; box-sizing: border-box; min-height: 88px; margin: 8px 0; padding: 10px 12px; font: 13px/1.4 var(--font-mono); word-break: break-all; color: var(--ink); background: var(--white); border: 1px solid var(--control-border); border-radius: var(--radius-input); }
+@media (max-width: 760px) { .booth-link { grid-template-columns: minmax(0, 1fr); } }
+/* D6b (depth plan Section 9.1): the programme wall's rings and heat table on Courses, the booth's kiosk and its idle return.
+   The heat table's cells say their level in words as well as in fill: emerald with white text for H (5.2), tints with ink. */
+.wall-rings { list-style: none; margin: 12px 0 20px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.wall-ring { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
+.wall-ring.is-closed { border-color: var(--emerald); background: var(--tint-1); }
+.wall-ring .ring { flex: none; }
+.wall-ring-text { display: grid; gap: 3px; min-width: 0; font-size: 13px; justify-items: start; }
+.wall-ring-title { color: var(--ink); overflow-wrap: anywhere; }
+.wall-ring-open { color: var(--ink-2); }
+.record-table.heat-table { width: auto; min-width: 100%; }
+.heat-table th, .heat-table td { overflow-wrap: normal; word-break: normal; }
+.heat-table thead th, .heat-table th[scope="row"] { white-space: nowrap; }
+.heat-table th[scope="row"], .heat-table thead th:first-child { position: sticky; left: 0; z-index: 1; background: var(--white); }
+.heat-course { display: block; min-width: 120px; max-width: 180px; font-weight: 400; font-size: 12px; color: var(--ink-2); white-space: normal; }
+.heat-table .heat-cell { min-width: 40px; vertical-align: middle; border-left: 2px solid var(--white); }
+.heat-cell.is-h { background: var(--emerald); color: var(--white); }
+.heat-cell.is-m { background: var(--tint-2); color: var(--ink); }
+.heat-cell.is-l { background: var(--tint-1); color: var(--ink); }
+.heat-cell.is-linked { color: var(--ink-2); font-size: 12px; }
+.heat-n { font-size: 11px; font-weight: 600; margin-left: 2px; }
+.heat-table td.heat-none { text-align: left; font-weight: 400; color: var(--ink-2); font-style: italic; vertical-align: middle; }
+.kiosk { min-height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; padding: 24px 32px; background: var(--forest); cursor: pointer; overflow-y: auto; }
+.kiosk-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.kiosk-stage { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: center; }
+.kiosk-film { margin: 0; display: grid; gap: 10px; }
+.kiosk-film video { display: block; width: 100%; max-height: 62vh; border-radius: var(--radius-card); background: var(--forest-deep); }
+.kiosk-film-missing { display: grid; place-items: center; min-height: 240px; padding: 24px; border: 1px dashed var(--on-forest); border-radius: var(--radius-card); color: var(--on-forest); text-align: center; }
+.kiosk-film figcaption { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; color: var(--on-forest); font-size: 14px; }
+.kiosk-host { display: grid; place-items: center; }
+.on-forest .kiosk-touch { align-self: center; min-height: 64px; padding: 0 40px; border: 0; border-radius: 999px; background: var(--lime); color: var(--forest); font: 700 24px/1.1 var(--font-display); cursor: pointer; box-shadow: 0 4px 0 var(--forest-deep); }
+.kiosk-note { margin: 0; text-align: center; }
+.kiosk-foot { display: flex; justify-content: flex-end; }
+.kiosk-idle { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 140; max-width: calc(100% - 32px); padding: 12px 20px; border-radius: 999px; background: var(--forest); color: var(--white); font-weight: 600; text-align: center; box-shadow: var(--depth-menu); }
+@media (max-width: 760px) {
+  .kiosk { padding: 16px; gap: 14px; }
+  .kiosk-stage { grid-template-columns: 1fr; }
+  .kiosk-host .mascot svg { width: 120px; height: 120px; }
+  .on-forest .kiosk-touch { width: 100%; padding: 0 20px; font-size: 20px; }
+}
+
+/* D5b's views (depth plan Section 6.2): the dumbbell of hours, the swipe and onion-skin compare, the version scrubber and
+   the slopegraph. Tokens only; nothing here transitions, and the counters stop under reduced motion in code. */
+.dumbbell { margin: 10px 0; }
+.dumbbell figcaption, .slopegraph figcaption { font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+.dumbbell-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.dumbbell-rows li { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.dumbbell-rows li.is-changed { color: var(--ink); font-weight: 600; }
+.dumbbell-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dumbbell-svg { width: 100%; height: 26px; display: block; }
+@media (max-width: 760px) { .dumbbell-rows li { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+.slide-compare-open summary { cursor: pointer; font-weight: 600; margin-top: 8px; }
+.slide-compare { display: grid; gap: 8px; margin-top: 8px; }
+.slide-compare-stage { position: relative; cursor: col-resize; touch-action: pan-y; user-select: none; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.slide-compare-layer + .slide-compare-layer { position: absolute; inset: 0; }
+.slide-compare-layer .slide-svg { display: block; width: 100%; height: auto; }
+.slide-compare-divider { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--emerald); transform: translateX(-50%); pointer-events: none; }
+.slide-compare-label { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--ink-2); }
+.slide-compare-tag { position: absolute; top: 8px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 8px; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-chip); pointer-events: none; }
+.slide-compare-tag.is-before { left: 8px; }
+.slide-compare-tag.is-after { right: 8px; }
+.slide-compare-range, .version-range { width: 100%; accent-color: var(--emerald); }
+.version-scrubber { margin: 10px 0 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); display: grid; gap: 8px; }
+.version-ticks { list-style: none; margin: 0; padding: 0; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.version-tick { font: inherit; font-size: 13px; padding: 4px 12px; min-height: 36px; border: 1px solid var(--border); border-radius: 999px; background: var(--white); color: var(--ink); cursor: pointer; }
+.version-tick[aria-pressed="true"] { border-color: var(--emerald); background: var(--tint-1); font-weight: 700; }
+/* A pressed toggle reads as pressed: the redline's Hide changes, the compare's Swipe and Onion skin. */
+.slide-compare .button-row [aria-pressed="true"], .redline-controls [aria-pressed="true"] { border-color: var(--emerald); background: var(--tint-1); }
+.version-stop p { margin: 2px 0; }
+.slopegraph { margin: 10px 0; }
+.slopegraph-svg { width: 100%; max-width: 640px; height: auto; display: block; }
+.slope-table tr.is-chosen th, .slope-table tr.is-chosen td { background: var(--tint-1); }
+/* The check's items on a session card (depth plan Section 10): one card an item, the key in bold, the lint as chips with
+   every rule named, and the editor's options in a row. */
+.session-items { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.session-items-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.session-items-head h4 { margin: 0 6px 0 0; }
+.item-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 10px; }
+.item-card { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-input); background: var(--white); min-width: 0; }
+.item-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.item-stem { margin: 6px 0; font-weight: 600; }
+.item-options { margin: 4px 0 6px; padding-left: 22px; }
+.item-options li { margin: 3px 0; }
+.item-options li.is-key { font-weight: 600; }
+.item-lint { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.item-lint li { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--emerald-text); }
+.item-lint li.is-fail { color: var(--ink); border-color: var(--danger); background: var(--danger-soft); }
+.item-option-editor { border: 1px solid var(--border); border-radius: var(--radius-input); padding: 8px 10px; margin: 8px 0; min-width: 0; }
+.item-option-editor legend { float: left; width: 100%; padding: 0; margin: 0 0 6px; font-weight: 600; }
+.item-option-editor legend + * { clear: both; }
+.item-option-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; margin: 4px 0; }
+.item-option-row .control { width: 100%; min-width: 0; }
+.item-option-row .item-option-remove { padding: 6px; min-width: 0; min-height: 44px; }
+/* The OBE course report (depth plan Section 8.3): a document inside Learn, its facts in two columns, each interval under
+   its share, the CQI note quoted; printed alone, the shell's header and sidebar already off the page. */
+.obe-report { margin-top: 10px; padding: 16px 18px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
+.obe-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.obe-head h3 { margin: 2px 0 8px; font-size: 20px; }
+.obe-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; margin: 0; }
+.obe-facts div { min-width: 0; }
+.obe-facts dt { font-size: 12px; color: var(--ink-2); }
+.obe-facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.obe-table thead th { white-space: nowrap; }
+.obe-interval { display: block; font-size: 12px; color: var(--ink-2); }
+.attainment-interval { color: var(--ink-2); }
+.obe-report h4 { margin: 14px 0 4px; font-size: 15px; }
+.obe-plos { margin: 4px 0; padding-left: 20px; }
+.obe-plos li { margin: 3px 0; }
+.obe-cqi { display: grid; gap: 8px; justify-items: start; margin-top: 14px; }
+.obe-cqi .form-field { width: 100%; }
+.obe-cqi-text { margin: 4px 0; padding: 8px 12px; border-left: 4px solid var(--emerald); background: var(--tint-1); }
+.obe-cqi-text footer { margin-top: 4px; font-size: 12px; color: var(--ink-2); }
+.obe-foot { margin-top: 10px; font-size: 12px; color: var(--ink-2); }
+.obe-saved, .obe-sample { margin-top: 16px; }
+.obe-saved summary, .obe-sample summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 760px) { .obe-head { flex-direction: column; } .obe-facts { grid-template-columns: minmax(0, 1fr); } }
+@media print {
+  /* A4's content width (about 688 px) is under the phone breakpoint, so without this every record table would print as
+     stacked cards; on paper a table stays a table. */
+  .record-table:not(.plo-table) { display: table !important; }
+  .record-table:not(.plo-table) caption { display: table-caption !important; }
+  .record-table:not(.plo-table) thead { display: table-header-group !important; position: static !important; width: auto !important; height: auto !important; overflow: visible !important; clip: auto !important; }
+  .record-table:not(.plo-table) tbody { display: table-row-group !important; }
+  .record-table:not(.plo-table) tr { display: table-row !important; border: 0 !important; margin: 0 !important; padding: 0 !important; }
+  .record-table:not(.plo-table) th, .record-table:not(.plo-table) td { display: table-cell !important; width: auto !important; padding: 3px 8px !important; border-bottom: 1px solid var(--border) !important; }
+  .record-table:not(.plo-table) td[data-label]::before { content: none !important; }
+  .obe-head { flex-direction: row !important; }
+  .obe-facts { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .toast { display: none !important; }
+  /* One A4 sheet for the report: smaller type and tighter spacing than on screen, the same content. */
+  .obe-print .obe-report { border: 0; padding: 0; font-size: 10.5px; line-height: 1.35; }
+  .obe-print .obe-head h3 { font-size: 17px; margin: 0 0 4px; }
+  .obe-print .recap-mark img { height: 30px; }
+  .obe-print .obe-report p { margin: 4px 0; }
+  .obe-print .obe-report h4 { margin: 8px 0 2px; font-size: 12.5px; }
+  .obe-print .record-table { font-size: 10.5px; margin: 6px 0; }
+  .obe-print .record-table .tag { padding: 0 6px; font-size: 10px; }
+  .obe-print .obe-plos li { margin: 1px 0; }
+  .obe-print .obe-cqi-text { padding: 4px 10px; }
+  .obe-report h4 { break-after: avoid; }
+  .obe-report tr { break-inside: avoid; }
+}

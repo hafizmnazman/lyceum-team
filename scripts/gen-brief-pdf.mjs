@@ -98,7 +98,7 @@ const page2 = `<section class="page">
     <div class="screens r2">
       <figure>${shot("docs/presentation/shot-decide.png", 88, "The brief, its recipient and the programme owner's decision with its reason, term and course version.")}<figcaption><b>Decide.</b> The programme owner records adopt, with the reason, the term and the version.</figcaption></figure>
       <figure>${shot("docs/presentation/shot-history.png", 88, "The course history: the adopted version with its reason, the earlier version and the decision.")}<figcaption><b>Update.</b> The checked revision, adopted with its reason; the earlier version is kept.</figcaption></figure>
-      <figure>${shot("docs/presentation/pack/slide-03.png", 88, "A slide of the teaching pack as PowerPoint renders it, with the dashboards count and an exact quotation.", { h: 560 })}<figcaption><b>Teach.</b> The downloaded pack as PowerPoint draws it: editable, with no model text.</figcaption></figure>
+      <figure>${shot("docs/presentation/pack/slide-03.png", 88, "A slide of the teaching pack as PowerPoint renders it, with the dashboards count and an exact quotation.", { h: 560 })}<figcaption><b>Teach.</b> The downloaded pack as PowerPoint draws it: editable, and Lyceum adds no model text.</figcaption></figure>
       <figure>${shot("docs/presentation/shot-learn.png", 88, "Learn: the results file filed for the course version taught, with the mean mark per outcome and n of N.")}<figcaption><b>Learn.</b> Results filed for the version taught, with n of N. No learning gain is claimed.</figcaption></figure>
     </div>
     <p class="fine">Real captures of the working prototype in its demo mode, on the dated saved sample of Stripe's public job board.</p>
