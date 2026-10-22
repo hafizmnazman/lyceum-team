@@ -6,7 +6,7 @@
 
 import { getState } from "../app/store.ts";
 import { SCRIPT, type DemoStep } from "./script.ts";
-import { PRE_ACT_MS, SWITCH_PAD_MS, TWEEN_MS, TYPE_CHAR_MS, scaleMs } from "./timing.ts";
+import { PRE_ACT_MS, SWITCH_PAD_MS, TWEEN_MS, TYPE_CHAR_MS, isSampleTour, scaleMs } from "./timing.ts";
 
 export interface DemoCtx {
   setCaption: (c: string) => void;
@@ -122,7 +122,7 @@ async function applyScroll(scroll: string): Promise<void> {
 /** Click the real interactive element; fall through to the first clickable
  *  descendant when the data-demo-id sits on a wrapper. */
 function clickReal(el: HTMLElement) {
-  const interactive = "button, a, [role=button], input, textarea, select";
+  const interactive = "summary, button, a, [role=button], input, textarea, select";
   const target = el.matches(interactive)
     ? el
     : ((el.querySelector(interactive) as HTMLElement | null) ?? el);
@@ -147,13 +147,14 @@ function selectOption(el: HTMLElement, value: string) {
   host.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-async function typeInto(el: HTMLElement, text: string, ctx: DemoCtx) {
+async function typeInto(el: HTMLElement, text: string, ctx: DemoCtx, clear = false) {
   const host = el.matches("input, textarea")
     ? el
     : ((el.querySelector("input, textarea") as HTMLElement | null) ?? el);
   const field = host as HTMLInputElement | HTMLTextAreaElement;
   field.focus();
-  let value = field.value;
+  if (clear) setNativeValue(field, "");
+  let value = clear ? "" : field.value;
   const charMs = scaleMs(TYPE_CHAR_MS);
   for (const ch of text) {
     if (ctx.shouldAbort()) return;
@@ -177,8 +178,10 @@ function predicate(key: string): boolean {
   if (key === "collect-done") return s.collectRun?.status === "done" || s.collectRun?.status === "failed";
   if (key === "sources-imported") return s.evidenceSources.some((x) => x.subjectId === "CS310");
   if (key === "scan-proposals") return s.scanProposals.length > 0;
+  if (key === "snapshot-frozen") return s.evidenceSnapshots.some((x) => x.subjectId === "CS310");
   if (key === "brief-ready") return s.evidenceBriefs.length > 0;
   if (key === "brief-read") return s.notifications.some((n) => n.kind === "evidence-brief" && n.read);
+  if (key === "decision-recorded") return s.briefDecisions.some((d) => d.subjectId === "CS310" && d.byPersonId === "P-RAHMAN");
   return true;
 }
 
@@ -251,18 +254,25 @@ async function execStep(step: DemoStep, ctx: DemoCtx) {
     clickReal(el);
   } else if (step.action === "type") {
     await nudgeOnto(el, ctx);
-    await typeInto(el, step.value ?? "", ctx);
+    await typeInto(el, step.value ?? "", ctx, step.clear);
   } else if (step.action === "select") {
     await nudgeOnto(el, ctx);
     selectOption(el, step.value ?? "");
   }
 }
 
+/** The tour's steps; with ?demoSample the provider is the dated saved sample and the live board's fields are skipped. */
+export function tourSteps(): DemoStep[] {
+  if (!isSampleTour()) return SCRIPT;
+  return SCRIPT.filter((s) => s.target !== "collect-board" && s.target !== "collect-query")
+    .map((s) => (s.target === "collect-provider" && s.action === "select" ? { ...s, value: "sample" } : s));
+}
+
 export async function runDemo(ctx: DemoCtx): Promise<void> {
   cur = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   ctx.setCursor(cur.x, cur.y);
   let prevScreen = getState().screen;
-  for (const step of SCRIPT) {
+  for (const step of tourSteps()) {
     if (ctx.shouldAbort()) return;
     ctx.setCaption(step.caption);
     const screen = getState().screen;

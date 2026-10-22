@@ -15,8 +15,8 @@ export const SECTION_GUIDES: SectionGuide[] = [
   {
     screen: "inbox", title: "Home", audience: "Everyone",
     purpose: "Resume course preparation and respond to work routed to you.", status: "Working locally",
-    steps: ["Open a course to continue preparation.", "Use the work queue for drafts or reviews in your role.", "Open a notification to see the request in context. An evidence brief opens here with its receipts and can be downloaded."],
-    output: "A next action tied to an actual course, session or proposal in this workspace.",
+    steps: ["Read the receipts ring for your course in Start here: each step says Done only when its record exists this term, and Continue opens the next one.", "Open a brief waiting for a decision. The list opens by itself when one is waiting; a brief sent to you opens here with its receipts, and if you hold the decide position you record adopt, retain, defer or return with the reason.", "Open a notification to see the request in context. A decision on your own brief opens that course's Decide step. Your courses, with their loop summaries, are in the last disclosure."],
+    output: "A next action tied to an actual course, brief or session in this workspace.",
     limitation: "No real timetable, deadlines, email reminders or institutional notifications are connected.",
   },
   {
@@ -27,23 +27,58 @@ export const SECTION_GUIDES: SectionGuide[] = [
     limitation: "The initial catalogue is illustrative. Personal courses use your entered content and have no calibrated market or learning score. Counts describe saved work, not academic quality.",
   },
   {
-    screen: "studio", title: "Course Studio", audience: "Assigned lecturers and coordinators",
-    purpose: "Develop the course outline, prepare classes and keep a traceable local revision history.", status: "Partial",
-    steps: ["Overview: inspect current outcomes, prerequisites, source records and unfinished preparation.", "Outcomes & topics: start a revision. Add, edit or remove CLOs and topics; record achievement evidence, PLO mappings, hours, prerequisites and protected foundations.", "Save and check the revision. Fix errors, inspect warnings and the before/after comparison, then record your rationale and teaching term. Use as my course version requires your explicit review; university approval stays in its existing process.", "Evidence: run a research run against a permitted employer board or the dated saved sample, keep the postings worth reading, scan them for the skills you name and confirm each exact quotation (paraphrases are rejected), mark the extraction reviewed so the postings count, map each quoted skill to an outcome with a reviewed coverage stage and target, then prepare a meeting brief to download as a document or as editable slides, or send to a colleague. Shares show the numerator, denominator and a Wilson interval. Collection happens only when you ask.", "Teaching plan: save CLO-linked sessions, activities, learning checks and references; export the plan; download an editable teaching pack (.pptx) for any session with its outcomes, the employer evidence behind them, the activity and the check. Review affected sessions after a course change.", "Assessment: prepare a blueprint independently of a proposal, select preserved drafts and inspect illustrative item generation. A changed course requires another assessment review before submission. Proposal retains the legacy review workflow.", "History: inspect preserved course versions and revision decisions, and export a previous outline."],
-    output: "An editable course definition, candidate and active local versions, decision history, evidence receipts with an exportable report, teaching plan, Markdown outlines and assessment draft.",
-    limitation: "One teaching plan per course in this browser. Local version activation does not attest institutional approval. Evidence describes the recorded set only. Collection is on request from two documented board APIs (Greenhouse and Lever) through the local API, or from the dated saved sample; comparable time windows, employer-balanced views and scheduled refresh are not built. Slide packs are generated from saved data with no model-written text; model-drafted slide content and template import remain to be built. Configurable institution-wide reviews, term archives and accurate assessment allocation remain to be built. Agent drafting still uses fixtures.",
+    screen: "studio", title: "Course, Update, Teach and History", audience: "Assigned lecturers and coordinators",
+    purpose: "Set up the course, make the decided change, prepare classes and keep a traceable local history.", status: "Partial",
+    steps: ["Course: set the term this loop runs for first, so every record in it carries the term. The outline as cards, outcomes with their Bloom level and topics with their hours against the contact-hour budget. One action: Watch employers while the course has no evidence, Start a revision once it has. Teaching context, documents, the preparation checklist and the illustrative sandbox sit behind disclosures.", "Update: start a revision. The hours meters, the number of changes and the check state open it. Add, edit or remove CLOs and topics; record achievement evidence, PLO mappings, hours, prerequisites and protected foundations. Save and check it, inspect the warnings and the before and after comparison, then record the rationale and teaching term. The coordinator, or the owner of a personal course, makes it the course version; university approval stays in its existing process. The sessions and assessments a change affects are listed behind a disclosure. When the decision was retain, Update shows no change this term, and says so if a version was adopted anyway.", "Teach: session cards by week, each with its linked outcomes and its editable teaching pack (.pptx) built from the session and the employer evidence behind its outcomes. Save CLO-linked sessions, activities, learning checks and references, and export the plan. The assessment blueprint and template items sit behind a disclosure. Review affected sessions after a course change.", "History: versions and decisions on one timeline, newest first. Each entry opens to its outline, with an export, or to its decision and reason; the revision log sits behind a disclosure."],
+    output: "An editable course definition, candidate and active local versions, the decision history, a teaching plan, Markdown outlines and an assessment draft.",
+    limitation: "One teaching plan per course in this browser. Local version activation does not attest institutional approval. Slide packs are generated from saved data with no model-written text; model-drafted slide content and template import remain to be built. Configurable institution-wide reviews, term archives and accurate assessment allocation remain to be built. Agent drafting still uses fixtures.",
+  },
+  {
+    screen: "watch", title: "Watch", audience: "Assigned lecturers and coordinators",
+    purpose: "See what employers are asking for, right now and over time.", status: "Working locally",
+    steps: ["Run a research run against a permitted employer board (Greenhouse or Lever, through the local API) or the dated saved sample. Collection happens only when you ask.", "Keep the postings worth reading. Each keeps its link, publication date, retrieval time and fingerprint; a copy of a kept posting is flagged as a duplicate and not counted twice.", "Paste a document you are permitted to keep, such as an employer letter or an advisory board note, with its exact text.", "Freeze a snapshot of the reviewed evidence at each review and compare a later window with it. A skill is called rising or falling only when the two 95% intervals separate."],
+    output: "Dated sources with their receipts, and frozen snapshots to compare.",
+    limitation: "Two documented board APIs and a dated saved sample only; no other sites, no scheduled refresh and no employer-balanced view. A convenience sample describes the postings kept, not the labour market.",
+  },
+  {
+    screen: "report", title: "Report", audience: "Assigned lecturers and coordinators",
+    purpose: "Say exactly what employers ask, how often, and what the course does about it.", status: "Working locally",
+    steps: ["Quote: name the skills, scan the kept postings and confirm each proposed sentence beside its source, with the matched words highlighted. A paraphrase is rejected.", "Review: mark the postings you have read so they join the denominator. Unreviewed postings are not counted.", "Count: read each skill's share as postings of reviewed postings, with its Wilson 95% interval. There is no score.", "Map: place each quoted skill on an outcome's coverage ladder (absent, introduced, practised, assessed) against a target.", "Brief: prepare the meeting brief with every receipt, download it as a document or as editable slides, and send it to the people who decide. With a snapshot, the brief reports what changed since it."],
+    output: "Confirmed quotations, a reviewed denominator, counts with intervals, coverage mappings and a meeting brief with receipts.",
+    limitation: "Counts describe the recorded set only. The scan proposes and a person confirms; nothing counts without review. The brief recommends; it does not decide.",
+  },
+  {
+    screen: "decide", title: "Decide", audience: "Coordinators and the programme owner; lecturers send briefs",
+    purpose: "Record what will be done about the brief, by whom, when and why.", status: "Working locally",
+    steps: ["Open the latest brief from Home or this step. It shows its recipients, who has read it and what each person decided.", "Choose adopt, retain, defer or return and write the reason. The note travels with the record.", "A decision on your own brief is self-recorded and the step stays open until a second person decides, except on a personal single-owner course.", "To change your mind, record again: the earlier record stays and the newest is your standing decision. A newer brief supersedes the older one, whose decisions stay on record. A decision taken before the evidence changed is marked as such."],
+    output: "An immutable decision record bound to the brief, the course version and the term, on the course timeline.",
+    limitation: "Positions are local personas and role checks are not authenticated server authorization. A recorded decision does not by itself establish official university approval. The mock-cohort try is illustrative.",
+  },
+  {
+    screen: "proposal", title: "Change proposal", audience: "Lecturers and coordinators",
+    purpose: "Explore the prototype's earlier proposal and approval chain in the illustrative sandbox.", status: "Demonstration",
+    steps: ["Start a draft for a course or continue an open one.", "Edit the proposed outcomes and topics, ask for an agent review and submit for coordinator review.", "Run the acceptance scenario and pass the proposal to the approval sandbox."],
+    output: "An illustrative proposal with its review history.",
+    limitation: "This is the earlier approval chain, kept for exploration. Course decisions are recorded in each course's Decide step. Forecasts are uncalibrated and agent drafting uses fixtures.",
+  },
+  {
+    screen: "learn", title: "Learn", audience: "Assigned lecturers and coordinators",
+    purpose: "See what came back for each outcome, as far as we can honestly tell.", status: "Partial",
+    steps: ["Read attainment per outcome from the latest results file: the mean mark as filed, its spread, and n of N, where N is the most students the file records for any one outcome.", "File the term's results or a CLO survey. You see what was read beside what it was taken to mean, and you confirm the course version the results are for; by default it is the version this term's sessions were saved on.", "Check the results and surveys filed for the course. A seeded example is labelled and never counts.", "Open the benchmark protocol and its status, and read what is planned for the pilot."],
+    output: "A results file matched to the version taught, and attainment per outcome with n of N.",
+    limitation: "No learning gain is claimed; the benchmark has not been run. Intervals, response adequacy, pooling, perception beside attainment and scored predictions are planned. N is read from the file, not from an enrolment record.",
   },
   {
     screen: "upload", title: "Upload", audience: "Assigned lecturers and coordinators",
     purpose: "Read a document and review its interpretation before filing it.", status: "Partial",
-    steps: ["Choose a supported PDF, PPTX or spreadsheet with the local API running.", "Check extracted text/tables, document type, course and term in the preview.", "Correct the interpretation and confirm; inspect the filed record in Data room."],
+    steps: ["Choose a supported PDF, PPTX or spreadsheet with the local API running. Results and surveys can also be filed from Learn.", "Check extracted text/tables, document type, course and term in the preview; for results, confirm the course version taught.", "Correct the interpretation and confirm; inspect the filed record in Learn or the Data room."],
     output: "Extracted records and source metadata in this browser's workspace.",
     limitation: "Confirmation records a reviewed upload and never marks it institutionally verified. Original files are not a durable library or part of JSON backups. Structured survey/result matching needs further validation.",
   },
   {
     screen: "acceptance", title: "Acceptance test", audience: "Assigned lecturers and coordinators",
     purpose: "Explore the prototype's curriculum sequencing and readiness scenario.", status: "Demonstration",
-    steps: ["Prepare a proposal; a lecturer-authored proposal needs coordinator review first.", "Run the scenario from the proposal in Studio.", "Inspect the explanation, assumptions and drill-down before treating it as a discussion aid."],
+    steps: ["Prepare a proposal in the sandbox; a lecturer-authored proposal needs coordinator review first.", "Run the scenario from the proposal.", "Inspect the explanation, assumptions and drill-down before treating it as a discussion aid."],
     output: "An illustrative report routed into the management review workflow.",
     limitation: "The model is uncalibrated. Editing teaching sessions or topic wording does not cause a validated learning forecast. Never treat this score as approval evidence on its own.",
   },
@@ -56,10 +91,10 @@ export const SECTION_GUIDES: SectionGuide[] = [
   },
   {
     screen: "approval", title: "Approvals", audience: "Management",
-    purpose: "Review a tested proposal and record a decision with its reasoning.", status: "Partial",
+    purpose: "Review a tested proposal in the illustrative sandbox and record a decision with its reasoning.", status: "Partial",
     steps: ["Read the proposed changes, illustrative scenario report and review history.", "Approve the tested candidate or return it with a reason. Changes after testing require a new check; a changed baseline cannot be approved.", "Inspect the resulting local course version in Studio History and the illustrative prediction in Closed loop."],
     output: "Actual candidate CLO/topic edits in a new local version, the preserved baseline and a local decision event; approval also records an illustrative prediction.",
-    limitation: "This remains the prototype's fixed review chain with uncalibrated forecasts. Role checks are local, not authenticated server authorization. A local decision does not independently establish official university approval.",
+    limitation: "This remains the prototype's fixed review chain with uncalibrated forecasts, kept in the sandbox; decisions on the loop are recorded in Decide. Role checks are local, not authenticated server authorization. A local decision does not independently establish official university approval.",
   },
   {
     screen: "programme", title: "Programme", audience: "Department",
@@ -98,10 +133,10 @@ export const SECTION_GUIDES: SectionGuide[] = [
   },
   {
     screen: "office", title: "How it works", audience: "Everyone",
-    purpose: "See the seven roles in order, what each reads, produces and cannot do, and the real record of what happened on your course.", status: "Working locally",
-    steps: ["Open a role card to read what it reads, produces and cannot do.", "Choose a course to see its timeline: every line is derived from a saved record, in order.", "Use Open on a timeline entry to jump to the tab that holds it."],
+    purpose: "See the loop with the host at its centre and the seven helpers at their stations, what each reads, produces and cannot do, and the real record of what happened on your course.", status: "Working locally",
+    steps: ["Choose a helper on the loop, or its card, to read what it reads, produces and cannot do. Decide is the station where people decide.", "Choose See the record on this course to open its timeline. Lines from the event log (briefs prepared, sent and read, decisions, snapshots, adoptions, term changes) carry the time they happened; lines worked out from the records are labelled derived.", "Use Open on a timeline entry to jump to the step that holds it."],
     output: "A step-by-step record of the work done on a course, told by role, with a link to each result.",
-    limitation: "Roles are deterministic workflow steps with optional model help, not autonomous agents. The timeline shows only recorded work; it never invents reasoning or activity.",
+    limitation: "Roles are deterministic workflow steps with optional model help, not autonomous agents. The timeline shows only recorded work; it never invents reasoning or activity, and a derived line never claims a time it does not have.",
   },
   {
     screen: "evaluation", title: "Evaluation", audience: "Everyone",
@@ -120,11 +155,11 @@ export const SECTION_GUIDES: SectionGuide[] = [
 ];
 
 export const REMAINING_WORK = [
-  { title: "Evidence collection", detail: "On-request collection from the Greenhouse and Lever board APIs, exact-excerpt receipts, fingerprint duplicate detection, lexicon-assisted scanning, reviewed denominators and meeting briefs work. Scrapling page adapters, snapshots of arbitrary sites, cross-site vacancy clustering, scheduled refresh and refresh-failure reporting remain planned." },
+  { title: "Evidence collection", detail: "On-request collection from the Greenhouse and Lever board APIs, exact-excerpt receipts, fingerprint duplicate detection, lexicon-assisted scanning, reviewed denominators and meeting briefs work. Scrapling page adapters, snapshots of arbitrary sites, cross-site vacancy clustering, scheduled refresh and refresh-failure reporting remain planned. Frozen evidence snapshots and their comparison work; a re-collected posting is matched by its board posting id." },
   { title: "Defensible calculations", detail: "Observed shares with explicit numerators and denominators, Wilson intervals, reviewed coverage stages and a demand-weighted coverage index work for recorded evidence. Comparable time windows, employer-balanced sensitivity views, publication gates and validation against real course/cohort data remain planned." },
-  { title: "Institutional review", detail: "Local CLO/topic editing, constraints, diffs and version activation work. Institution profiles, configurable review authorities, term archives and server-enforced decisions remain to be built." },
+  { title: "Institutional review", detail: "Local CLO/topic editing, constraints, diffs and version activation work, and decisions on briefs are recorded with their reason, person, course version and term. Institution profiles, configurable review authorities, positions as data, term archives and server-enforced decisions remain to be built." },
   { title: "Teaching materials", detail: "Editable PPTX teaching packs and brief decks are generated from saved sessions, outcomes and evidence receipts, with speaker notes and no model-written text. Model-drafted slide content with lecturer review, selective regeneration, institutional templates, handouts and accessibility checks of exported decks remain planned." },
-  { title: "Agent integrations", detail: "Distinct branded roles, structured model output, provider SDK adapters, job retries, usage/cost controls and evaluation fixtures." },
+  { title: "Agent integrations", detail: "A local, read-only MCP server over an exported workspace works (mcp/, docs/doors.md), with a skill folder for assistants. Remote access with OAuth, the Teams, Google Workspace and LMS doors, structured model output, provider SDK adapters, job retries, usage and cost controls and evaluation fixtures remain planned." },
   { title: "Shared institutional workspace", detail: "Database, authenticated roles, durable source files, validated legacy migration, term/cohort separation and collaboration. JSON backup/restore works locally; it does not include original uploaded files." },
   { title: "Accessibility and pilot validation", detail: "Full WCAG 2.2 AA audit, screen-reader testing, accessible exports and a real lecturer trial. Current improvements are not a compliance certification." },
 ];

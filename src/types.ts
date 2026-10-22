@@ -113,6 +113,10 @@ export interface ResultUpload {
   filedAt: string; // ISO
   // v3: which file this came from, for provenance in the Data room.
   sourceFileName?: string;
+  // A2b: the course version these results are for, the version taught that term, confirmed when filed (plan Section 4, Learn).
+  courseVersionId?: string;
+  // A8: filed from one of the app's sample files, so its marks are synthetic and say so.
+  sample?: boolean;
 }
 
 export interface DataSource {
@@ -125,6 +129,7 @@ export interface DataSource {
   // v3: verified = ingested from a published document rather than self-entered.
   verified?: boolean;
   sourceFileName?: string;
+  sample?: boolean; // A8: filed from one of the app's sample files
 }
 
 // ---------- change proposals (the flow) ----------
@@ -226,7 +231,8 @@ export type NotificationKind =
   | "test-done"
   | "approved"
   | "rejected"
-  | "evidence-brief";
+  | "evidence-brief"
+  | "brief-decision"; // a decision was recorded on a brief you prepared
 
 export interface Notification {
   id: string;
@@ -290,6 +296,8 @@ export interface ParsedDoc {
   kind: UploadedFileKind;
   pages: Array<{ index: number; text: string }>; // slides = pages
   tables: Array<{ name: string; rows: string[][] }>; // sheets and detected tables
+  // A8: one of the sample files the app ships in public/demo; every record filed from it says it is synthetic.
+  sample?: boolean;
 }
 
 /** What the Intake agent makes of a ParsedDoc. The user always confirms this
@@ -301,6 +309,7 @@ export interface IntakeInterpretation {
   mappedRows?: ResultUpload["rows"]; // when docType === "results"
   surveyRecords?: SurveyRecord[]; // when docType === "clo-survey"
   contentSummary?: string; // syllabus/slides: filed as subject material
+  courseVersionId?: string; // results: the course version taught, confirmed by the person filing
   confidence: number; // 0..1, shown to the user
   notes: string[]; // "column 'Avg' read as meanScore", etc.
 }
@@ -547,9 +556,43 @@ export interface CollectedPosting {
   publishedAt: string; // as published by the board, empty when unknown
   updatedAt: string; text: string; retrievedAt: string;
 }
+// ---------- watching the evidence over time ----------
+/** A reviewed posting as it stood when a snapshot was frozen. `identity` stays stable across re-imports of the same board posting. */
+export interface SnapshotPosting { id: string; identity: string; title: string; organisation: string; url: string; sourceDate: string; textHash: string }
+/** One skill's counts at the moment of freezing. Intervals are recomputed from these counts, never stored. */
+export interface SnapshotSkill {
+  key: string; skill: string;
+  postings: number; required: number; preferred: number; // reviewed vacancy clusters quoting it
+  stage: CoverageStage; target: CoverageStage; // the lecturer's reviewed coverage at the time
+  sourceIds: string[]; // the canonical postings behind the count, for receipts
+}
+/** The reviewed evidence for one course, frozen at a moment so a later window can be compared with it. Never edited after it is taken. */
+export interface EvidenceSnapshot {
+  id: string; subjectId: SubjectId; label: string; takenBy: PersonId; takenAt: string;
+  eligible: number; organisations: number; unreviewed: number; duplicates: number; contextual: number;
+  lookedFor: string[]; // skill keys scanned for or quoted at the time; a skill outside this list was not looked for
+  skills: SnapshotSkill[];
+  postings: SnapshotPosting[];
+}
+
 export type BriefRecommendation = "keep" | "refresh" | "revise" | "undecided";
 /** A meeting brief prepared from the evidence at one moment; the markdown is a snapshot with receipts. */
 export interface EvidenceBrief {
   id: string; subjectId: SubjectId; createdBy: PersonId; createdAt: string; recommendation: BriefRecommendation; notes: string; markdown: string;
   recipients: PersonId[]; sentAt: string | null;
+}
+
+// ---------- the decision record and the event log (plan Section 4) ----------
+export type DecisionOutcome = "adopt" | "retain" | "defer" | "return";
+/** One person's decision on one brief, bound to the brief, the course version and the term. Immutable:
+ *  an amendment is a new record, and a person's latest record on a brief is their standing decision. */
+export interface BriefDecision {
+  id: string; briefId: string; subjectId: SubjectId; courseVersionId: string; term: string;
+  byPersonId: PersonId; at: string; outcome: DecisionOutcome; note: string;
+}
+export type LoopEventKind = "brief-prepared" | "brief-sent" | "brief-read" | "decision-recorded" | "snapshot-frozen" | "version-adopted" | "term-set";
+/** An append-only record of what happened and when. The How it works timeline reads these first. */
+export interface LoopEvent {
+  id: string; at: string; byPersonId: PersonId; kind: LoopEventKind;
+  refs: { subjectId: SubjectId; briefId?: string; decisionId?: string; snapshotId?: string; versionId?: string; draftId?: string; term?: string; previousTerm?: string };
 }

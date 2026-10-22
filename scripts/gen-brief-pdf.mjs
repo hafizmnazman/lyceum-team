@@ -1,272 +1,263 @@
-// The project brief as a PDF, for sharing Lyceum with someone who has not seen
-// it: the idea and how it works (page 1), where it stands with real screens
-// (page 2), and the organizer's review (page 3). The text lives in this file;
-// edit it here and run `node scripts/gen-brief-pdf.mjs` (add `--preview <dir>`
-// for PNG previews). The screens come from `node scripts/presentation-shots.mjs`.
-// Fonts load from Google Fonts when online and fall back to Segoe UI and Georgia.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+// The project brief as a three-page A4 PDF, for someone who has not seen Lyceum:
+// the person, why now, the receipt and the loop (page 1); the journey in real
+// screens and what is real (page 2); the doors, why a department pays, the
+// organiser's review and the ask (page 3). The same eight beats as the deck
+// (plan Section 4.1), on the tokens and the bundled faces, with the mascots and
+// the screenshots from scripts/presentation-shots.mjs. Every number sits in an
+// element marked data-claim (a row of docs/claims.md) or data-ref (a date, an id,
+// a clause), and the script fails on a stray digit, a dash, or text that runs
+// into a footer. Run `node scripts/gen-brief-pdf.mjs` (add `--preview <dir>` for
+// PNG previews of the pages).
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { ChartColumn, CircleCheck, FileText, Gavel, PenLine, Plug, Presentation, Quote, Search, UserCheck } from "lucide-react";
 import puppeteer from "puppeteer-core";
+import { ROOT, fontFaceCss, fontsReady, rootVarsCss } from "./lib/theme-node.mjs";
+import { claimsRegister, figureProblems, readFigures } from "./lib/claims-node.mjs";
+import { PAIN_STATS } from "../src/data/painStats.ts";
+import { PROOF } from "../src/data/proof.ts";
 
-const OUT = "docs/presentation/lyceum-brief.pdf";
+const OUT = join(ROOT, "docs/presentation/lyceum-brief.pdf");
 const previewAt = process.argv.indexOf("--preview");
 const PREVIEW_DIR = previewAt > 0 ? process.argv[previewAt + 1] : null;
 
-const C = { ink: "#191c1f", ink2: "#55595e", ink3: "#62676d", accent: "#3b5bdb", accentSoft: "#edf0fc", ok: "#1f7a4d", okSoft: "#e7f3ec", warn: "#925108", warnSoft: "#fcf0e0", border: "#e4e4e0", bg: "#f7f7f5", surface2: "#f1f1ee" };
-const icon = (Icon, color = C.accent, size = 15) => renderToStaticMarkup(createElement(Icon, { size, color, strokeWidth: 1.75, "aria-hidden": true }));
-
-// Real screens, cropped in CSS. Coordinates are in the PNG's own pixels.
-const png = (file) => { const b = readFileSync(file); return { src: "data:image/png;base64," + b.toString("base64"), w: b.readUInt32BE(16), h: b.readUInt32BE(20) }; };
-const shot = (img, area, boxW, alt) => {
-  const { x = 0, y = 0, w = img.w, h = img.h } = area, s = boxW / w;
-  return `<div class="shot" style="width:${boxW}mm;height:${(h * s).toFixed(2)}mm"><img alt="${alt}" src="${img.src}" style="width:${(img.w * s).toFixed(2)}mm;margin-left:${(-x * s).toFixed(2)}mm;margin-top:${(-y * s).toFixed(2)}mm"></div>`;
-};
-const SHOTS = {
-  journey: png("docs/presentation/shot-studio-journey.png"),
-  evidence: png("docs/presentation/shot-evidence-table.png"),
-  agents: png("docs/presentation/shot-agents.png"),
-};
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const dataUri = (file, type) => "data:" + type + ";base64," + readFileSync(join(ROOT, file)).toString("base64");
+const mascot = (who, pose = "resting") => dataUri("public/brand/mascots/" + who + "-" + pose + ".svg", "image/svg+xml");
+const png = (file) => { const b = readFileSync(join(ROOT, file)); return { src: "data:image/png;base64," + b.toString("base64"), w: b.readUInt32BE(16), h: b.readUInt32BE(20) }; };
+/** A real screenshot at a width in mm, optionally cropped to a region given in the image's own pixels. */
+function shot(file, widthMm, alt, area = {}) {
+  const img = png(file), { x = 0, y = 0, w = img.w, h = img.h } = area, s = widthMm / w;
+  return `<div class="shot" style="width:${widthMm}mm;height:${(h * s).toFixed(2)}mm"><img alt="${esc(alt)}" src="${img.src}" style="width:${(img.w * s).toFixed(2)}mm;margin-left:${(-x * s).toFixed(2)}mm;margin-top:${(-y * s).toFixed(2)}mm"></div>`;
+}
+const proof = Object.fromEntries(PROOF.map((p) => [p.claim, p]));
 
 // ---------- the content ----------
-const STATS = [
-  { scope: "Malaysia", num: "32.2%", label: "of graduates worked below their qualification in 2024, while graduate unemployment was only 3.2%", src: "DOSM, Graduates Statistics 2024" },
-  { scope: "Asia Pacific", num: "77%", label: "of employers can't find the skills they need, up from 45% in 2014", src: "ManpowerGroup, Talent Shortage 2025 (10,095 employers surveyed)" },
-  { scope: "World", num: "39%", label: "of workers' skills are expected to change or become outdated by 2030", src: "World Economic Forum, Future of Jobs Report 2025" },
-];
 const STEPS = [
-  { n: 1, title: "Watch", agent: "Scout", icon: Search, text: "Collects job postings from employer websites for the roles your graduates apply to." },
-  { n: 2, title: "Report", agent: "Lens and Steward", icon: FileText, text: "Counts what employers ask for, keeps the exact quote behind every number, and drafts a report you can escalate." },
-  { n: 3, title: "Decide", agent: "You and your committee", icon: Gavel, human: true, text: "Your coordinator or programme meeting decides. A proposed change can be tried on a mock cohort of simulated students first." },
-  { n: 4, title: "Update", agent: "Quill", icon: PenLine, text: "Once a change is approved, helps you revise the outcomes and topics, checked against teaching hours and prerequisites." },
-  { n: 5, title: "Teach", agent: "Prism", icon: Presentation, text: "Builds editable slides, test questions and quizzes that fit each Course Learning Outcome." },
-  { n: 6, title: "Learn", agent: "Lens", icon: ChartColumn, text: "After the test, the results and the SSRT and CLO surveys flow back in for the next round." },
+  { step: "Course", who: "folio", helper: "Folio", ask: "What does this course promise today?" },
+  { step: "Watch", who: "scout", helper: "Scout", ask: "What are employers asking for, right now and over time?" },
+  { step: "Report", who: "atlas", helper: "Atlas, Lens and Steward", ask: "What exactly do they ask, how often, and what does the course do about it?" },
+  { step: "Decide", who: null, helper: "People decide", ask: "What will we do, and who said so?" },
+  { step: "Update", who: "quill", helper: "Quill", ask: "What does the approved change look like, within our hours and rules?" },
+  { step: "Teach", who: "prism", helper: "Prism", ask: "What will the class do, and with what?" },
+  { step: "Learn", who: "lens", helper: "Lens", ask: "Did it work, as far as we can honestly tell?" },
 ];
-const DIFFERENT = [
-  { icon: Plug, title: "Fits the tools you already use", status: "Planned", text: "Lyceum isn't one more app to log into. It is built to sit inside Microsoft 365 and Teams, Google Workspace, the LMS and the university's own AI assistant, through MCP and extensions." },
-  { icon: Quote, title: "Every number has a receipt", status: "Working", text: "Each requirement is an exact quote from a real job posting, and every count shows what it is out of, so any number can be traced back to its source." },
-  { icon: UserCheck, title: "The lecturer stays in charge", status: "Working", text: "Agents gather, draft and check. People decide, and the university's own approval process stays in control." },
+const NOT_BUILT = ["Remote doors for ChatGPT Edu, Copilot and Gemini", "The LMS door for Canvas and Moodle", "Learn's intervals, pooling and the perception gap", "The benchmark run against the CLO survey", "Watching on a schedule", "A shared workspace with sign-in"];
+const REVIEW = [
+  { ask: "Less wordy, more visual: give the agents mascots and living personas.", status: "Done", tone: "built", response: "A host and seven helpers, drawn in code, whose moods follow real records; in the app, the deck and the poster." },
+  { ask: "Research the problem beyond Malaysia, at Asia and world level.", status: "Started", tone: "local", response: "One sourced comparison each for the world, Asia and Malaysia, labelled desk research. Interviews with lecturers in at least three Asian countries come next." },
+  { ask: "Make the flow of the app and the flow of the pitch tally.", status: "Done", tone: "built", response: "One loop with the same six names in the app, the demo, the deck and this brief; the film follows the same order." },
+  { ask: "Benchmark the mock cohort against the SSRT and CLO surveys.", status: "Planned", tone: "planned", response: "Predictions frozen before a semester and scored against that semester's CLO survey and results. Not run yet." },
 ];
-const WORKING = [
-  "Pulls real job postings from employer job boards (Greenhouse and Lever) when the lecturer asks",
-  "Checks every quote against its source and counts honestly",
-  "Prepares the report and sends it to a colleague inside the app",
-  "Updates the course outline, checked against hours and prerequisites",
-  "Exports editable PowerPoint slide packs and drafts template quiz items against the CLOs",
-  "160 automated checks pass on the current code",
-];
-const TO_BUILD = [
-  "Watching on a schedule (today it runs when asked)",
-  "The MCP, Microsoft 365, Google and LMS plug-ins",
-  "AI-drafted test questions and quizzes",
-  "A mock cohort benchmarked against real survey results",
-  "Mascots and personas for the agents",
-];
-const IMPROVE = [
-  { title: "Less wordy, more visual", ask: "Give each agent a mascot and a living persona, with some gamification.", response: "Mascot art for our seven agents, which already have names and jobs, with moods that follow real work: working, waiting for you, done." },
-  { title: "Research the problem beyond Malaysia", ask: "At least at Asia level, and globally if possible, to show that universities everywhere face it.", response: "A first pass with Malaysian, Asian and global sources is done. Next come interviews with lecturers in a few Asian countries." },
-  { title: "Make the app and the pitch tally", ask: "The flow of the app and the flow of the presentation should match, so the story runs smoothly.", response: "One storyline, the six steps on page 1, used in the same order by the app, the demo and the slides." },
-  { title: "Benchmark the mock cohort", ask: "The agent that simulates a cohort needs a benchmark. Use the SSRT and CLO surveys we collect every semester.", response: "Lock the agent's predictions before a semester starts, then score them against that semester's CLO survey and results." },
-];
-
-// ---------- the loop diagram (all units in mm) ----------
-const CW = 52, CH = 39, GX = 12, GY = 11;
-const POS = { 1: [0, 0], 2: [CW + GX, 0], 3: [2 * (CW + GX), 0], 4: [2 * (CW + GX), CH + GY], 5: [CW + GX, CH + GY], 6: [0, CH + GY] };
-const W = 3 * CW + 2 * GX, H = 2 * CH + GY;
-const midY1 = CH / 2, midY2 = CH + GY + CH / 2, col = (i) => i * (CW + GX) + CW / 2;
-const ARROWS = [
-  [CW + 1.2, midY1, CW + GX - 1.6, midY1], [2 * CW + GX + 1.2, midY1, 2 * (CW + GX) - 1.6, midY1],
-  [col(2), CH + 1.2, col(2), CH + GY - 1.6],
-  [2 * (CW + GX) - 1.2, midY2, 2 * CW + GX + 1.6, midY2], [CW + GX - 1.2, midY2, CW + 1.6, midY2],
-  [col(0), CH + GY - 1.2, col(0), CH + 1.6],
-];
-const loopSvg = `<svg class="loop-arrows" viewBox="0 0 ${W} ${H}" width="${W}mm" height="${H}mm" aria-hidden="true">
-  <defs><marker id="head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${C.accent}"/></marker></defs>
-  ${ARROWS.map(([x1, y1, x2, y2]) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${C.accent}" stroke-width="0.55" marker-end="url(#head)"/>`).join("")}
-  <text x="${col(0) + 3}" y="${CH + GY / 2 + 1}" font-size="2.9" fill="${C.ink2}" font-family="Inter, Segoe UI, sans-serif">and round again, every semester</text>
-</svg>`;
-const stepCard = (s) => { const [x, y] = POS[s.n]; return `<div class="step${s.human ? " human" : ""}" style="left:${x}mm;top:${y}mm">
-  <div class="step-head"><span class="badge">${s.n}</span><span class="step-icon">${icon(s.icon, s.human ? C.ok : C.accent, 14)}</span><span class="step-title">${s.title}</span></div>
-  <div class="agent">${s.agent}</div><p>${s.text}</p></div>`; };
+const PEOPLE_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>`;
 
 const PAGES = 3;
-const mast = `<div class="mast"><span class="wordmark">Lyceum</span><span class="mast-meta">Project brief · October 2026</span></div>`;
-const foot = (n, left) => `<div class="foot"><span>${left}</span><span>${n} / ${PAGES}</span></div>`;
+const mast = `<header class="mast"><span class="wordmark"><img src="${dataUri("public/brand/mark.svg", "image/svg+xml")}" alt="">Lyceum</span><span class="mast-meta" data-ref>Project brief · 22 October 2026</span></header>`;
+const foot = (n, left) => `<footer class="foot"><span>${left}</span><span class="page-number">${n} / ${PAGES}</span></footer>`;
+
+const page1 = `<section class="page">
+  ${mast}
+  <h1>Lyceum turns real job postings into a course decision with receipts, every semester, inside the tools lecturers already use.</h1>
+  <p class="lede">After class, Dr Aisyah, a fictional lecturer, is asked what her course should change before the next review. She can suggest a change; she cannot show why. The evidence sits in browser tabs and in memory: no exact sentences from employers, no denominator, no record of who decided.</p>
+
+  <section class="section">
+    <p class="eyebrow">Why now</p>
+    <div class="stats">${PAIN_STATS.map((s) => `<div class="stat" data-claim="${s.claim}"><div class="scope">${esc(s.scope)}</div><div class="num">${esc(s.value)}</div><div class="lbl">${esc(s.label)}${s.vendor ? " (a vendor survey)" : ""}</div><div class="src">${esc(s.sources.map((x) => x.name).join("; "))}</div></div>`).join("")}</div>
+    <p class="caption">Desk research, one comparison for each level, until interviews with lecturers add a quotation per level. The figures describe different populations, so they are never one chart.</p>
+  </section>
+
+  <section class="section receipt-row">
+    <div>
+      <p class="eyebrow">The gift: a receipt</p>
+      <p class="caption tight">Every requirement Lyceum counts is an exact sentence from a real posting, with its employer, its dates and its link, counted over a known denominator.</p>
+    </div>
+    <article class="receipt">
+      <p class="receipt-meta" data-ref>Stripe · Data Analyst, Intern · published 2026-10-01</p>
+      <blockquote>“You'll build metrics, scalable data pipelines, dashboards, and reports to inform and run the business.”</blockquote>
+      <p class="receipt-count" data-claim="deck-receipt"><strong>1 of 9</strong> reviewed postings</p>
+      <p class="receipt-link" data-ref>stripe.com/jobs/search?gh_jid=8194291 · retrieved 2026-10-09 · fnv1a-68604535-974</p>
+    </article>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">The plan: one loop, six steps, every semester</p>
+    <ol class="steps">${STEPS.map((s, i) => `<li class="step${s.who ? "" : " people"}"><span class="figure">${s.who ? `<img src="${mascot(s.who)}" alt="">` : PEOPLE_SVG}</span><span class="step-name">${i ? "" : "Setup: "}${s.step}</span><span class="helper">${s.helper}</span><span class="ask">${s.ask}</span></li>`).join("")}</ol>
+    <p class="caption">Seven helpers do the work; at Decide there is none, because people decide. Tualang, the host, keeps the loop, and every semester adds a ring.</p>
+  </section>
+  ${foot(1, "Figures and their sources: docs/claims.md. Dr Aisyah is fictional; the posting is real.")}
+</section>`;
+
+const page2 = `<section class="page">
+  ${mast}
+  <section class="section">
+    <p class="eyebrow">The journey, in real screens</p>
+    <h2>Each step ends in a record she can hold.</h2>
+    <div class="screens r1">
+      <figure>${shot("docs/presentation/shot-report-quote.png", 112, "A proposed quotation about dashboards beside the Stripe posting it came from, the matched words marked.", { h: 530 })}<figcaption><b>Report.</b> A quotation is proposed beside its source, and confirmed only if it is there word for word.</figcaption></figure>
+      <figure>${shot("docs/presentation/shot-report-card.png", 64, "The dashboards card: postings that quote it over the reviewed postings, with its interval.")}<figcaption><b>Count.</b> Over reviewed postings only, with its interval.</figcaption></figure>
+    </div>
+    <div class="screens r2">
+      <figure>${shot("docs/presentation/shot-decide.png", 88, "The brief, its recipient and the programme owner's decision with its reason, term and course version.")}<figcaption><b>Decide.</b> The programme owner records adopt, with the reason, the term and the version.</figcaption></figure>
+      <figure>${shot("docs/presentation/shot-history.png", 88, "The course history: the adopted version with its reason, the earlier version and the decision.")}<figcaption><b>Update.</b> The checked revision, adopted with its reason; the earlier version is kept.</figcaption></figure>
+      <figure>${shot("docs/presentation/pack/slide-03.png", 88, "A slide of the teaching pack as PowerPoint renders it, with the dashboards count and an exact quotation.", { h: 560 })}<figcaption><b>Teach.</b> The downloaded pack as PowerPoint draws it: editable, with no model text.</figcaption></figure>
+      <figure>${shot("docs/presentation/shot-learn.png", 88, "Learn: the results file filed for the course version taught, with the mean mark per outcome and n of N.")}<figcaption><b>Learn.</b> Results filed for the version taught, with n of N. No learning gain is claimed.</figcaption></figure>
+    </div>
+    <p class="fine">Real captures of the working prototype in its demo mode, on the dated saved sample of Stripe's public job board.</p>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">What is real, and what is not yet</p>
+    <div class="real">
+      <div class="real-box" data-claim="deck-trl"><div class="num">TRL 6</div><p>Self-assessed against NASA ESTO's software column: “Prototype implementations of the software demonstrated on full-scale realistic problems.” The relevant environment: real postings from a real public board, a sample course outline, a lecturer persona.</p></div>
+      <div class="real-box" data-claim="proof-checks"><div class="num">${esc(proof["proof-checks"].value)}</div><p>${esc(proof["proof-checks"].label)}.</p></div>
+      <div class="planned-box"><p class="planned-head"><span class="pill planned">Planned</span>Not built yet</p><ul>${NOT_BUILT.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
+    </div>
+  </section>
+  ${foot(2, "The next level is one department running the loop for one term inside its LMS.")}
+</section>`;
+
+const page3 = `<section class="page">
+  ${mast}
+  <section class="section">
+    <p class="eyebrow">The wider world: one core, many doors</p>
+    ${shot("docs/presentation/architecture.png", 180, "Lyceum's architecture: people work through doors into one deterministic core; built doors solid, planned doors dashed.")}
+    <p class="caption">The web workspace is built, and so is a local, read-only MCP door over an exported workspace, set up for Claude and tested with the official MCP client. The doors for the university's own assistants, its LMS and its office suite are planned. No door confirms a quotation or decides.</p>
+  </section>
+
+  <section class="section cols2">
+    <div>
+      <p class="eyebrow">Why a department pays</p>
+      <div class="ladder">
+        <div class="tier built-tier"><strong>Free</strong><span class="pill built">Built</span><p>One course on one laptop, no account, the whole loop and every export.</p></div>
+        <div class="tier"><strong>Department</strong><span class="pill planned">Planned</span><p>The shared workspace, sign-in, the assistant and LMS doors, the term's review pack.</p></div>
+        <div class="tier"><strong>Institution</strong><span class="pill planned">Planned</span><p>Tenancy, audit, the office suite doors and data agreements.</p></div>
+      </div>
+      <p class="caption">The periodic review happens anyway, and each step is the working form of what reviewers already look for: <span data-ref>AUN-QA 1.4, MQA 6.1.6, ABET Criteria 2 and 4, ESG 1.9</span>, and for Teach the teaching principle of constructive alignment (Biggs).</p>
+    </div>
+    <div>
+      <p class="eyebrow">The organiser's review of <span data-ref>14 October 2026</span>, and what we did</p>
+      <ul class="review">${REVIEW.map((r) => `<li><p class="ask"><span class="pill ${r.tone}">${r.status}</span>${esc(r.ask)}</p><p class="resp">${esc(r.response)}</p></li>`).join("")}</ul>
+    </div>
+  </section>
+
+  <section class="ask-box">
+    <img src="${mascot("host", "celebrating")}" alt="">
+    <div><p class="ask-eyebrow">The ask</p><p class="ask-line">One department, one term, inside its LMS.</p><p class="ask-measures">The pilot measures task completion, citation fidelity, time to a brief and repeat use: measures, not results yet.</p></div>
+  </section>
+  ${foot(3, "Prepared by the Lyceum team, Universiti Teknologi PETRONAS.")}
+</section>`;
 
 // ---------- the page ----------
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Lyceum, project brief</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
 <style>
+${fontFaceCss()}
+${rootVarsCss()}
 @page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #fff; }
-body { font-family: Inter, "Segoe UI", system-ui, sans-serif; color: ${C.ink}; font-size: 9.2pt; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.page { width: 210mm; height: 297mm; padding: 13mm 15mm 10mm; position: relative; overflow: hidden; page-break-after: always; }
+html, body { margin: 0; padding: 0; background: var(--white); }
+body { font-family: var(--font-body); color: var(--ink); font-size: 9pt; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+img { display: block; }
+.page { width: 210mm; height: 297mm; padding: 12mm 15mm 10mm; position: relative; overflow: hidden; page-break-after: always; }
 .page:last-child { page-break-after: auto; }
-.mast { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1.4px solid ${C.ink}; padding-bottom: 2.5mm; }
-.wordmark { font-family: Newsreader, Georgia, serif; font-size: 21pt; font-weight: 600; letter-spacing: -0.01em; line-height: 1; }
-.mast-meta { font-size: 7.4pt; color: ${C.ink2}; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 600; }
-h1 { font-family: Newsreader, Georgia, serif; font-weight: 500; font-size: 22.5pt; line-height: 1.12; margin: 6.5mm 0 3mm; letter-spacing: -0.01em; max-width: 168mm; }
-.lede { font-size: 10.6pt; line-height: 1.52; margin: 0; max-width: 176mm; }
-.section { margin-top: 6.5mm; }
-.eyebrow { font-size: 7.2pt; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: ${C.accent}; margin: 0 0 2mm; }
-h2 { font-family: Newsreader, Georgia, serif; font-weight: 500; font-size: 14.5pt; line-height: 1.2; margin: 0 0 3mm; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
-.stat { border: 1px solid ${C.border}; border-radius: 2.6mm; padding: 3.4mm 3.8mm; }
-.stat .scope { font-size: 6.8pt; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: ${C.ink2}; }
-.stat .num { font-family: Newsreader, Georgia, serif; font-size: 25pt; line-height: 1; margin: 1.6mm 0 1.4mm; color: ${C.accent}; font-weight: 500; }
-.stat .lbl { font-size: 8.4pt; line-height: 1.4; }
-.stat .src { font-size: 6.8pt; color: ${C.ink3}; margin-top: 1.6mm; }
-.caption { font-size: 8.6pt; color: ${C.ink2}; margin: 2.6mm 0 0; max-width: 176mm; }
-.loop { position: relative; width: ${W}mm; height: ${H}mm; margin-top: 1mm; }
-.loop-arrows { position: absolute; left: 0; top: 0; }
-.step { position: absolute; width: ${CW}mm; height: ${CH}mm; border: 1px solid ${C.border}; border-radius: 2.6mm; padding: 3mm 3.4mm; background: #fff; }
-.step.human { background: ${C.okSoft}; border-color: #bfdccb; }
-.step-head { display: flex; align-items: center; gap: 2mm; }
-.badge { width: 4.6mm; height: 4.6mm; border-radius: 50%; background: ${C.ink}; color: #fff; font-size: 7pt; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.step-icon { width: 6.6mm; height: 6.6mm; border-radius: 1.8mm; background: ${C.accentSoft}; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.step.human .step-icon { background: #fff; }
-.step-title { font-weight: 700; font-size: 10.4pt; }
-.agent { margin: 1.6mm 0 1mm; font-size: 6.9pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: ${C.ink2}; }
-.step p { margin: 0; font-size: 8.3pt; line-height: 1.4; }
-.agents-note { font-size: 8.6pt; color: ${C.ink2}; margin: 3.4mm 0 0; max-width: 178mm; }
-.agents-note strong { color: ${C.ink}; font-weight: 600; }
-.foot { position: absolute; left: 15mm; right: 15mm; bottom: 8mm; display: flex; justify-content: space-between; gap: 6mm; font-size: 6.8pt; color: ${C.ink3}; border-top: 1px solid ${C.border}; padding-top: 2mm; }
-.foot span:last-child { white-space: nowrap; }
-.cols3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
-.diff { border: 1px solid ${C.border}; border-radius: 2.6mm; padding: 3.4mm 3.8mm; }
-.diff-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.8mm; }
-.diff-title { font-weight: 700; font-size: 9.4pt; margin: 0 0 1.2mm; }
-.diff p { margin: 0; font-size: 8.3pt; line-height: 1.42; }
-.pill { font-size: 6.6pt; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.7mm 2mm; border-radius: 99px; }
-.pill.ok { background: ${C.okSoft}; color: ${C.ok}; } .pill.plan { background: ${C.warnSoft}; color: ${C.warn}; }
-.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
-.box { border-radius: 2.6mm; padding: 3.4mm 4mm; }
-.box.ok { background: ${C.okSoft}; } .box.todo { background: ${C.surface2}; }
-.box h3 { margin: 0 0 1.8mm; font-size: 8.6pt; font-weight: 700; }
-.box ul { margin: 0; padding-left: 4mm; } .box li { font-size: 8.3pt; line-height: 1.4; margin: 0.6mm 0; }
-.shot { overflow: hidden; border: 1px solid ${C.border}; border-radius: 2mm; background: ${C.bg}; }
-.shot img { display: block; max-width: none; }
-.shot-cap { font-size: 7.8pt; color: ${C.ink2}; margin: 1.6mm 0 0; line-height: 1.4; }
-.shot-cap b { color: ${C.ink}; font-weight: 600; }
-.shots-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin-top: 4mm; align-items: start; }
-.fine { font-size: 7.2pt; color: ${C.ink3}; margin: 3mm 0 0; }
-.context { font-size: 10pt; line-height: 1.55; margin: 0 0 5mm; max-width: 178mm; }
-.sub { font-size: 7.4pt; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: ${C.ink2}; margin: 0 0 2.6mm; }
-.landed { display: grid; grid-template-columns: 1fr 2.1fr; gap: 5mm; margin-bottom: 6mm; }
-.quote { border-left: 2.6px solid ${C.ok}; padding: 0.6mm 0 0.6mm 3.6mm; font-size: 9.2pt; line-height: 1.5; }
-.quote strong { display: block; font-size: 9.8pt; margin-bottom: 1mm; }
-.improve { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
-.imp { border: 1px solid ${C.border}; border-radius: 2.6mm; padding: 3.8mm 4.2mm; }
-.imp-head { display: flex; align-items: center; gap: 2.2mm; margin-bottom: 1.8mm; }
-.imp-head strong { font-size: 10pt; }
-.imp p { margin: 0; font-size: 9pt; line-height: 1.48; }
-.imp .resp { margin-top: 2.4mm; padding-top: 2.2mm; border-top: 1px dashed ${C.border}; color: ${C.ink2}; }
-.imp .resp b { color: ${C.accent}; font-weight: 700; }
-.outcome { margin-top: 6mm; display: flex; align-items: center; gap: 3.4mm; background: ${C.ink}; color: #fff; border-radius: 2.6mm; padding: 4.4mm 5mm; font-size: 10.2pt; line-height: 1.5; }
-.outcome strong { font-weight: 700; }
+.mast { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.4px solid var(--forest); padding-bottom: 2.4mm; }
+.wordmark { display: flex; align-items: center; gap: 2mm; font-family: var(--font-display); font-size: 19pt; font-weight: 600; letter-spacing: -0.01em; line-height: 1; }
+.wordmark img { width: 7.5mm; height: 7.5mm; }
+.mast-meta { font-family: var(--font-mono); font-size: 7pt; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: 19.5pt; line-height: 1.14; margin: 6mm 0 3mm; letter-spacing: -0.01em; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 14pt; line-height: 1.2; margin: 0 0 3mm; }
+.lede { font-size: 10.2pt; line-height: 1.5; margin: 0; }
+.section { margin-top: 5.5mm; }
+.eyebrow { font-family: var(--font-mono); font-size: 7pt; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald-text); margin: 0 0 2mm; }
+.caption { font-size: 8.4pt; color: var(--ink-2); margin: 2.4mm 0 0; }
+.caption.tight { margin-top: 0; }
+.fine { font-size: 7.2pt; color: var(--ink-2); margin: 2mm 0 0; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3.5mm; }
+.stat { border: 1px solid var(--border); border-radius: 2.6mm; padding: 3.2mm 3.6mm; }
+.scope { font-family: var(--font-mono); font-size: 6.6pt; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
+.num { font-family: var(--font-display); font-size: 22pt; line-height: 1; margin: 1.4mm 0 1.2mm; color: var(--emerald-text); font-weight: 800; }
+.lbl { font-size: 8.2pt; line-height: 1.38; }
+.src { font-size: 6.8pt; color: var(--ink-3); margin-top: 1.4mm; }
+.receipt-row { display: grid; grid-template-columns: 52mm 1fr; gap: 5mm; align-items: start; }
+.receipt { background: var(--tint-1); border-radius: 3mm; padding: 4mm 5mm; }
+.receipt-meta, .receipt-link { font-family: var(--font-mono); font-size: 6.8pt; color: var(--ink-2); margin: 0; }
+.receipt blockquote { margin: 2mm 0; padding-left: 3mm; border-left: 2px solid var(--emerald); font-size: 11pt; font-weight: 600; line-height: 1.35; }
+.receipt-count { margin: 0 0 1.2mm; font-size: 9pt; color: var(--ink-2); }
+.receipt-count strong { font-family: var(--font-display); font-size: 18pt; font-weight: 800; color: var(--emerald-text); margin-right: 1.4mm; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: 2.2mm; }
+.step { display: grid; justify-items: center; align-content: start; gap: 0.8mm; text-align: center; border: 1px solid var(--border); border-radius: 2.6mm; padding: 2.6mm 1.6mm 3mm; background: var(--white); }
+.step.people { background: var(--tint-1); }
+.figure { width: 13mm; height: 13mm; display: grid; place-items: center; }
+.figure img { width: 13mm; height: 13mm; }
+.figure svg { width: 8mm; height: 8mm; fill: none; stroke: var(--forest); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.step-name { font-family: var(--font-display); font-size: 10.5pt; font-weight: 600; }
+.helper { font-family: var(--font-mono); font-size: 6.2pt; letter-spacing: 0.04em; color: var(--emerald-text); }
+.ask { font-size: 7.4pt; line-height: 1.32; color: var(--ink-2); }
+.screens { display: grid; gap: 3.5mm 4mm; align-items: start; margin-top: 3.5mm; }
+.screens.r1 { grid-template-columns: 112mm 64mm; margin-top: 0; }
+.screens.r2 { grid-template-columns: 88mm 88mm; }
+.screens figure { margin: 0; }
+.shot { overflow: hidden; border: 1px solid var(--border); border-radius: 2mm; background: var(--white); }
+.shot img { max-width: none; }
+figcaption { font-size: 7.6pt; color: var(--ink-2); margin: 1.4mm 0 0; line-height: 1.38; }
+figcaption b { color: var(--ink); font-weight: 700; }
+.real { display: grid; grid-template-columns: 1fr 0.8fr 1.1fr; gap: 3.5mm; }
+.real-box { background: var(--forest); color: var(--white); border-radius: 2.6mm; padding: 3.4mm 4mm; }
+.real-box .num { color: var(--lime); font-size: 20pt; }
+.real-box p { margin: 1.4mm 0 0; font-size: 7.8pt; line-height: 1.4; color: var(--on-forest); }
+.planned-box { background: var(--warn-soft); border-radius: 2.6mm; padding: 3.2mm 4mm; }
+.planned-head { display: flex; align-items: center; gap: 2mm; margin: 0 0 1.4mm; font-weight: 700; font-size: 8.6pt; color: var(--warn); }
+.planned-box ul { margin: 0; padding-left: 4mm; } .planned-box li { font-size: 7.8pt; line-height: 1.38; margin: 0.5mm 0; }
+.planned-box li::marker { color: var(--warn); }
+.pill { display: inline-block; font-family: var(--font-mono); font-size: 6.2pt; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.5mm 1.8mm; border-radius: 99px; margin-right: 1.6mm; vertical-align: 0.2mm; }
+.pill.built { background: var(--tint-2); color: var(--emerald-text); }
+.pill.local { background: var(--white); color: var(--emerald-text); border: 1px solid var(--border); }
+.pill.planned { background: var(--white); color: var(--warn); }
+.ladder .pill.planned, .review .pill.planned { background: var(--warn-soft); }
+.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+.ladder { display: grid; gap: 2mm; }
+.tier { border: 1px dashed var(--control-border); border-radius: 2.4mm; padding: 2.4mm 3.2mm; }
+.tier.built-tier { border: 1px solid var(--border); border-left: 2.4px solid var(--emerald); }
+.tier strong { font-family: var(--font-display); font-size: 10pt; font-weight: 600; margin-right: 2mm; }
+.tier p { margin: 0.8mm 0 0; font-size: 7.8pt; color: var(--ink-2); line-height: 1.38; }
+.review { list-style: none; margin: 0; padding: 0; display: grid; gap: 2.2mm; }
+.review li { border-bottom: 1px solid var(--border); padding-bottom: 2mm; }
+.review .ask { margin: 0; font-size: 8pt; color: var(--ink); font-weight: 600; line-height: 1.38; }
+.review .resp { margin: 0.8mm 0 0; font-size: 7.8pt; color: var(--ink-2); line-height: 1.38; }
+.ask-box { margin-top: 5mm; display: flex; align-items: center; gap: 5mm; background: var(--forest); color: var(--white); border-radius: 3mm; padding: 4mm 6mm; }
+.ask-box img { width: 22mm; height: 22mm; background: var(--tint-2); border-radius: 50%; padding: 1.4mm; }
+.ask-eyebrow { margin: 0; font-family: var(--font-mono); font-size: 7pt; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lime); }
+.ask-line { margin: 1mm 0; font-family: var(--font-display); font-size: 15pt; font-weight: 600; line-height: 1.15; }
+.ask-measures { margin: 0; font-size: 8.2pt; color: var(--on-forest); }
+.foot { position: absolute; left: 15mm; right: 15mm; bottom: 7mm; display: flex; justify-content: space-between; gap: 6mm; font-size: 6.8pt; color: var(--ink-2); border-top: 1px solid var(--border); padding-top: 2mm; }
+.page-number { white-space: nowrap; font-family: var(--font-mono); }
 </style></head><body>
-
-<section class="page">
-  ${mast}
-  <h1>Lyceum helps lecturers keep their courses in step with what industry needs.</h1>
-  <p class="lede">It is an assistant for university lecturers. A small team of AI agents keeps watch over each subject: they gather what employers are asking for from job sites, report what has changed, and, once a change is approved, help the lecturer update the course and build what is needed to teach it, from slides to test questions and quizzes that fit the Course Learning Outcomes (CLOs). After the test, the results come back in, so the next review starts from evidence instead of guesswork.</p>
-
-  <div class="section">
-    <p class="eyebrow">Why it matters</p>
-    <div class="stats">${STATS.map((s) => `<div class="stat"><div class="scope">${s.scope}</div><div class="num">${s.num}</div><div class="lbl">${s.label}</div><div class="src">${s.src}</div></div>`).join("")}</div>
-    <p class="caption">Graduates are finding jobs. The problem is the match between what they learned and what the job asks for. Courses are reviewed only every few years, and the evidence behind a review usually sits in browser tabs and people's memory.</p>
-  </div>
-
-  <div class="section">
-    <p class="eyebrow">How it works</p>
-    <h2>One loop, six steps, and people decide</h2>
-    <div class="loop">${loopSvg}${STEPS.map(stepCard).join("")}</div>
-    <p class="agents-note">Seven agents share the work, each with a name and a job: <strong>Folio</strong> reads the course, <strong>Scout</strong> watches industry, <strong>Atlas</strong> maps skills to outcomes, <strong>Lens</strong> counts, <strong>Quill</strong> designs, <strong>Prism</strong> makes the materials and <strong>Steward</strong> prepares the review. Nothing changes a course until a person approves it.</p>
-  </div>
-  ${foot(1, "Sources: DOSM, Graduates Statistics 2024; ManpowerGroup, Talent Shortage 2025, Asia Pacific; World Economic Forum, Future of Jobs Report 2025.")}
-</section>
-
-<section class="page">
-  ${mast}
-  <div class="section">
-    <p class="eyebrow">What makes it different</p>
-    <div class="cols3">${DIFFERENT.map((d) => `<div class="diff"><div class="diff-head">${icon(d.icon, C.accent, 16)}<span class="pill ${d.status === "Working" ? "ok" : "plan"}">${d.status}</span></div><p class="diff-title">${d.title}</p><p>${d.text}</p></div>`).join("")}</div>
-  </div>
-
-  <div class="section">
-    <p class="eyebrow">Where it stands today</p>
-    <div class="cols2">
-      <div class="box ok"><h3>Working now, as a local prototype</h3><ul>${WORKING.map((w) => `<li>${w}</li>`).join("")}</ul></div>
-      <div class="box todo"><h3>Still to build</h3><ul>${TO_BUILD.map((w) => `<li>${w}</li>`).join("")}</ul></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <p class="eyebrow">What it looks like</p>
-    ${shot(SHOTS.journey, { x: 520, y: 250, w: 2310, h: 600 }, 180, "The CS310 course workspace with its guided steps all ticked off")}
-    <p class="shot-cap"><b>The course workspace.</b> Its guided steps tick off only when the real work behind them is saved. They will be renamed to match the six-step loop on page 1, which is one of the review's points.</p>
-    <div class="shots-row">
-      <div>${shot(SHOTS.evidence, { x: 30, y: 225, w: 1260, h: 340 }, 88, "Bars showing how many reviewed job postings ask for each skill")}
-        <p class="shot-cap"><b>The report.</b> How many of the reviewed postings ask for each skill. The thin line under each bar shows the uncertainty range.</p></div>
-      <div>${shot(SHOTS.agents, {}, 88, "The seven agent cards: Folio, Scout, Atlas, Quill, Prism, Lens and Steward")}
-        <p class="shot-cap"><b>The seven agents.</b> Each card opens to show what the agent reads, produces and cannot do. Mascots and personalities come next.</p></div>
-    </div>
-    <p class="fine">Real captures of the working prototype, filled by its built-in demo with a saved sample of real job postings.</p>
-  </div>
-  ${foot(2, "Lyceum runs today as a local prototype. Everything under Still to build is in the project's improvement plan.")}
-</section>
-
-<section class="page">
-  ${mast}
-  <div class="section">
-    <p class="eyebrow">Review</p>
-    <h2>Comments from Cai Yiyu</h2>
-    <p class="context">Cai Yiyu is the organizer who approves the travel fellowships, and had already approved another team's. For ours to be approved as well, I presented Lyceum so Cai Yiyu could judge whether the project was worth sponsoring. These were the comments.</p>
-    <p class="sub">What landed well</p>
-    <div class="landed">
-      <div class="quote"><strong>Solid, clear, on theme</strong>The idea is solid and clear, and it fits the theme.</div>
-      <div class="quote"><strong>The platform answer</strong>Asked why a lecturer would pick Lyceum over other apps, especially when they already juggle too many tools, I said we are not selling one more separate tool. Lyceum is a platform that fits into any university's existing ecosystem, through MCP and extensions for Microsoft 365, Google and the AI tools they already use. Cai Yiyu liked the concept. It isn't built yet, so it is now a committed work package in our improvement plan.</div>
-    </div>
-    <p class="sub">What to improve, and our response</p>
-    <div class="improve">${IMPROVE.map((m, i) => `<div class="imp"><div class="imp-head"><span class="badge">${i + 1}</span><strong>${m.title}</strong></div><p>${m.ask}</p><p class="resp"><b>Our response:</b> ${m.response}</p></div>`).join("")}</div>
-    <div class="outcome">${icon(CircleCheck, "#ffffff", 20)}<span><strong>Outcome.</strong> Overall, the idea is clear and fits the theme. The travel fellowship is on: Cai Yiyu applied for it on our behalf.</span></div>
-  </div>
-  ${foot(3, "Prepared by Hafiz Azman, 14 October 2026.")}
-</section>
+${page1}
+${page2}
+${page3}
 </body></html>`;
 
 // ---------- render ----------
-const executablePath = [
-  "C:/Program Files/Google/Chrome/Application/chrome.exe",
-  "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-  "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-  "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
-].find(existsSync);
+const executablePath = ["C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", "C:/Program Files/Microsoft/Edge/Application/msedge.exe"].find(existsSync);
 if (!executablePath) throw new Error("Chrome or Edge must be installed");
-writeFileSync(join(tmpdir(), "lyceum-brief.html"), html);
 const browser = await puppeteer.launch({ executablePath, headless: true });
+let problems = [];
 try {
   const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 }).catch(() => page.setContent(html, { waitUntil: "load" }));
-  await page.evaluate(() => document.fonts.ready);
-  const fonts = await page.evaluate(() => [...document.fonts].filter((f) => f.status === "loaded").map((f) => f.family).filter((v, i, a) => a.indexOf(v) === i));
-  console.log("fonts loaded:", fonts.join(", ") || "none (system fallbacks used)");
-  // Every page's content must stop at least 2 mm above its footer. A cropped
-  // screenshot counts by its frame, not by the hidden part of its image.
+  await page.setContent(html, { waitUntil: "load" });
+  await fontsReady(page);
+  // Every number registered or a reference; no dash.
+  problems = figureProblems(await page.evaluate(readFigures, ".page"), claimsRegister(), "Page");
+  // Every page's content must stop at least 2 mm above its footer. A cropped screenshot counts by its frame.
   const space = await page.evaluate(() => [...document.querySelectorAll(".page")].map((p, i) => {
     const limit = p.querySelector(".foot").getBoundingClientRect().top - 2 * 3.7795;
     const bottoms = [...p.querySelectorAll("*")].filter((el) => !el.closest(".foot") && !el.parentElement?.closest(".shot")).map((el) => el.getBoundingClientRect().bottom);
     return { page: i + 1, spareMm: Math.round((limit - Math.max(...bottoms)) / 3.7795 * 10) / 10 };
   }));
   console.log("spare space above each footer, in mm:", JSON.stringify(space));
-  if (space.some((s) => s.spareMm < 0)) { console.error("content runs into a footer; shorten the text or tighten the layout"); process.exitCode = 1; }
-  await page.pdf({ path: OUT, format: "A4", printBackground: true, preferCSSPageSize: true });
-  console.log("wrote", OUT);
+  for (const s of space) if (s.spareMm < 0) problems.push("Page " + s.page + ": content runs into the footer by " + -s.spareMm + " mm.");
+  if (!problems.length) {
+    await page.pdf({ path: OUT, format: "A4", printBackground: true, preferCSSPageSize: true });
+    console.log("wrote docs/presentation/lyceum-brief.pdf");
+  }
   if (PREVIEW_DIR) {
     mkdirSync(PREVIEW_DIR, { recursive: true });
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
@@ -275,3 +266,5 @@ try {
     console.log("previews in", PREVIEW_DIR);
   }
 } finally { await browser.close(); }
+if (problems.length) { console.error("BRIEF CHECK FAILED\n  " + problems.join("\n  ")); process.exit(1); }
+console.log("Brief checks passed: every number is in the claims register or a reference, no dash, nothing runs into a footer.");

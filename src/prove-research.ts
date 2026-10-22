@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { PEOPLE_IDS } from "./data/seed.ts";
 import {
   confirmProposals, evidenceReportForCourse, exportWorkspaceBackup, getState, importCollectedPostings, login, openNotification,
-  prepareEvidenceBrief, previewWorkspaceBackup, resetDemoState, restoreWorkspaceBackup, runCollection, scanForRequirements,
+  prepareEvidenceBrief, previewWorkspaceBackup, recordDecision, resetDemoState, restoreWorkspaceBackup, runCollection, scanForRequirements,
   sendEvidenceBrief, setSkillLexicon, setSourcesReviewed, type CollectRun,
 } from "./app/store.ts";
 import { classifyRequirement, locateExcerpt, parseLexicon, proposeMentions } from "./lib/evidence.ts";
@@ -110,32 +110,59 @@ test("a meeting brief carries the evidence and reaches a colleague's inbox", asy
   openNotification(notification.id);
   assert.equal(getState().notifications.find((n) => n.id === notification.id)?.read, true);
   assert.equal(getState().selectedBriefId, brief.id); assert.equal(getState().screen, "inbox");
+  assert.deepEqual(getState().events.map((e) => [e.kind, e.byPersonId, e.refs.briefId]), [["brief-prepared", PEOPLE_IDS.sobri, brief.id], ["brief-sent", PEOPLE_IDS.sobri, brief.id], ["brief-read", PEOPLE_IDS.rahman, brief.id]],
+    "the brief's life is on the event log: prepared, sent and read, each by the person who did it");
+  const decided = recordDecision(brief.id, "adopt", "Run the dashboard lab in week 6.");
+  assert.equal(decided.ok, true);
+  const decision = getState().briefDecisions.find((d) => d.id === decided.decisionId)!;
+  assert.deepEqual({ briefId: decision.briefId, subjectId: decision.subjectId, by: decision.byPersonId, outcome: decision.outcome, note: decision.note },
+    { briefId: brief.id, subjectId: "CS310", by: PEOPLE_IDS.rahman, outcome: "adopt", note: "Run the dashboard lab in week 6." });
+  assert.equal(getState().events.at(-1)!.kind, "decision-recorded"); assert.equal(getState().events.at(-1)!.refs.decisionId, decision.id);
+  assert.ok(getState().notifications.some((n) => n.kind === "brief-decision" && n.toPersonId === PEOPLE_IDS.sobri && n.briefId === brief.id), "the author is told");
   assert.equal(prepareEvidenceBrief("CS310", { recommendation: "keep", notes: "" }).ok, false);
   login(PEOPLE_IDS.tan);
   assert.equal(prepareEvidenceBrief("CS310", { recommendation: "keep", notes: "" }).ok, true);
 });
 
-test("backups carry briefs and lexicons at schema 3 and older schemas still restore", async () => {
+test("backups carry briefs, lexicons, decisions and events at schema 5 and older schemas still restore", async () => {
   const sources = await collected();
   setSkillLexicon("CS310", ["SQL"]); scanForRequirements("CS310"); confirmProposals("CS310", getState().scanProposals); setSourcesReviewed("CS310", sources.map((s) => s.id), true);
   const prepared = prepareEvidenceBrief("CS310", { recommendation: "revise", notes: "" }); sendEvidenceBrief(prepared.briefId!, [PEOPLE_IDS.rahman]);
+  login(PEOPLE_IDS.rahman);
+  assert.equal(recordDecision(prepared.briefId!, "defer", "Wait for the committee.").ok, true);
+  login(PEOPLE_IDS.sobri);
   const raw = exportWorkspaceBackup(), people = getState().people.map((p) => p.id);
-  assert.equal(JSON.parse(raw).schemaVersion, 3);
+  assert.equal(JSON.parse(raw).schemaVersion, 5);
   const parsed = parseWorkspaceBackup(raw, people);
   assert.ok(parsed.ok);
   assert.equal(parsed.backup.data.evidenceBriefs.length, 1); assert.deepEqual(parsed.backup.data.skillLexicon.CS310, ["SQL"]);
   assert.equal(parsed.backup.data.evidenceSources[0].collection?.provider, "sample");
+  assert.equal(parsed.backup.data.briefDecisions.length, 1);
+  assert.deepEqual(parsed.backup.data.events.map((e) => e.kind), ["brief-prepared", "brief-sent", "decision-recorded"]);
   for (const mutate of [
     (x: any) => { x.data.notifications.find((n: any) => n.kind === "evidence-brief").briefId = "missing"; },
     (x: any) => { x.data.evidenceBriefs[0].recipients = ["P-NOBODY"]; },
     (x: any) => { x.data.skillLexicon.NOPE = ["x"]; },
     (x: any) => { x.data.evidenceSources[0].collection.provider = "linkedin"; },
+    (x: any) => { x.data.briefDecisions[0].briefId = "missing"; },
+    (x: any) => { x.data.briefDecisions[0].note = "  "; },
+    (x: any) => { x.data.briefDecisions[0].outcome = "approve"; },
+    (x: any) => { x.data.briefDecisions[0].byPersonId = "P-NOBODY"; },
+    (x: any) => { x.data.briefDecisions[0].subjectId = "CS220"; },
+    (x: any) => { x.data.events[0].kind = "brief-deleted"; },
+    (x: any) => { x.data.events.at(-1).refs.decisionId = "missing"; },
+    (x: any) => { x.data.events.push({ ...x.data.events[0] }); },
   ]) {
     const candidate = JSON.parse(raw); mutate(candidate);
-    assert.equal(parseWorkspaceBackup(JSON.stringify(candidate), people).ok, false);
+    assert.equal(parseWorkspaceBackup(JSON.stringify(candidate), people).ok, false, mutate.toString());
   }
-  const older = JSON.parse(raw); older.schemaVersion = 2; delete older.data.evidenceBriefs; delete older.data.skillLexicon;
-  older.data.notifications = older.data.notifications.filter((n: any) => n.kind !== "evidence-brief");
+  const four = JSON.parse(raw); four.schemaVersion = 4; delete four.data.briefDecisions; delete four.data.events;
+  four.data.notifications = four.data.notifications.filter((n: any) => n.kind !== "brief-decision");
+  const restoredFour = parseWorkspaceBackup(JSON.stringify(four), people);
+  assert.ok(restoredFour.ok); assert.deepEqual(restoredFour.backup.data.briefDecisions, []); assert.deepEqual(restoredFour.backup.data.events, []);
+  const older = JSON.parse(raw); older.schemaVersion = 2;
+  for (const key of ["evidenceBriefs", "skillLexicon", "evidenceSnapshots", "briefDecisions", "events"]) delete older.data[key];
+  older.data.notifications = older.data.notifications.filter((n: any) => n.kind !== "evidence-brief" && n.kind !== "brief-decision");
   const restoredOlder = parseWorkspaceBackup(JSON.stringify(older), people);
   assert.ok(restoredOlder.ok); assert.deepEqual(restoredOlder.backup.data.evidenceBriefs, []); assert.deepEqual(restoredOlder.backup.data.skillLexicon, {});
   const before = workspaceFingerprint(getState());
@@ -143,5 +170,5 @@ test("backups carry briefs and lexicons at schema 3 and older schemas still rest
   const preview = previewWorkspaceBackup(raw); assert.ok(preview.ok);
   assert.equal(restoreWorkspaceBackup(raw, preview.fingerprint, true).ok, true);
   assert.equal(workspaceFingerprint(getState()), before);
-  assert.equal(getState().evidenceBriefs.length, 1);
+  assert.equal(getState().evidenceBriefs.length, 1); assert.equal(getState().briefDecisions.length, 1); assert.equal(getState().events.length, 3);
 });

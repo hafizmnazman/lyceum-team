@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lyceum: a course decision with receipts</title>
+<link rel="icon" href="../public/brand/favicon.svg">
+<link rel="stylesheet" href="theme.generated.css">
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<!--
+  The pitch (plan Section 14): eleven slides, one presenter, eight minutes plus two.
+  Present: open this file in Chrome or Edge, press F for full screen; arrows,
+  space, Page Up and Page Down move; V plays the film on slide 5; N shows the notes.
+  Every figure carries data-claim with its id in docs/claims.md; dates, ids and
+  clause numbers carry data-ref. scripts/gen-deck.mjs checks both, then exports
+  the PDF and the PPTX (one 2x image per slide, these notes as speaker notes).
+-->
+<main class="stage">
+
+<!-- 1. A receipt (beat 3) -->
+<section class="slide forest s-receipt" data-title="A receipt">
+  <div class="brand"><img src="../public/brand/mark-white.svg" alt=""><span>Lyceum</span></div>
+  <h1 class="big hero">This is a receipt.</h1>
+  <div class="host-badge"><img src="../public/brand/mascots/host-greeting.svg" alt="Tualang, Lyceum's host, greeting"></div>
+  <div class="receipt-wrap">
+    <span class="chip lime">Real posting</span>
+    <article class="receipt" data-receipt data-source-hash="fnv1a-68604535-974">
+      <p class="receipt-meta" data-ref>Stripe · Data Analyst, Intern · published 2026-10-01</p>
+      <blockquote data-quote>“You'll build metrics, scalable data pipelines, dashboards, and reports to inform and run the business.”</blockquote>
+      <div class="receipt-count" data-claim="deck-receipt"><span class="big">1 of 9</span><span>reviewed postings</span></div>
+      <p class="receipt-link" data-ref>stripe.com/jobs/search?gh_jid=8194291 · retrieved 2026-10-09 · fingerprint fnv1a-68604535-974</p>
+    </article>
+  </div>
+  <footer class="foot"><span>A real posting, from the dated saved sample of Stripe's public job board.</span><span class="slide-number"></span></footer>
+  <aside class="notes">0:00 to 0:30. Open on the receipt, never on the team. Point at the sentence.
+"This is a receipt: one sentence from a real Stripe posting, one of nine reviewed in the demo workspace. By the end of this talk you will have seen a course decision made of them."
+Then the sentence: "Lyceum turns real job postings into a course decision with receipts, every semester, inside the tools lecturers already use."
+Transition: "But one receipt is not a decision, and the course it should change was approved long ago."</aside>
+</section>
+
+<!-- 2. The latency (beat 2) -->
+<section class="slide forest s-latency" data-title="The latency">
+  <p class="eyebrow">Why now</p>
+  <h2 class="title">Approval takes a year or more; skills keep moving.</h2>
+  <div class="latency-grid">
+    <figure class="panel" data-claim="world-skills-and-approval">
+      <figcaption class="panel-label">Approving a new degree programme, at the US universities cited</figcaption>
+      <p class="big num">12 to 18 <span class="unit">months</span></p>
+      <div class="calendar" data-months="18" data-certain="12" aria-hidden="true"></div>
+      <div class="calendar-key"><span><i class="on"></i>12 months</span><span><i></i>up to 18</span></div>
+    </figure>
+    <figure class="panel" data-claim="world-skills-and-approval">
+      <figcaption class="panel-label">Workers' skills employers expect to be transformed or outdated, 2025 to 2030</figcaption>
+      <p class="big num">39%</p>
+      <div class="waffle" data-cells="100" data-on="39" aria-hidden="true"></div>
+    </figure>
+  </div>
+  <p class="caveat">Different measures of different populations, so never one chart.</p>
+  <footer class="foot"><span data-ref>Sources: World Economic Forum, Future of Jobs Report 2025; Wayne State and Texas Tech approval pages.</span><span class="slide-number"></span></footer>
+  <aside class="notes">0:30 to 1:15. One figure, one caveat.
+"At the US universities we checked, approving a new degree programme takes twelve to eighteen months. And between 2025 and 2030, employers expect 39% of workers' existing skills to be transformed or outdated, the World Economic Forum reports."
+Slower, the caveat: "These describe different populations, so they are two pictures, never one chart."
+"The accreditors already ask universities for this evidence, and AI assistants are already on campuses such as the University of Hong Kong and Florida State."
+Transition: "So who does the review land on?"</aside>
+</section>
+
+<!-- 3. Who it lands on (beat 1) -->
+<section class="slide dots s-desk" data-title="Who it lands on">
+  <p class="eyebrow">Who it lands on</p>
+  <h2 class="title">She can suggest a change. She cannot show why.</h2>
+  <p class="lede">Dr Aisyah is fictional. The review she faces is real.</p>
+  <svg class="desk-scene" viewBox="0 0 1110 760" role="img" aria-label="A lecturer at her desk: a laptop with job posting tabs, the course outline on paper, and a message from her coordinator asking what to change before the review.">
+    <g transform="translate(560 8)">
+      <rect class="sc-card" x="0" y="0" width="540" height="176" rx="24"/>
+      <path class="sc-card" d="M70 170 L112 170 L84 206 Z"/>
+      <circle class="sc-dot" cx="42" cy="46" r="10"/>
+      <text class="sc-card-meta" x="66" y="52">PROGRAMME COORDINATOR</text>
+      <text class="sc-card-text" x="40" y="104">Before the review: what should</text>
+      <text class="sc-card-text" x="40" y="142">we change, and why?</text>
+    </g>
+    <rect class="sc-screen" x="330" y="236" width="620" height="374" rx="22"/>
+    <rect class="sc-tab-on" x="350" y="254" width="90" height="38" rx="10"/><text class="sc-label" x="364" y="279">Posting</text>
+    <rect class="sc-tab" x="446" y="254" width="90" height="38" rx="10"/><text class="sc-label" x="460" y="279">Posting</text>
+    <rect class="sc-tab" x="542" y="254" width="90" height="38" rx="10"/><text class="sc-label" x="556" y="279">Posting</text>
+    <rect class="sc-tab" x="638" y="254" width="90" height="38" rx="10"/><text class="sc-label" x="652" y="279">Posting</text>
+    <rect class="sc-tab" x="734" y="254" width="96" height="38" rx="10"/><text class="sc-label" x="746" y="279">Syllabus</text>
+    <rect class="sc-tab" x="836" y="254" width="96" height="38" rx="10"/><text class="sc-label" x="852" y="279">Survey</text>
+    <rect class="sc-line-strong" x="362" y="320" width="300" height="18" rx="9"/>
+    <rect class="sc-line" x="362" y="360" width="550" height="12" rx="6"/>
+    <rect class="sc-line" x="362" y="388" width="510" height="12" rx="6"/>
+    <rect class="sc-line" x="362" y="416" width="540" height="12" rx="6"/>
+    <rect class="sc-line" x="362" y="444" width="420" height="12" rx="6"/>
+    <rect class="sc-line" x="362" y="486" width="530" height="12" rx="6"/>
+    <rect class="sc-line" x="362" y="514" width="480" height="12" rx="6"/>
+    <rect class="sc-line" x="362" y="542" width="350" height="12" rx="6"/>
+    <path class="sc-base" d="M292 610 L988 610 L1030 652 L250 652 Z"/>
+    <g transform="rotate(-7 160 500)">
+      <rect class="sc-paper" x="40" y="352" width="232" height="300" rx="10"/>
+      <text class="sc-title" x="62" y="394">Course outline</text>
+      <rect class="sc-line" x="62" y="418" width="182" height="10" rx="5"/>
+      <rect class="sc-line" x="62" y="442" width="160" height="10" rx="5"/>
+      <rect class="sc-line" x="62" y="466" width="176" height="10" rx="5"/>
+      <rect class="sc-line" x="62" y="500" width="150" height="10" rx="5"/>
+      <rect class="sc-line" x="62" y="524" width="180" height="10" rx="5"/>
+      <rect class="sc-line" x="62" y="548" width="120" height="10" rx="5"/>
+      <rect class="sc-line" x="62" y="582" width="170" height="10" rx="5"/>
+    </g>
+    <path class="sc-person" d="M962 662 C962 566 998 524 1040 524 C1082 524 1108 566 1108 662 Z"/>
+    <circle class="sc-head" cx="1036" cy="456" r="58"/>
+    <circle class="sc-eye" cx="1008" cy="452" r="6"/>
+    <circle class="sc-eye" cx="1030" cy="454" r="6"/>
+    <rect class="sc-desk" x="0" y="652" width="1110" height="30" rx="15"/>
+  </svg>
+  <footer class="foot"><span>An illustrative scene. Dr Aisyah is a fictional lecturer.</span><span class="slide-number"></span></footer>
+  <aside class="notes">1:15 to 1:45. Fictional lecturer, real workflow.
+"Meet Dr Aisyah. She is fictional; the review she faces is not. After class, her coordinator asks what the course should change before the review. She has the outline, a row of tabs of job postings and a survey export."
+"She can suggest a change. She cannot show why: no exact sentences, no denominator, no record of who decided."
+Transition: "So we gave her a loop."</aside>
+</section>
+
+<!-- 4. The loop (beat 4) -->
+<section class="slide dots s-loop" data-title="The loop">
+  <div class="loop-copy">
+    <p class="eyebrow">The plan</p>
+    <h2 class="title">One loop, six steps, every semester.</h2>
+    <p class="lede">Seven helpers do the work. People decide.</p>
+  </div>
+  <div class="ring">
+    <svg class="ring-track" viewBox="0 0 900 900" aria-hidden="true"><ellipse class="t" cx="450" cy="450" rx="370" ry="352"/><ellipse class="p" cx="450" cy="450" rx="370" ry="352"/></svg>
+    <div class="ring-host"><img src="../public/brand/mascots/host-greeting.svg" alt="Tualang, the host, at the centre of the loop"><span>Tualang, the host</span></div>
+    <ol class="stations" aria-label="The loop, station by station">
+      <li class="station" style="--i:0"><div class="pop"><img src="../public/brand/mascots/folio-resting.svg" alt=""><strong>Course</strong><span>Folio reads the outline</span></div></li>
+      <li class="station" style="--i:1"><div class="pop"><img src="../public/brand/mascots/scout-resting.svg" alt=""><strong>Watch</strong><span>Scout fetches, on request</span></div></li>
+      <li class="station" style="--i:2"><div class="pop"><img src="../public/brand/mascots/atlas-resting.svg" alt=""><strong>Report</strong><span>Atlas quotes and maps</span></div></li>
+      <li class="station" style="--i:3"><div class="pop"><img src="../public/brand/mascots/lens-resting.svg" alt=""><strong>Report</strong><span>Lens counts, with n</span></div></li>
+      <li class="station" style="--i:4"><div class="pop"><img src="../public/brand/mascots/steward-resting.svg" alt=""><strong>Report</strong><span>Steward prepares the brief</span></div></li>
+      <li class="station" style="--i:5"><div class="pop"><span class="people-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg></span><strong>Decide</strong><span>People decide</span></div></li>
+      <li class="station" style="--i:6"><div class="pop"><img src="../public/brand/mascots/quill-resting.svg" alt=""><strong>Update</strong><span>Quill checks the revision</span></div></li>
+      <li class="station" style="--i:7"><div class="pop"><img src="../public/brand/mascots/prism-resting.svg" alt=""><strong>Teach</strong><span>Prism builds the pack</span></div></li>
+      <li class="station" style="--i:8"><div class="pop"><img src="../public/brand/mascots/lens-resting.svg" alt=""><strong>Learn</strong><span>Lens reads the results, n of N</span></div></li>
+    </ol>
+  </div>
+  <footer class="foot"><span>The same names in the app, the demo, the film and this deck.</span><span class="slide-number"></span></footer>
+  <aside class="notes">1:45 to 2:15. The host introduces the cast; the helpers arrive one by one.
+"Six steps, with the same names you will see in the app: Watch, Report, Decide, Update, Teach, Learn. Tualang hosts. Seven helpers each do one job, and you will meet them at their steps. At Decide there is no helper: people decide."
+Transition: "Let us run it on a real board."</aside>
+</section>
+
+<!-- 5. Live: Watch and Report (beat 5) -->
+<section class="slide s-live" data-title="Watch and Report">
+  <div class="slide-head">
+    <div class="head-row"><span class="chip live">In the app · Watch and Report</span><span class="by"><img class="helper" src="../public/brand/mascots/scout-resting.svg" alt="">Scout fetched Stripe's board, on request.</span></div>
+    <h2 class="title">A quotation is exact, or it is rejected.</h2>
+  </div>
+  <div class="screens">
+    <div class="side">
+      <figure class="shot"><div class="region" style="--x: 0; --y: 0; --w: 1552; --h: 578; --iw: 1552"><img src="../docs/presentation/shot-report-quote.png" alt="A proposed quotation about dashboards beside the Stripe posting it came from, the matched words marked in the posting."></div><figcaption><img class="helper" src="../public/brand/mascots/atlas-resting.svg" alt="">Atlas proposes each quotation beside its source.</figcaption></figure>
+      <figure class="shot"><div class="region" style="--x: 0; --y: 404; --w: 1552; --h: 398; --iw: 1552"><img src="../docs/presentation/shot-report-paraphrase.png" alt="A quotation typed by hand, experience with Python, refused because the words are not in the saved source text."></div><figcaption>A paraphrase, refused before it is stored.</figcaption></figure>
+    </div>
+    <figure class="shot"><img src="../docs/presentation/shot-report-card.png" alt="The dashboards card: postings that quote it over the reviewed postings, with its interval and a waffle of the postings."><figcaption><img class="helper" src="../public/brand/mascots/lens-resting.svg" alt="">Lens counts reviewed postings only, with an interval.</figcaption></figure>
+  </div>
+  <div class="film"><video src="media/loop90.mp4" preload="none" playsinline></video></div>
+  <footer class="foot"><span>Real screens from the demo, on the saved sample of a real board.</span><span class="slide-number"></span></footer>
+  <aside class="notes">2:15 to 4:15. Switch to the app; the operator drives and the presenter never touches the keyboard.
+Watch: fetch Stripe's board live, or the dated saved sample if the network is down, and say which.
+Report: scan, confirm a quotation beside its source, then type a paraphrase and let it fail. Pause after the rejection.
+"Nothing invented, nothing pasted. A paraphrase is rejected."
+Review the postings, then the count over reviewed postings with its interval, then one mapping and the brief.
+If the room is hostile, press V for the film instead.
+Transition: "But a count is not a decision."</aside>
+</section>
+
+<!-- 6. Decide and Update (beat 5) -->
+<section class="slide s-decide" data-title="Decide and Update">
+  <div class="slide-head">
+    <span class="chip live">Decide and Update</span>
+    <h2 class="title">People decide, and the decision leaves a record.</h2>
+  </div>
+  <div class="screens">
+    <figure class="shot"><img src="../docs/presentation/shot-decide.png" alt="The brief, its recipient Dr Rahman, and his decision to adopt the change with his reason, the term and the course version."><figcaption><img class="helper" src="../public/brand/mascots/steward-resting.svg" alt="">The brief, and the decision with its reason, its term and its version.</figcaption></figure>
+    <figure class="shot"><img src="../docs/presentation/shot-history.png" alt="The course history: the adopted version with its reason above the earlier version and the decision."><figcaption><img class="helper" src="../public/brand/mascots/quill-resting.svg" alt="">Update: the checked revision, adopted with its reason.</figcaption></figure>
+    <p class="aside-note">Formal approval stays in the university's own process; Lyceum keeps the decision that goes into it.</p>
+  </div>
+  <footer class="foot"><span>Real screens from the demo.</span><span class="slide-number"></span></footer>
+  <aside class="notes">4:15 to 5:00.
+"The brief goes to Dr Rahman, the programme owner. He records adopt, with his reason. The record names the brief, the term and the course version, and it never changes; an amendment is a new record. A decision by the brief's own author is labelled self-recorded and stays open until a second person confirms."
+Update: "Here the revision sharpens the visualisation outcome and adds a dashboards topic within the existing hours. Quill checks it against the hours and the protected topics, and the adopted version keeps its reason."
+Transition: "But a course is not a class."</aside>
+</section>
+
+<!-- 7. Teach and Learn (beat 5) -->
+<section class="slide s-teach" data-title="Teach and Learn">
+  <div class="slide-head">
+    <span class="chip live">Teach and Learn</span>
+    <h2 class="title">Teach from the pack. Learn from the results.</h2>
+  </div>
+  <div class="screens">
+    <figure class="pack-frame">
+      <div class="bar"><span>Opened in PowerPoint</span><span data-ref>sample-CS310-week-6-teaching-pack.pptx</span></div>
+      <img src="../docs/presentation/pack/slide-03.png" alt="A slide of the teaching pack as PowerPoint renders it: what employers ask for, with the dashboards count and an exact quotation from the Stripe posting.">
+      <figcaption><img class="helper" src="../public/brand/mascots/prism-resting.svg" alt="">The downloaded file as PowerPoint draws it. Editable; no model text.</figcaption>
+    </figure>
+    <div class="side">
+      <figure class="shot"><img src="../docs/presentation/shot-learn.png" alt="Learn: the results file filed for the course version taught, with the mean mark for the outcome and n of N."><figcaption><img class="helper" src="../public/brand/mascots/lens-resting.svg" alt="">Sample results, synthetic marks, filed for the version taught, with n of N.</figcaption></figure>
+      <p class="track-a">No learning gain is claimed; the benchmark has not been run.</p>
+      <div class="planned-card">
+        <h3><span class="chip planned">Planned</span>Learn, after Amsterdam</h3>
+        <ul><li>Intervals and small-cohort pooling</li><li>Perception beside attainment</li><li>The benchmark against the CLO survey</li></ul>
+      </div>
+    </div>
+  </div>
+  <footer class="foot"><span>Real screens; the pack as PowerPoint renders it; the results are a synthetic sample file. Learn is descriptive only.</span><span class="slide-number"></span></footer>
+  <aside class="notes">5:00 to 5:45.
+Teach: "Prism builds the teaching pack from the saved session and the evidence linked to its outcomes. This is the downloaded file as PowerPoint opens it. It is editable, and no model wrote a word of it."
+Learn: "The term's results come back, here a synthetic sample file, matched to the course version taught, with n of N. We claim no learning gain; the benchmark has not been run. Intervals, pooling and perception are planned, in amber."
+Transition: "Next semester the loop runs again. So what here is real?"</aside>
+</section>
+
+<!-- 8. What is real (beat 6) -->
+<section class="slide forest s-real" data-title="What is real">
+  <p class="eyebrow">The proof</p>
+  <h2 class="title">What is real, and what is not yet.</h2>
+  <div class="real-grid">
+    <div class="real-card" data-claim="deck-trl">
+      <p class="eyebrow">Readiness, self-assessed</p>
+      <p class="big lime">TRL 6</p>
+      <p>“Prototype implementations of the software demonstrated on full-scale realistic problems.”</p>
+      <p class="quiet">NASA ESTO, software. Our relevant environment: real postings from a real public board, a sample course outline, a lecturer persona.</p>
+    </div>
+    <div class="real-card" data-claim="proof-checks">
+      <p class="eyebrow">Checks</p>
+      <p class="big">185</p>
+      <p>automated checks passed on 22 October 2026, plus four headless browser runs.</p>
+      <p class="quiet">One dataset for everything: the dated sample of a real board, restored before every run.</p>
+    </div>
+    <div class="planned-card">
+      <h3><span class="chip planned">Planned</span>Not built yet</h3>
+      <ul>
+        <li>Remote doors for ChatGPT, Copilot, Gemini</li>
+        <li>The LMS door for Canvas and Moodle</li>
+        <li>Learn's statistics and the benchmark run</li>
+        <li>Watching on a schedule</li>
+        <li>A shared workspace with sign-in</li>
+      </ul>
+    </div>
+  </div>
+  <p class="next-level"><span>Next level:</span> one department, one term, inside its LMS.</p>
+  <footer class="foot"><span>Self-assessed against NASA ESTO's software readiness levels.</span><span class="slide-number"></span></footer>
+  <aside class="notes">5:45 to 6:15. Say the limits slower than the claims.
+"Against NASA's software readiness levels we place Lyceum at TRL 6, self-assessed, on real postings from a real public board, a sample course outline and a lecturer persona. 185 checks pass, plus four browser runs; in amber, what is not built."
+"TRL 7 needs one department running it for a term inside its LMS: the step we ask for."
+Transition: "And it has to live in the tools lecturers already use."</aside>
+</section>
+
+<!-- 9. The doors (beat 7) -->
+<section class="slide s-doors" data-title="The doors">
+  <img class="full" src="../docs/presentation/architecture.png" alt="Lyceum's architecture: people work through doors into one deterministic core. The web workspace is built and the local Claude door is built and read-only; the remote assistant doors, the LMS door and the office suite are planned. The core reads permitted job boards, taxonomies and references, and files results from institution systems.">
+  <footer class="foot"><span class="slide-number"></span></footer>
+  <aside class="notes">6:15 to 6:50.
+"One core, many doors. The web workspace is built. The local door is built: a read-only MCP server over an exported workspace, set up for Claude Desktop and Claude Code and tested with the official MCP client. The remote doors for ChatGPT Edu, Copilot and Gemini, the LMS door for Canvas and Moodle, and the office suite are planned, and drawn dashed. No door confirms a quotation, adopts a revision or decides by itself; a person does."
+Transition: "So why would a department pay for it?"</aside>
+</section>
+
+<!-- 10. Why a department pays (beat 7) -->
+<section class="slide dots s-pays" data-title="Why a department pays">
+  <p class="eyebrow">Why a department pays</p>
+  <h2 class="title">The review happens anyway; the evidence is kept.</h2>
+  <div class="pays-grid">
+    <div class="ladder" aria-label="The ladder: free, department, institution">
+      <div class="tier inst"><h3>Institution <span class="chip planned">Planned</span></h3><p>Tenancy, audit, the office suite doors</p><p>Data agreements with the institution</p></div>
+      <div class="tier dept"><h3>Department <span class="chip planned">Planned</span></h3><p>Shared workspace, sign-in, the remote and LMS doors</p><p>The term's review pack, and support</p></div>
+      <div class="tier free"><h3>Free <span class="chip built">Built</span></h3><p>One course, on one laptop, no account</p><p>The whole loop, every export, the local assistant door</p></div>
+    </div>
+    <div>
+      <p class="clauses-head">Each step answers what reviewers already look for</p>
+      <ol class="clauses">
+        <li><strong>Watch</strong><span class="body" data-ref>AUN-QA Guide v4.0, 1.4</span><q data-clause="AUN-QA Guide v4.0, 1.4">the requirements of the stakeholders, especially the external stakeholders, are gathered</q></li>
+        <li><strong>Report</strong><span class="body" data-ref>MQA COPPA, 6.1.6</span><q data-clause="MQA COPPA, 2nd edition, 6.1.6">market needs and graduate employability analyses</q></li>
+        <li><strong>Decide</strong><span class="body" data-ref>ABET, Criterion 2</span><q data-clause="ABET, Criterion 2">for the periodic review of these program educational objectives</q></li>
+        <li><strong>Update</strong><span class="body" data-ref>ESG 2015, 1.9</span><q data-clause="ESG 2015, 1.9">monitor and periodically review their programmes</q></li>
+        <li><strong>Teach</strong><span class="body">Biggs, constructive alignment, a teaching principle</span><q data-clause="Biggs, constructive alignment, a teaching principle">the assessment tasks, are aligned to each other</q></li>
+        <li><strong>Learn</strong><span class="body" data-ref>ABET, Criterion 4</span><q data-clause="ABET, Criterion 4">systematically utilized as input for the program's continuous improvement actions</q></li>
+      </ol>
+    </div>
+  </div>
+  <footer class="foot"><span>Free: a local prototype today. The other tiers: planned. Clauses quoted from dated notes.</span><span class="slide-number"></span></footer>
+  <aside class="notes">6:50 to 7:20.
+"Every university already runs a periodic review, and each step of the loop is the working form of what reviewers already look for."
+"The review happens anyway; with Lyceum the evidence is already kept. One course is free and local. A department would pay for the shared workspace and the doors; the price is the hypothesis our pilot tests."
+If asked what the free tier costs: "Nothing to try: one course, one laptop, no account."
+Transition: "So here is what we ask."</aside>
+</section>
+
+<!-- 11. The ask and the close (beat 8) -->
+<section class="slide forest s-ask" data-title="The ask">
+  <div class="host-badge"><img src="../public/brand/mascots/host-celebrating.svg" alt="Tualang celebrating a closed loop"></div>
+  <svg class="closed-ring" viewBox="0 0 320 320" role="img" aria-label="The ring, closed for the term"><circle cx="160" cy="160" r="130"/><text x="160" y="152">closed for</text><text x="160" y="184">the term</text></svg>
+  <div class="ask-copy">
+    <p class="eyebrow">The ask</p>
+    <h2 class="title">One department, one term, inside its LMS.</h2>
+    <p class="measures-label">What the pilot measures</p>
+    <ul class="measures"><li>Task completion</li><li>Citation fidelity</li><li>Time to a brief</li><li>Repeat use</li></ul>
+    <p class="sentence">Lyceum turns real job postings into a course decision with receipts, every semester, inside the tools lecturers already use.</p>
+    <p class="big closing">Every semester adds a ring.</p>
+  </div>
+  <footer class="foot"><span>Pilot measures, not results. Lyceum, Universiti Teknologi PETRONAS.</span><span class="slide-number"></span></footer>
+  <aside class="notes">7:20 to 8:00. Restate the three points: receipts, people decide, the tools they already use.
+"We ask for one department, for one term, inside its LMS. We will measure task completion, citation fidelity, time to a brief and repeat use."
+"Three things: receipts, people decide, and the tools they already use."
+"Lyceum turns real job postings into a course decision with receipts, every semester, inside the tools lecturers already use. Every semester adds a ring."
+Rehearsed word for word. Where is the AI: "The numbers come from deterministic code on purpose. AI sits at the doors, where an assistant asks Lyceum for the evidence report through the read-only local door, and in drafting, where a model may propose and a lecturer confirms; it never confirms a quotation, never moves a count and never decides."
+Why not ChatGPT with search: "A chat can draft text. It cannot refuse a quotation that is not in the source, keep the denominator honest, record who decided, or keep the version history. Lyceum does those four things; today its local door answers any MCP client, and the ChatGPT door is planned."</aside>
+</section>
+
+</main>
+<div class="deck-notes" hidden></div>
+<div class="deck-toast" hidden></div>
+<script src="deck.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@ export function PrototypeNotice() {
       aria-label="Prototype data limitations"
       style={{
         padding: "10px 20px",
-        background: "var(--surface-2)",
+        background: "var(--tint-1)",
         color: "var(--ink-2)",
         borderBottom: "1px solid var(--border)",
         fontSize: 13,

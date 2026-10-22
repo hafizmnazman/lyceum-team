@@ -26,7 +26,7 @@ const BAND_TONE: Record<RelevanceBand, "danger" | "warn" | "ok" | "neutral"> = {
 };
 
 function deltaColor(delta: number): string {
-  return delta < 0 ? "var(--danger)" : "var(--ok)";
+  return delta < 0 ? "var(--danger)" : "var(--emerald)";
 }
 
 function formatDelta(delta: number): string {
@@ -43,7 +43,7 @@ function ScoreBar(props: { score: number }) {
         width: 120,
         height: 4,
         borderRadius: 2,
-        background: "var(--surface-2)",
+        background: "var(--tint-1)",
         overflow: "hidden",
         flexShrink: 0,
       }}
@@ -53,7 +53,7 @@ function ScoreBar(props: { score: number }) {
           display: "block",
           width: `${Math.round(props.score * 100)}%`,
           height: "100%",
-          background: "var(--accent)",
+          background: "var(--emerald)",
         }}
       />
     </span>
@@ -90,14 +90,14 @@ function Receipts(props: { rating: RelevanceRating; loggedIn: boolean; subject: 
               key={c.cloId}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "5px 0" }}
             >
-              <span className="num" style={{ width: 52, fontSize: 12.5, color: "var(--ink-2)" }}>
+              <span className="num" style={{ width: 52, fontSize: 13, color: "var(--ink-2)" }}>
                 {c.cloId}
               </span>
               <ScoreBar score={c.score} />
-              <span className="num" style={{ width: 32, fontSize: 12.5 }}>
+              <span className="num" style={{ width: 32, fontSize: 13 }}>
                 {Math.round(c.score * 100)}
               </span>
-              <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+              <span style={{ fontSize: 13, color: "var(--ink-2)" }}>
                 {c.movedBy.length > 0 ? `moved by ${c.movedBy.join(", ")}` : "no moving skills"}
               </span>
             </div>
@@ -114,19 +114,19 @@ function Receipts(props: { rating: RelevanceRating; loggedIn: boolean; subject: 
                   style={{
                     flex: "1 1 220px",
                     minWidth: 200,
-                    background: "var(--surface-2)",
-                    borderRadius: "var(--radius-s)",
+                    background: "var(--tint-1)",
+                    borderRadius: "var(--radius-chip)",
                     padding: "10px 12px",
                   }}
                 >
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{source?.name ?? sid}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 6 }}>
                     synthetic fixture, example date {source?.snapshotDate ?? "undated"}
                   </div>
                   {rows.map((e) => (
                     <div
                       key={`${sid}-${e.skill}`}
-                      style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12.5, padding: "2px 0" }}
+                      style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13, padding: "2px 0" }}
                     >
                       <span style={{ flex: 1, color: "var(--ink-2)" }}>{e.skill}</span>
                       <span className="num">{e.demandScore.toFixed(2)}</span>
@@ -143,7 +143,7 @@ function Receipts(props: { rating: RelevanceRating; loggedIn: boolean; subject: 
           {hasSourceDisagreement(rating.evidence) ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
               <Tag tone="warn">sources disagree</Tag>
-              <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+              <span style={{ fontSize: 13, color: "var(--ink-2)" }}>
                 The source directions differ for at least one skill. Agreement is not evidence quality.
               </span>
             </div>
@@ -225,9 +225,9 @@ export function IndexScreen() {
                     {rating && band !== "unrated" ? Math.round(rating.score * 100) : ""}
                   </span>
                   {expanded ? (
-                    <ChevronDown size={16} color="var(--ink-3)" />
+                    <ChevronDown size={16} color="var(--ink-2)" />
                   ) : (
-                    <ChevronRight size={16} color="var(--ink-3)" />
+                    <ChevronRight size={16} color="var(--ink-2)" />
                   )}
                 </Row>
                 {expanded && rating ? (
@@ -239,7 +239,7 @@ export function IndexScreen() {
         </div>
       )}
 
-      <div style={{ marginTop: 28, fontSize: 12, color: "var(--ink-3)", maxWidth: 640 }}>
+      <div style={{ marginTop: 28, fontSize: 13, color: "var(--ink-2)", maxWidth: 640 }}>
         Demand derived from job-ad frequency is a proxy and is labelled as such. The advisory
         scores its own recommendations against next-term results; see the closed loop.
       </div>
@@ -262,10 +262,10 @@ export function IndexScreen() {
           justifyContent: "space-between",
           padding: "0 24px",
           borderBottom: "1px solid var(--border)",
-          background: "var(--surface)",
+          background: "var(--white)",
         }}
       >
-        <span className="page-title" style={{ fontSize: 20 }}>
+        <span className="page-title" style={{ fontSize: 22 }}>
           Lyceum
         </span>
         <Button variant="quiet" data-demo-id="index-signin" onClick={() => navigate("login")}>

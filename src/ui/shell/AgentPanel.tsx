@@ -21,9 +21,9 @@ export function AgentPanel() {
         bottom: 0,
         width: 380,
         maxWidth: "90vw",
-        background: "var(--surface)",
+        background: "var(--white)",
         borderLeft: "1px solid var(--border)",
-        boxShadow: "var(--shadow-2)",
+        boxShadow: "var(--depth-menu)",
         zIndex: 70,
         display: "flex",
         flexDirection: "column",
@@ -55,7 +55,7 @@ export function AgentPanel() {
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
         {runs.length === 0 ? (
-          <div style={{ color: "var(--ink-3)", fontSize: 13, padding: 12 }}>
+          <div style={{ color: "var(--ink-2)", fontSize: 13, padding: 12 }}>
             No agent has run yet this session. Agents wake where you work: drop a
             file on Upload, open Trends, or draft in the Studio.
           </div>
@@ -65,31 +65,31 @@ export function AgentPanel() {
               key={r.id}
               style={{
                 border: "1px solid var(--border)",
-                borderRadius: "var(--radius-m)",
+                borderRadius: "var(--radius-card)",
                 padding: 12,
                 marginBottom: 10,
-                background: "var(--surface)",
+                background: "var(--white)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{AGENT_LABELS[r.agent]}</span>
                 <StatusDot status={r.status} />
-                <span style={{ fontSize: 11.5, color: "var(--ink-3)", marginLeft: "auto" }}>
+                <span style={{ fontSize: 13, color: "var(--ink-2)", marginLeft: "auto" }}>
                   {r.status === "fallback" ? "offline draft" : r.status}
                 </span>
               </div>
-              <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginTop: 4 }}>{r.label}</div>
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 4 }}>{r.label}</div>
               {r.streamText ? (
                 <pre
                   style={{
                     margin: "8px 0 0",
                     padding: 10,
-                    background: "var(--surface-2)",
-                    borderRadius: "var(--radius-s)",
-                    fontSize: 11.5,
+                    background: "var(--tint-1)",
+                    borderRadius: "var(--radius-chip)",
+                    fontSize: 13,
                     lineHeight: 1.5,
                     whiteSpace: "pre-wrap",
-                    fontFamily: "var(--font-ui)",
+                    fontFamily: "var(--font-body)",
                     color: "var(--ink-2)",
                     maxHeight: 180,
                     overflowY: "auto",
@@ -109,12 +109,12 @@ export function AgentPanel() {
 function StatusDot(props: { status: string }) {
   const color =
     props.status === "done"
-      ? "var(--ok)"
+      ? "var(--emerald)"
       : props.status === "failed"
         ? "var(--danger)"
         : props.status === "fallback"
           ? "var(--warn)"
-          : "var(--accent)";
+          : "var(--emerald)";
   const pulsing = props.status === "thinking" || props.status === "streaming" || props.status === "queued";
   return (
     <span

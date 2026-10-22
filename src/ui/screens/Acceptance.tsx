@@ -45,7 +45,7 @@ function MasteryBar(props: { value: number; danger?: boolean }) {
       style={{
         flex: 1,
         height: 6,
-        background: "var(--surface-2)",
+        background: "var(--tint-1)",
         borderRadius: 3,
         overflow: "hidden",
       }}
@@ -54,7 +54,7 @@ function MasteryBar(props: { value: number; danger?: boolean }) {
         style={{
           width: `${Math.max(0, Math.min(1, props.value)) * 100}%`,
           height: "100%",
-          background: props.danger ? "var(--danger)" : "var(--accent)",
+          background: props.danger ? "var(--danger)" : "var(--emerald)",
           borderRadius: 3,
           transition: "width 250ms ease-out",
         }}
@@ -122,7 +122,7 @@ export function AcceptanceScreen() {
           Scenario using {sim.totalLearners} learner records; seed records are synthetic
         </Provenance>
 
-        <div style={{ marginTop: 24, fontSize: 17, fontWeight: 600 }}>{sim.caption}</div>
+        <div style={{ marginTop: 24, fontSize: 18, fontWeight: 600 }}>{sim.caption}</div>
         <div className="num" style={{ marginTop: 6, fontSize: 13, color: "var(--ink-2)" }}>
           {sim.learnersRun} of {sim.totalLearners}
         </div>
@@ -145,23 +145,23 @@ export function AcceptanceScreen() {
                 flex: 1,
                 height: `${(count / maxBin) * 100}%`,
                 minHeight: count > 0 ? 2 : 0,
-                background: "var(--accent)",
+                background: "var(--emerald)",
                 borderRadius: "2px 2px 0 0",
                 transition: "height 180ms ease-out",
               }}
             />
           ))}
         </div>
-        <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 4 }}>
+        <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 4 }}>
           Per-learner mastery, 0 to 1
         </div>
 
         {sim.phase === "settling" ? (
           <div style={{ marginTop: 28 }}>
-            <div className="num" style={{ fontSize: 52, fontWeight: 600, lineHeight: 1 }}>
+            <div className="num" style={{ fontSize: 48, fontWeight: 600, lineHeight: 1 }}>
               {sim.displayedMastery.toFixed(2)}
             </div>
-            <div style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 4 }}>
+            <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 4 }}>
               projected cohort mastery, settling
             </div>
           </div>
@@ -184,7 +184,7 @@ export function AcceptanceScreen() {
       </Provenance>
 
       <Card focal style={{ marginTop: 20 }} data-demo-id="acceptance-verdict">
-        <p style={{ margin: "0 0 16px", fontSize: 15, maxWidth: 640 }}>{report.summary}</p>
+        <p style={{ margin: "0 0 16px", fontSize: 16, maxWidth: 640 }}>{report.summary}</p>
         <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
           <Stat label="current mastery" value={report.currentMastery.toFixed(2)} />
           <Stat
@@ -212,7 +212,7 @@ export function AcceptanceScreen() {
             <span className="num" style={{ width: 44, textAlign: "right", fontWeight: 600 }}>
               {m.meanP.toFixed(2)}
             </span>
-            <span className="num" style={{ fontSize: 12, color: "var(--ink-3)", width: 150 }}>
+            <span className="num" style={{ fontSize: 13, color: "var(--ink-2)", width: 150 }}>
               spread {m.spread.toFixed(2)}, confidence {m.confidence.toFixed(2)}
             </span>
           </Row>
@@ -231,10 +231,10 @@ export function AcceptanceScreen() {
                 gap: 8,
                 background: "var(--warn-soft)",
                 color: "var(--warn)",
-                borderRadius: "var(--radius-s)",
+                borderRadius: "var(--radius-chip)",
                 padding: "10px 12px",
                 marginBottom: 8,
-                fontSize: 13.5,
+                fontSize: 14,
               }}
             >
               <AlertTriangle size={16} />
@@ -269,14 +269,14 @@ export function AcceptanceScreen() {
                   data-demo-id={i === DRILL_STEPS - 1 ? "drill-final" : undefined}
                   style={{
                     border: "1px solid var(--border)",
-                    borderLeft: "3px solid var(--accent)",
-                    borderRadius: "var(--radius-m)",
-                    background: "var(--surface)",
-                    boxShadow: "var(--shadow-1)",
+                    borderLeft: "3px solid var(--emerald)",
+                    borderRadius: "var(--radius-card)",
+                    background: "var(--white)",
+                    boxShadow: "none",
                     padding: "14px 16px",
                   }}
                 >
-                  <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 4 }}>
                     Hop {i + 1} of {DRILL_STEPS}
                   </div>
                   {renderHop(i, report)}
@@ -308,7 +308,7 @@ function renderHop(i: number, report: VerdictReport) {
       return (
         <div>
           <div style={{ fontWeight: 600, marginBottom: 2 }}>The verdict figure</div>
-          <span className="num" style={{ fontSize: 26, fontWeight: 600 }}>
+          <span className="num" style={{ fontSize: 28, fontWeight: 600 }}>
             {report.projectedMastery.toFixed(2)}
           </span>
           <span style={{ fontSize: 13, color: "var(--ink-2)", marginLeft: 8 }}>
@@ -362,10 +362,10 @@ function renderHop(i: number, report: VerdictReport) {
       return (
         <div>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>The probability</div>
-          <div className="num" style={{ fontSize: 26, fontWeight: 600 }}>
+          <div className="num" style={{ fontSize: 28, fontWeight: 600 }}>
             P(correct) = sigma(theta - b) = {d.p.toFixed(2)}
           </div>
-          <p style={{ margin: "6px 0 0", fontSize: 13.5, color: "var(--ink-2)" }}>{d.cause}</p>
+          <p style={{ margin: "6px 0 0", fontSize: 14, color: "var(--ink-2)" }}>{d.cause}</p>
         </div>
       );
     default:

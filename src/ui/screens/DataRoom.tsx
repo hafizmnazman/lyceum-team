@@ -84,7 +84,7 @@ export function DataRoomScreen() {
                   <span className="num" style={{ width: 96, fontSize: 13 }}>
                     {ds.recordCount} records
                   </span>
-                  <span style={{ width: 110, fontSize: 12.5, color: "var(--ink-2)" }}>
+                  <span style={{ width: 110, fontSize: 13, color: "var(--ink-2)" }}>
                     {freshness(ds.ingestedAt)}
                   </span>
                   {ds.verified ? (
@@ -93,8 +93,8 @@ export function DataRoomScreen() {
                         display: "inline-flex",
                         alignItems: "center",
                         gap: 4,
-                        fontSize: 12.5,
-                        color: "var(--ok)",
+                        fontSize: 13,
+                        color: "var(--emerald-text)",
                       }}
                     >
                       <ShieldCheck size={15} /> verified
@@ -106,15 +106,15 @@ export function DataRoomScreen() {
                     <span
                       style={{
                         marginLeft: "auto",
-                        fontSize: 12,
-                        color: "var(--ink-3)",
+                        fontSize: 13,
+                        color: "var(--ink-2)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                         maxWidth: 220,
                       }}
                     >
-                      {ds.sourceFileName}
+                      {ds.sourceFileName}{ds.sample ? ", a sample file, synthetic" : ""}
                     </span>
                   ) : null}
                 </Row>
@@ -127,9 +127,9 @@ export function DataRoomScreen() {
       <SectionLabel style={{ marginTop: 36 }}>Synthetic market examples</SectionLabel>
       {MARKET_SOURCES.map((s) => (
         <Row key={s.id}>
-          <span style={{ width: 240, fontSize: 13.5, fontWeight: 500 }}>{s.name}</span>
+          <span style={{ width: 240, fontSize: 14, fontWeight: 500 }}>{s.name}</span>
           <Tag>{MARKET_KIND_LABEL[s.kind] ?? s.kind}</Tag>
-          <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+          <span style={{ fontSize: 13, color: "var(--ink-2)" }}>
             {s.isSynthetic ? "synthetic fixture, example date" : "snapshot"}, {fmtDate(s.snapshotDate)}
           </span>
           <span className="num" style={{ marginLeft: "auto", fontSize: 13 }}>
@@ -137,19 +137,19 @@ export function DataRoomScreen() {
           </span>
         </Row>
       ))}
-      <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--ink-3)", maxWidth: 560 }}>
+      <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-2)", maxWidth: 560 }}>
         These counts and dates are fixture values, with no underlying retrieved records.
         Occupational reports must be analysed separately from job postings.
       </p>
 
       <SectionLabel style={{ marginTop: 36 }}>The survey</SectionLabel>
-      <p style={{ margin: 0, fontSize: 13.5, color: "var(--ink-2)", maxWidth: 560 }}>
+      <p style={{ margin: 0, fontSize: 14, color: "var(--ink-2)", maxWidth: 560 }}>
         <span className="num" style={{ fontWeight: 600, color: "var(--ink)" }}>
           {state.survey.length}
         </span>{" "}
         CLO mastery survey records on file across subjects.
       </p>
-      <p style={{ marginTop: 6, fontSize: 12.5, color: "var(--ink-3)", maxWidth: 560 }}>
+      <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-2)", maxWidth: 560 }}>
         Seed survey records are synthetic. Uploaded self-ratings describe perceived mastery;
         they are not measured ability or validation of the scenario model.
       </p>

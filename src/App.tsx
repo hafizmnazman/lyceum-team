@@ -1,70 +1,57 @@
-// The router: Login and the public Relevance Index render bare; everything else
-// renders inside the Shell. Navigation syncs to the URL hash (#/screen) so
-// refresh, back, and deep links work like a real app.
+// The router: Login and the public landing page render bare; everything else
+// renders inside the Shell. Navigation syncs to the URL hash (#/screen, or
+// #/course/<id>/<step> inside a course's loop) so refresh, back and deep links
+// work like a real app.
 
 import { useEffect, useRef } from "react";
-import type { Screen } from "./app/roles.ts";
-import { navAllows } from "./app/roles.ts";
+import { navAllows, subjectsForPerson } from "./app/roles.ts";
+import { stepDef } from "./app/loop.ts";
+import { hashFor, parseRoute, type CourseRoute } from "./app/routes.ts";
 import { currentPerson, getState, navigate, useStore } from "./app/store.ts";
 import { Shell } from "./ui/shell/Shell.tsx";
 import { SCREENS } from "./ui/screens/index.ts";
 import { DemoOverlay } from "./demo/DemoOverlay.tsx";
 import { LandingScreen } from "./ui/screens/Landing.tsx";
 
-const HASH_SCREENS: Screen[] = [
-  "login",
-  "index",
-  "inbox",
-  "trends",
-  "approval",
-  "programme",
-  "new-subject",
-  "assignments",
-  "courses",
-  "studio",
-  "acceptance",
-  "upload",
-  "backtest",
-  "dataroom",
-  "office",
-  "evaluation",
-  "guide",
-];
-
-function parseHash(): Screen | null {
-  const h = window.location.hash.replace(/^#\/?/, "");
-  return (HASH_SCREENS as string[]).includes(h) ? (h as Screen) : null;
+/** A course route is honoured only for a course this person may open in the workspace. */
+function mayOpen(route: CourseRoute): boolean {
+  const s = getState(), person = currentPerson();
+  if (!person || !s.subjects.some((x) => x.id === route.subjectId)) return false;
+  if (!navAllows(person, s.assignments, stepDef(route.step).screen)) return false;
+  return person.orgRole !== "academic" || subjectsForPerson(person.id, s.assignments).includes(route.subjectId);
 }
 
 export default function App() {
   const state = useStore();
+  const wanted = hashFor(state);
 
-  // Keep the hash in step with the screen (deep links, refresh, back button).
-  // On first load a valid deep link wins: the hash effect below navigates to it
-  // and this effect then records the result, instead of overwriting the link.
+  // Keep the hash in step with the screen and the loop step (deep links,
+  // refresh, back button). On first load a valid deep link wins: the hash
+  // effect below navigates to it and this effect then records the result,
+  // instead of overwriting the link.
   const initialSync = useRef(true);
   useEffect(() => {
-    if (initialSync.current) { initialSync.current = false; if (parseHash()) return; }
-    const want = `#/${state.screen}`;
-    if (window.location.hash !== want) {
-      // replaceState for programmatic moves keeps back-button history sane for
-      // the common case; the browser still records user-initiated hash changes.
-      window.history.pushState(null, "", want);
-    }
-  }, [state.screen]);
+    if (initialSync.current) { initialSync.current = false; if (parseRoute(window.location.hash)) return; }
+    if (window.location.hash !== wanted) window.history.pushState(null, "", wanted);
+  }, [wanted]);
 
   useEffect(() => {
     function onHashChange() {
-      const target = parseHash();
-      if (!target) return;
+      const route = parseRoute(window.location.hash);
+      if (!route) return;
       const s = getState();
       const person = currentPerson();
       if (!person) {
-        if (target === "index" || target === "login") navigate(target);
-        else window.history.replaceState(null, "", `#/${s.screen}`); // a private link, signed out: keep the URL honest
+        if ("screen" in route && (route.screen === "index" || route.screen === "login")) navigate(route.screen);
+        else window.history.replaceState(null, "", hashFor(s)); // a private link, signed out: keep the URL honest
         return;
       }
-      if (navAllows(person, s.assignments, target) && target !== s.screen) navigate(target);
+      if ("course" in route) {
+        if (!mayOpen(route.course)) { window.history.replaceState(null, "", hashFor(s)); return; }
+        if (window.location.hash !== hashFor(s)) navigate(stepDef(route.course.step).screen, route.course);
+        return;
+      }
+      if (navAllows(person, s.assignments, route.screen) && route.screen !== s.screen) navigate(route.screen);
     }
     // On first load, honour a deep link.
     onHashChange();

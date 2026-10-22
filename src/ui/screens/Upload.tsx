@@ -1,7 +1,9 @@
 // Upload (spec 6.3): real file intake, the product's trust moment. The flow is
-// drop -> parse -> interpret -> preview and confirm -> filed receipt. Nothing
+// drop, parse, interpret, preview and confirm, then a filed receipt. Nothing
 // files until the human has seen what was read (left) beside what the agent
-// made of it (right); the confirm step is the trust boundary.
+// made of it (right); the confirm step is the trust boundary. The same intake
+// panel files results and surveys on the Learn step, where the person filing
+// also confirms the course version the results are for.
 
 import { useRef, useState } from "react";
 import type { ChangeEvent, DragEvent } from "react";
@@ -14,10 +16,13 @@ import {
   finishAgentRun,
   getState,
   navigate,
+  openStep,
   personById,
   stagePendingIntake,
+  trackRequest,
   useStore,
 } from "../../app/store.ts";
+import { courseVersionIds, taughtVersionId } from "../../app/loop.ts";
 import { interpretDoc, parseFile } from "../../agents/client.ts";
 import { AgentStrip } from "../shell/AgentStrip.tsx";
 import {
@@ -46,9 +51,9 @@ function PreviewTable(props: { name: string; rows: string[][] }) {
   const rows = props.rows.slice(0, 6);
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 4 }}>{props.name}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{props.name}</div>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
+        <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
@@ -80,10 +85,10 @@ function QuietWell(props: { text: string }) {
   return (
     <div
       style={{
-        background: "var(--surface-2)",
-        borderRadius: "var(--radius-s)",
+        background: "var(--tint-1)",
+        borderRadius: "var(--radius-chip)",
         padding: "8px 10px",
-        fontSize: 12.5,
+        fontSize: 13,
         color: "var(--ink-2)",
         marginBottom: 12,
         whiteSpace: "pre-wrap",
@@ -94,7 +99,30 @@ function QuietWell(props: { text: string }) {
   );
 }
 
+const ALL_SAMPLES: Array<[string, string]> = [
+  ["results.xlsx", "sample-results"],
+  ["clo-survey.csv", "sample-survey"],
+  ["syllabus.pdf", "sample-syllabus"],
+  ["lecture-slides.pptx", "sample-slides"],
+];
+
 export function UploadScreen() {
+  const state = useStore();
+  return (
+    <Page>
+      <PageHead
+        title="Upload"
+        context="Results, surveys, syllabi and slides become ground here. The agent reads the file; you confirm what it read before anything files."
+      />
+      <AgentStrip agent="intake" />
+      <IntakePanel samples={ALL_SAMPLES} />
+      {!state.pendingIntake ? <><SectionLabel style={{ marginTop: 32 }}>Recent uploads</SectionLabel><RecentUploads /></> : null}
+    </Page>
+  );
+}
+
+/** Drop or pick a file, see what was read beside what it was taken to mean, then confirm and file. */
+export function IntakePanel({ samples, prompt }: { samples: Array<[string, string]>; prompt?: string }) {
   const state = useStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [parsingName, setParsingName] = useState<string | null>(null);
@@ -105,11 +133,11 @@ export function UploadScreen() {
   const pending = state.pendingIntake;
   const receipt = !pending ? state.flashUpload : null;
 
-  async function handleFile(file: File) {
+  async function handleFile(file: File, sample = false) {
     setParseError(null);
     setParsingName(file.name);
     const runId = beginAgentRun("intake", `Reading ${file.name}`, "upload");
-    const parsed = await parseFile(file);
+    const parsed = await trackRequest("parse", state.selectedSubjectId, () => parseFile(file));
     if (parsed.doc === null) {
       finishAgentRun(runId, "failed");
       setParseError(parsed.error ?? "Could not read this file.");
@@ -122,7 +150,7 @@ export function UploadScreen() {
       label: `Read ${file.name}: ${interp.docType}, ${Math.round(interp.confidence * 100)}% confident`,
     });
     setLastVia(via);
-    stagePendingIntake(parsed.doc, interp);
+    stagePendingIntake(sample ? { ...parsed.doc, sample: true } : parsed.doc, interp);
     setParsingName(null);
   }
 
@@ -140,13 +168,7 @@ export function UploadScreen() {
   }
 
   return (
-    <Page>
-      <PageHead
-        title="Upload"
-        context="Results, surveys, syllabi and slides become ground here. The agent reads the file; you confirm what it read before anything files."
-      />
-      <AgentStrip agent="intake" />
-
+    <div className="intake-panel">
       {pending ? (
         <ReviewPanels pending={pending} lastVia={lastVia} onDone={() => setLastVia(null)} />
       ) : (
@@ -169,9 +191,9 @@ export function UploadScreen() {
               if ((e.key === "Enter" || e.key === " ") && !parsingName) inputRef.current?.click();
             }}
             style={{
-              border: `1px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`,
-              borderRadius: "var(--radius-l)",
-              background: dragOver ? "var(--accent-soft)" : "var(--surface)",
+              border: `1px dashed ${dragOver ? "var(--emerald)" : "var(--border)"}`,
+              borderRadius: "var(--radius-card)",
+              background: dragOver ? "var(--tint-2)" : "var(--white)",
               padding: "48px 32px",
               textAlign: "center",
               cursor: parsingName ? "default" : "pointer",
@@ -185,11 +207,11 @@ export function UploadScreen() {
               </div>
             ) : (
               <>
-                <UploadCloud size={28} color="var(--ink-3)" style={{ marginBottom: 8 }} />
-                <div style={{ fontSize: 14.5, fontWeight: 500 }}>
-                  Drop the term's results, a survey export, a syllabus pdf, or lecture slides.
+                <UploadCloud size={28} color="var(--ink-2)" style={{ marginBottom: 8 }} />
+                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                  {prompt ?? "Drop the term's results, a survey export, a syllabus pdf, or lecture slides."}
                 </div>
-                <div style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 4 }}>
+                <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 4 }}>
                   xlsx, csv, pdf, pptx, docx
                 </div>
               </>
@@ -210,19 +232,14 @@ export function UploadScreen() {
           {/* One-click samples: fetched from public/demo and pushed through the
               exact same parse-interpret-confirm pipeline as a dropped file. */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 12, color: "var(--ink-3)" }}>Or try a sample:</span>
-            {[
-              ["results.xlsx", "sample-results"],
-              ["clo-survey.csv", "sample-survey"],
-              ["syllabus.pdf", "sample-syllabus"],
-              ["lecture-slides.pptx", "sample-slides"],
-            ].map(([name, demoId]) => (
+            <span style={{ fontSize: 13, color: "var(--ink-2)" }}>Or try a sample:</span>
+            {samples.map(([name, demoId]) => (
               <Button
                 key={name}
                 variant="outline"
                 data-demo-id={demoId}
                 disabled={Boolean(parsingName)}
-                style={{ height: 28, fontSize: 12, padding: "0 10px" }}
+                style={{ height: 28, fontSize: 13, padding: "0 10px" }}
                 onClick={() => {
                   void (async () => {
                     try {
@@ -230,7 +247,7 @@ export function UploadScreen() {
                       const res = await fetch(`/demo/${name}`);
                       if (!res.ok) throw new Error(String(res.status));
                       const blob = await res.blob();
-                      await handleFile(new File([blob], name));
+                      await handleFile(new File([blob], name), true);
                     } catch {
                       setParseError(`Could not load the sample ${name}.`);
                     }
@@ -246,18 +263,28 @@ export function UploadScreen() {
           {receipt ? (
             <Card focal style={{ marginTop: 24 }} data-demo-id="upload-receipt">
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                <CheckCircle size={20} color="var(--ok)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <CheckCircle size={20} color="var(--emerald-text)" style={{ flexShrink: 0, marginTop: 2 }} />
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 14.5 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>
                     Filed to <span className="num">{receipt.subjectId}</span>, {receipt.term}
                   </div>
                   <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>
                     <span className="num">{receipt.rows.length}</span> row
                     {receipt.rows.length === 1 ? "" : "s"}
-                    {receipt.sourceFileName ? ` from ${receipt.sourceFileName}` : ""}.
+                    {receipt.sourceFileName ? ` from ${receipt.sourceFileName}` : ""}{receipt.sample ? ", a sample file with synthetic marks" : ""}.
                   </div>
                   <div style={{ fontSize: 13, marginTop: 8 }}>
-                    This ground now feeds the cohort.{" "}
+                    {receipt.courseVersionId ? <>For course version <span className="num">{receipt.courseVersionId}</span>. </> : null}
+                    <a
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        openStep(receipt.subjectId, "learn");
+                      }}
+                    >
+                      Read it in Learn
+                    </a>
+                    {" or "}
                     <a
                       href="#"
                       onClick={(e) => {
@@ -265,7 +292,7 @@ export function UploadScreen() {
                         navigate("dataroom");
                       }}
                     >
-                      See it in the data room
+                      see it in the data room
                     </a>
                   </div>
                 </div>
@@ -273,11 +300,9 @@ export function UploadScreen() {
             </Card>
           ) : null}
 
-          <SectionLabel style={{ marginTop: 32 }}>Recent uploads</SectionLabel>
-          <RecentUploads />
         </>
       )}
-    </Page>
+    </div>
   );
 }
 
@@ -309,7 +334,7 @@ function ReviewPanels(props: {
           />
         ))}
         {doc.tables.length === 0 && doc.pages.length === 0 ? (
-          <div style={{ fontSize: 13, color: "var(--ink-3)" }}>
+          <div style={{ fontSize: 13, color: "var(--ink-2)" }}>
             Nothing readable was found in {doc.fileName}.
           </div>
         ) : null}
@@ -345,16 +370,32 @@ function ReviewPanels(props: {
         </Field>
         <Field label="Term">
           <Input
+            data-demo-id="upload-term"
             value={interp.termGuess ?? ""}
             placeholder="e.g. 2025-S1"
             onChange={(e) => stagePendingIntake(doc, { ...interp, termGuess: e.target.value })}
           />
         </Field>
+        {interp.docType === "results" && interp.subjectGuess ? (
+          <Field label="Course version taught" hint="The results are matched to this version. It defaults to the version this term's sessions were saved on.">
+            <Select
+              data-demo-id="upload-version"
+              value={interp.courseVersionId ?? taughtVersionId(state, interp.subjectGuess) ?? ""}
+              onChange={(e) => stagePendingIntake(doc, { ...interp, courseVersionId: e.target.value })}
+            >
+              {[...courseVersionIds(state, interp.subjectGuess)].map((id) => (
+                <option key={id} value={id}>
+                  {id}{id === state.subjects.find((s) => s.id === interp.subjectGuess)?.currentVersionId ? " (current)" : ""}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
 
         {interp.mappedRows && interp.mappedRows.length > 0 ? (
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 4 }}>Mapped rows</div>
-            <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Mapped rows</div>
+            <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr>
                   {["CLO", "mean", "sd", "n"].map((h) => (
@@ -382,7 +423,7 @@ function ReviewPanels(props: {
                       {r.meanScore.toFixed(2)}
                     </td>
                     <td className="num" style={{ border: "1px solid var(--border)", padding: "3px 10px" }}>
-                      {r.sd}
+                      {r.sd.toFixed(2)}
                     </td>
                     <td className="num" style={{ border: "1px solid var(--border)", padding: "3px 10px" }}>
                       {r.n}
@@ -403,7 +444,7 @@ function ReviewPanels(props: {
         {interp.contentSummary ? <QuietWell text={interp.contentSummary} /> : null}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <span style={{ fontSize: 12.5, color: "var(--ink-3)" }}>Confidence</span>
+          <span style={{ fontSize: 13, color: "var(--ink-2)" }}>Confidence</span>
           <span
             aria-hidden
             style={{
@@ -411,7 +452,7 @@ function ReviewPanels(props: {
               width: 120,
               height: 4,
               borderRadius: 2,
-              background: "var(--surface-2)",
+              background: "var(--tint-1)",
               overflow: "hidden",
             }}
           >
@@ -420,11 +461,11 @@ function ReviewPanels(props: {
                 display: "block",
                 width: `${Math.round(interp.confidence * 100)}%`,
                 height: "100%",
-                background: "var(--accent)",
+                background: "var(--emerald)",
               }}
             />
           </span>
-          <span className="num" style={{ fontSize: 12.5 }}>
+          <span className="num" style={{ fontSize: 13 }}>
             {Math.round(interp.confidence * 100)}%
           </span>
         </div>
@@ -434,7 +475,7 @@ function ReviewPanels(props: {
             style={{
               margin: "0 0 14px",
               paddingLeft: 18,
-              fontSize: 12.5,
+              fontSize: 13,
               color: "var(--ink-2)",
             }}
           >
@@ -505,8 +546,8 @@ function RecentUploads() {
           <span
             style={{
               flex: 1,
-              fontSize: 12.5,
-              color: "var(--ink-3)",
+              fontSize: 13,
+              color: "var(--ink-2)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -514,7 +555,7 @@ function RecentUploads() {
           >
             {u.sourceFileName ?? ""}
           </span>
-          <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+          <span style={{ fontSize: 13, color: "var(--ink-2)" }}>
             {personById(u.uploadedBy)?.name ?? u.uploadedBy}
           </span>
         </Row>

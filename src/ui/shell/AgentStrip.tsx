@@ -26,26 +26,26 @@ export function AgentStrip(props: { agent: AgentId; idleText?: string }) {
         width: "100%",
         padding: "8px 12px",
         marginBottom: 18,
-        borderRadius: "var(--radius-s)",
+        borderRadius: "var(--radius-chip)",
         border: "1px solid var(--border)",
-        background: working ? undefined : "var(--surface-2)",
+        background: working ? undefined : "var(--tint-1)",
         cursor: "pointer",
-        fontSize: 12.5,
+        fontSize: 13,
         color: "var(--ink-2)",
         textAlign: "left",
       }}
     >
-      <Sparkles size={14} color={working ? "var(--accent)" : "var(--ink-3)"} />
-      <span style={{ fontWeight: 600, color: working ? "var(--accent)" : "var(--ink-2)" }}>
+      <Sparkles size={14} color={working ? "var(--emerald-text)" : "var(--ink-2)"} />
+      <span style={{ fontWeight: 600, color: working ? "var(--emerald-text)" : "var(--ink-2)" }}>
         {AGENT_LABELS[props.agent]}
       </span>
       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {text}
       </span>
       {run?.status === "fallback" ? (
-        <span style={{ fontSize: 11, color: "var(--warn)", flexShrink: 0 }}>offline draft</span>
+        <span style={{ fontSize: 13, color: "var(--warn)", flexShrink: 0 }}>offline draft</span>
       ) : null}
-      <ChevronRight size={14} color="var(--ink-3)" />
+      <ChevronRight size={14} color="var(--ink-2)" />
     </button>
   );
 }

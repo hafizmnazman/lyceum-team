@@ -19,6 +19,17 @@ export function isTurbo(): boolean {
   }
 }
 
+/** The saved sample from the start (?demoSample), for the film's capture: the same tour, offline and
+ *  deterministic, with the dated sample of the same board in place of the live fetch (video/README.md). */
+export function isSampleTour(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return new URLSearchParams(window.location.search).has("demoSample");
+  } catch {
+    return false;
+  }
+}
+
 /** Shrink a paced duration under turbo; full speed (identity) otherwise. */
 export function scaleMs(ms: number): number {
   return isTurbo() ? Math.max(16, Math.round(ms * 0.05)) : ms;

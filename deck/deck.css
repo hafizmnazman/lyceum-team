@@ -1,0 +1,227 @@
+/* The pitch deck (plan Section 14): eleven slides at 1920 by 1080 on the tokens.
+   Every colour is a custom property from theme.generated.css, written from
+   src/theme/tokens.ts by scripts/gen-deck.mjs; the faces are the bundled ones,
+   inlined there. Lime only on forest surfaces; amber (warn on warn-soft) for
+   everything not built; real screenshots with a hairline border. */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--forest-deep); }
+body { overflow: hidden; font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+img { display: block; }
+
+/* ---------- the stage: one slide at a time, scaled to the window ---------- */
+.stage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform: translate(-50%, -50%); transform-origin: center; }
+.slide { position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden; display: none; padding: 88px 96px 0; background: var(--mint); color: var(--ink); }
+.slide.is-current { display: block; }
+.slide.forest { background: var(--forest); color: var(--white); }
+.slide.dots { background-image: radial-gradient(circle at center, var(--dots) 2px, transparent 2.6px); background-size: 28px 28px; }
+.notes { display: none; }
+
+/* ---------- type ---------- */
+.eyebrow { margin: 0 0 18px; font-family: var(--font-mono); font-size: 24px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald-text); }
+.forest .eyebrow { color: var(--lime); }
+.title { margin: 0; max-width: 1560px; font-family: var(--font-display); font-size: 68px; font-weight: 600; line-height: 1.08; letter-spacing: -0.01em; }
+.lede { margin: 22px 0 0; max-width: 1200px; font-size: 34px; line-height: 1.35; color: var(--ink-2); }
+.forest .lede { color: var(--on-forest); }
+.big { font-family: var(--font-display); font-weight: 800; line-height: 0.95; letter-spacing: -0.02em; }
+.mono { font-family: var(--font-mono); }
+.foot { position: absolute; left: 96px; right: 96px; bottom: 34px; display: flex; justify-content: space-between; gap: 32px; font-family: var(--font-mono); font-size: 18px; color: var(--ink-2); }
+.forest .foot { color: var(--on-forest); }
+.slide-number { white-space: nowrap; }
+.slide-head { display: grid; gap: 18px; justify-items: start; }
+
+/* ---------- chips ---------- */
+.chip { display: inline-flex; align-items: center; gap: 10px; padding: 8px 18px; border-radius: 999px; font-family: var(--font-mono); font-size: 20px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+.chip.live { background: var(--forest); color: var(--lime); } /* a forest pill, so the lime sits on forest */
+.chip.lime { background: var(--lime); color: var(--forest); } /* only ever on a forest slide */
+.chip.built { background: var(--tint-2); color: var(--emerald-text); }
+.chip.planned { background: var(--warn-soft); color: var(--warn); }
+.chip.local { background: var(--white); color: var(--emerald-text); border: 1px solid var(--border); }
+
+/* ---------- real screenshots ---------- */
+.shot { margin: 0; }
+.shot > img { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 16px; background: var(--white); }
+.shot figcaption { display: flex; align-items: center; gap: 14px; margin-top: 14px; font-size: 25px; line-height: 1.3; color: var(--ink-2); }
+.helper { flex: none; width: 56px; height: 56px; }
+
+/* ---------- the not-built card ---------- */
+.planned-card { padding: 30px 34px; border-radius: 24px; background: var(--warn-soft); color: var(--ink); }
+.planned-card h3 { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; font-size: 28px; font-weight: 700; color: var(--warn); }
+.planned-card ul { margin: 0; padding-left: 26px; }
+.planned-card li { margin: 8px 0; font-size: 25px; line-height: 1.3; }
+.planned-card li::marker { color: var(--warn); }
+.planned-card .chip.planned { background: var(--white); }
+
+/* ---------- 1. a receipt ---------- */
+.brand { display: flex; align-items: center; gap: 16px; font-family: var(--font-display); font-size: 40px; font-weight: 600; letter-spacing: -0.01em; }
+.brand img { width: 52px; height: 52px; }
+.s-receipt .hero { position: absolute; left: 96px; top: 250px; margin: 0; font-size: 128px; max-width: 700px; }
+.host-badge { position: absolute; display: grid; place-items: center; border-radius: 50%; background: var(--tint-2); }
+.s-receipt .host-badge { left: 96px; top: 600px; width: 340px; height: 340px; }
+.host-badge img { width: 78%; height: 78%; }
+.s-receipt .receipt-wrap { position: absolute; left: 860px; top: 150px; width: 964px; display: grid; gap: 20px; justify-items: start; }
+.receipt { width: 100%; padding: 48px 52px 40px; border-radius: 28px; background: var(--tint-1); color: var(--ink); }
+.receipt-meta, .receipt-link { margin: 0; font-family: var(--font-mono); font-size: 22px; line-height: 1.4; color: var(--ink-2); }
+.receipt blockquote { margin: 26px 0 30px; padding-left: 28px; border-left: 6px solid var(--emerald); font-size: 46px; font-weight: 600; line-height: 1.28; }
+.receipt-count { display: flex; align-items: baseline; gap: 22px; padding-top: 26px; border-top: 1px solid var(--border); }
+.receipt-count .big { font-size: 112px; color: var(--emerald-text); }
+.receipt-count span:last-child { font-size: 34px; color: var(--ink-2); }
+.receipt-link { margin-top: 18px; font-size: 19px; }
+
+/* ---------- 2. the latency ---------- */
+.latency-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 52px; }
+.panel { margin: 0; padding: 40px 44px; border-radius: 32px; background: var(--forest-2); }
+.panel-label { font-size: 28px; line-height: 1.3; color: var(--on-forest); }
+.panel .num { margin: 18px 0 30px; font-size: 136px; color: var(--white); }
+.panel .unit { font-size: 56px; font-weight: 600; }
+.calendar { display: grid; grid-template-columns: repeat(9, 60px); gap: 12px; }
+.calendar i { height: 60px; border-radius: 12px; border: 3px solid var(--ray-3); }
+.calendar i.on { background: var(--ray-3); }
+.calendar-key { display: flex; gap: 28px; margin-top: 20px; font-family: var(--font-mono); font-size: 20px; color: var(--on-forest); }
+.calendar-key span { display: inline-flex; align-items: center; gap: 10px; }
+.calendar-key i { width: 22px; height: 22px; border-radius: 6px; border: 3px solid var(--ray-3); }
+.calendar-key i.on { background: var(--ray-3); }
+.waffle { display: grid; grid-template-columns: repeat(20, 30px); gap: 8px; }
+.waffle i { height: 30px; border-radius: 7px; border: 2px solid var(--forest-border); }
+.waffle i.on { background: var(--lime); border-color: var(--lime); }
+.caveat { margin: 36px 0 0; font-size: 30px; color: var(--on-forest); }
+
+/* ---------- 3. who it lands on ---------- */
+.s-desk .title { max-width: 760px; }
+.s-desk .lede { max-width: 700px; }
+.desk-scene { position: absolute; right: 70px; top: 150px; width: 1110px; height: 760px; }
+.sc-desk { fill: var(--tint-2); stroke: var(--forest); stroke-width: 5; }
+.sc-ink { fill: none; stroke: var(--forest); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.sc-paper { fill: var(--white); stroke: var(--forest); stroke-width: 5; }
+.sc-screen { fill: var(--white); stroke: var(--forest); stroke-width: 6; }
+.sc-tab { fill: var(--tint-1); stroke: var(--forest); stroke-width: 3; }
+.sc-tab-on { fill: var(--white); stroke: var(--forest); stroke-width: 3; }
+.sc-line { fill: var(--border); }
+.sc-line-strong { fill: var(--ink-3); }
+.sc-label { font-family: var(--font-mono); font-size: 15px; fill: var(--ink-3); }
+.sc-title { font-family: var(--font-body); font-size: 20px; font-weight: 700; fill: var(--ink); }
+.sc-card { fill: var(--forest); }
+.sc-card-meta { font-family: var(--font-mono); font-size: 17px; fill: var(--on-forest); letter-spacing: 0.06em; }
+.sc-card-text { font-family: var(--font-body); font-size: 27px; font-weight: 600; fill: var(--white); }
+.sc-dot { fill: var(--lime); }
+.sc-person { fill: var(--emerald); stroke: var(--forest); stroke-width: 5; }
+.sc-head { fill: var(--tint-1); stroke: var(--forest); stroke-width: 5; }
+.sc-eye { fill: var(--forest); }
+.sc-base { fill: var(--tint-2); stroke: var(--forest); stroke-width: 5; stroke-linejoin: round; }
+
+/* ---------- 4. the loop ---------- */
+.s-loop .loop-copy { position: absolute; left: 96px; top: 200px; width: 700px; }
+.s-loop .title { font-size: 76px; }
+.ring { position: absolute; left: 920px; top: 60px; width: 900px; height: 900px; }
+.ring-track { position: absolute; inset: 0; }
+.ring-track ellipse { fill: none; }
+.ring-track .t { stroke: var(--tint-2); stroke-width: 22; }
+.ring-track .p { stroke: var(--emerald); stroke-width: 4; }
+.ring-host { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 10px; text-align: center; }
+.ring-host img { width: 230px; height: 230px; }
+.ring-host span { font-family: var(--font-mono); font-size: 20px; color: var(--ink-2); }
+.stations { margin: 0; padding: 0; list-style: none; }
+.station { --a: calc(-90deg + var(--i) * 40deg); position: absolute; left: calc(50% + cos(var(--a)) * 370px); top: calc(50% + sin(var(--a)) * 352px); width: 280px; transform: translate(-50%, -50%); } /* nine stations on a ring a little wider than tall */
+.station .pop { display: grid; justify-items: center; gap: 2px; text-align: center; }
+.station .pop > strong, .station .pop > span:not(.people-badge) { padding: 0 10px; border-radius: 8px; background: var(--mint); }
+.station img, .people-badge { width: 104px; height: 104px; }
+.people-badge { display: grid; place-items: center; border-radius: 50%; background: var(--tint-2); }
+.people-badge svg { width: 56px; height: 56px; fill: none; stroke: var(--forest); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.station strong { font-family: var(--font-display); font-size: 30px; font-weight: 600; }
+.station span { font-size: 19px; line-height: 1.25; color: var(--ink-2); }
+.s-loop.is-current .station .pop { animation: pop 420ms cubic-bezier(0.2, 0, 0, 1) both; animation-delay: calc(500ms + var(--i) * 380ms); }
+@keyframes pop { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+
+/* ---------- 5, 6, 7. the live screens ---------- */
+.screens { position: absolute; left: 96px; right: 96px; top: 272px; display: grid; gap: 28px 48px; }
+.side { display: grid; gap: 24px; align-content: start; }
+.head-row { display: flex; align-items: center; gap: 28px; }
+.head-row .by { display: inline-flex; align-items: center; gap: 12px; font-size: 25px; color: var(--ink-2); }
+.head-row .helper { width: 48px; height: 48px; }
+.s-live .screens { grid-template-columns: 920px 1fr; align-items: start; }
+/* A crop of a real screenshot, given in the image's own pixels: the frame keeps the region's shape and the image is scaled and shifted inside it. */
+.region { position: relative; overflow: hidden; aspect-ratio: var(--w) / var(--h); border: 1px solid var(--border); border-radius: 16px; background: var(--white); }
+.region img { position: absolute; left: 0; top: 0; max-width: none; width: calc(var(--iw) / var(--w) * 100%); margin-left: calc(var(--x) / var(--w) * -100%); margin-top: calc(var(--y) / var(--w) * -100%); }
+.s-decide .screens { grid-template-columns: 1fr 1fr; }
+.s-decide .aside-note { grid-column: 1 / span 2; margin: 0; font-family: var(--font-mono); font-size: 21px; color: var(--ink-2); }
+.s-teach .screens { grid-template-columns: 900px 1fr; }
+.pack-frame { margin: 0; }
+.pack-frame .bar { display: flex; justify-content: space-between; gap: 16px; padding: 12px 18px; border: 1px solid var(--border); border-bottom: 0; border-radius: 16px 16px 0 0; background: var(--white); font-family: var(--font-mono); font-size: 18px; color: var(--ink-2); }
+.pack-frame > img { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 0 0 16px 16px; }
+.pack-frame figcaption { display: flex; align-items: center; gap: 14px; margin-top: 14px; font-size: 25px; line-height: 1.3; color: var(--ink-2); }
+.track-a { margin: 0; font-size: 26px; line-height: 1.35; }
+
+/* ---------- 8. what is real ---------- */
+.real-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 36px; margin-top: 52px; }
+.real-card { padding: 38px 40px; border-radius: 32px; background: var(--forest-2); }
+.real-card .eyebrow { color: var(--on-forest); }
+.real-card .big { margin: 6px 0 22px; font-size: 128px; }
+.real-card .big.lime { color: var(--lime); }
+.real-card p { margin: 0 0 14px; font-size: 25px; line-height: 1.35; color: var(--white); }
+.real-card p.quiet { color: var(--on-forest); }
+.s-real .planned-card { align-self: stretch; }
+.next-level { margin: 40px 0 0; font-size: 34px; font-weight: 600; }
+.next-level span { color: var(--lime); }
+
+/* ---------- 9. the doors ---------- */
+.s-doors { padding: 0; }
+.s-doors > img.full { width: 1920px; height: 1080px; }
+.s-doors .foot { bottom: 18px; justify-content: flex-end; }
+
+/* ---------- 10. why a department pays ---------- */
+.s-pays .title { max-width: none; font-size: 64px; } /* one line */
+.pays-grid { display: grid; grid-template-columns: 900px 1fr; gap: 56px; margin-top: 44px; }
+.ladder { position: relative; height: 640px; }
+.tier { position: absolute; width: 520px; padding: 26px 30px; border-radius: 24px; background: var(--white); border: 1px solid var(--border); }
+.tier.free { left: 0; top: 440px; border-left: 8px solid var(--emerald); }
+.tier.dept { left: 190px; top: 206px; border: 2px dashed var(--control-border); }
+.tier.inst { left: 380px; top: 0; border: 2px dashed var(--control-border); }
+.tier h3 { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 10px; font-family: var(--font-display); font-size: 36px; font-weight: 600; }
+.tier p { margin: 4px 0; font-size: 23px; line-height: 1.3; color: var(--ink-2); }
+.tier .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.clauses { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.clauses li { display: grid; grid-template-columns: 150px 1fr; gap: 2px 20px; padding: 12px 0; border-top: 1px solid var(--border); }
+.clauses li:first-child { border-top: 0; }
+.clauses strong { grid-row: 1 / span 2; font-family: var(--font-display); font-size: 30px; font-weight: 600; }
+.clauses .body { font-family: var(--font-mono); font-size: 19px; color: var(--emerald-text); }
+.clauses q { font-size: 22px; line-height: 1.3; color: var(--ink); quotes: "\201C" "\201D"; }
+.clauses-head { margin: 0 0 8px; font-size: 26px; font-weight: 700; }
+
+/* ---------- 11. the ask ---------- */
+.s-ask .host-badge { left: 96px; top: 150px; width: 400px; height: 400px; }
+.closed-ring { position: absolute; left: 136px; top: 600px; width: 320px; height: 320px; }
+.closed-ring circle { fill: none; stroke: var(--lime); stroke-width: 26; }
+.closed-ring text { font-family: var(--font-mono); font-size: 22px; fill: var(--white); text-anchor: middle; }
+.ask-copy { position: absolute; left: 620px; top: 150px; right: 96px; }
+.ask-copy .title { font-size: 72px; }
+.measures { display: flex; flex-wrap: wrap; gap: 14px; margin: 34px 0 0; padding: 0; list-style: none; }
+.measures li { padding: 12px 22px; border-radius: 999px; background: var(--forest-2); border: 1px solid var(--forest-border); font-size: 26px; font-weight: 600; }
+.measures-label { margin: 46px 0 0; font-family: var(--font-mono); font-size: 22px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--on-forest); }
+.sentence { margin: 56px 0 0; max-width: 1150px; font-size: 38px; line-height: 1.35; color: var(--white); }
+.closing { margin: 40px 0 0; font-size: 84px; color: var(--lime); }
+
+/* ---------- the film, over slide 5 ---------- */
+.film { position: absolute; inset: 0; z-index: 5; display: none; background: var(--forest-deep); }
+.film.is-on { display: block; }
+.film video { width: 100%; height: 100%; }
+
+/* ---------- presenting helpers, never in an export ---------- */
+.deck-toast, .deck-notes { position: fixed; z-index: 10; font-family: var(--font-body); }
+.deck-toast { left: 50%; bottom: 28px; transform: translateX(-50%); padding: 12px 20px; border-radius: 12px; background: var(--forest-2); color: var(--white); font-size: 16px; }
+.deck-notes { left: 0; right: 0; bottom: 0; max-height: 34vh; overflow: auto; padding: 18px 28px; background: var(--white); color: var(--ink); border-top: 1px solid var(--border); font-size: 17px; line-height: 1.5; white-space: pre-wrap; }
+[hidden] { display: none !important; }
+
+/* ---------- export and print: every slide, its final state, no motion ---------- */
+.exporting body, .exporting { overflow: visible; }
+.exporting .stage { left: 0; top: 0; transform: none; }
+.exporting *, .exporting *::before, .exporting *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .station .pop { animation: none !important; } }
+@media print {
+  @page { size: 1920px 1080px; margin: 0; }
+  html, body { height: auto; overflow: visible; background: none; }
+  .stage { position: static; transform: none; width: 1920px; height: auto; }
+  .slide { position: relative; display: block; page-break-after: always; break-after: page; }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  .film, .deck-toast, .deck-notes { display: none !important; }
+  * { animation: none !important; }
+}

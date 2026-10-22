@@ -1,6 +1,14 @@
 # Published as .gitignore in the team repo.
 node_modules/
 dist/
+# Regenerated, not committed: the deck's exports and film, and the film's footage, timeline and renders.
+deck/export/
+deck/media/*.mp4
+video/remotion/node_modules/
+video/remotion/public/
+video/remotion/src/generated/
+video/out/
+video/install.log
 .env
 .env.*
 !.env.example

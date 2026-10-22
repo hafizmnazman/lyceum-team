@@ -1,21 +1,24 @@
-// The app shell (spec 6.1): persistent sidebar with the person's nav and their
-// subjects (hat badges), topbar with breadcrumb, search (command palette),
-// notification bell and account menu, the toast, and the right-side agent
-// panel. This chrome is what makes Lyceum read as an app you live in rather
-// than a deck of screens.
+// The app shell (plan Section 5.2): a forest header band with the wordmark,
+// search, notifications and the account menu; a white sidebar with Home,
+// Courses, your courses, Explore and the labelled sandbox, folded away until
+// opened (the course's loop runs as a path across the top of each step, StepFrame);
+// and the main column on mint. The header is the one forest element a working
+// screen carries (the restraint rule, Section 6.4).
 
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Bell, Check, ChevronDown, LogOut, Menu, RotateCcw, Search, ShieldCheck } from "lucide-react";
 import type { Screen } from "../../app/roles.ts";
 import { hatsOn, navFor, subjectsForPerson } from "../../app/roles.ts";
+import { stepDef } from "../../app/loop.ts";
+import { effectiveStep } from "../../app/routes.ts";
 import {
   currentPerson,
   dismissToast,
   logout,
   navigate,
+  openStep,
   resetWorkspace,
-  selectSubject,
   switchUser,
   unreadFor,
   useStore,
@@ -23,19 +26,26 @@ import {
 import { NAV_META, screenLabel } from "./nav.ts";
 import { CommandPalette } from "./CommandPalette.tsx";
 import { AgentPanel } from "./AgentPanel.tsx";
+import { Mark } from "../mascots/mark.tsx";
 import { Kbd } from "../primitives/index.tsx";
 import { PrototypeNotice } from "../primitives/PrototypeNotice.tsx";
 import { SectionHelp } from "../primitives/SectionHelp.tsx";
 
-const SIDEBAR_W = 240;
-const TOPBAR_H = 56;
-
+/** The first screens in the sidebar: where work starts. */
+const MAIN: Screen[] = ["inbox", "courses", "programme", "new-subject", "assignments"];
 /** Screens that explain the product rather than do the work. */
-const UNDERSTAND: Screen[] = ["office", "evaluation"];
+const EXPLORE: Screen[] = ["office", "evaluation", "guide"];
 /** The earlier illustrative screens: synthetic data, kept behind sign-in and labelled. */
-const SANDBOX: Screen[] = ["trends", "acceptance", "backtest", "dataroom", "index"];
-/** Where the prototype-data notice shows: the sandbox and the illustrative approval workflow. */
-const NOTICE_SCREENS: Screen[] = [...SANDBOX, "approval"];
+const SANDBOX: Screen[] = ["proposal", "acceptance", "approval", "trends", "backtest", "dataroom", "index"];
+/** Where the prototype-data notice shows: every sandbox screen, the old approval chain included. */
+const NOTICE_SCREENS: Screen[] = SANDBOX;
+
+/** Move focus to the page heading, so a keyboard or screen-reader user lands on the new content. */
+export function focusMainHeading() {
+  const main = document.getElementById("main-content");
+  const heading = main?.querySelector<HTMLElement>("h1");
+  (heading ?? main)?.focus({ preventScroll: true });
+}
 
 export function Shell(props: { children: ReactNode }) {
   const state = useStore();
@@ -45,15 +55,20 @@ export function Shell(props: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const navTrigger = useRef<HTMLButtonElement>(null);
 
-  // Cmd+K / Ctrl+K opens the palette from anywhere.
+  // Ctrl+K opens the palette from anywhere; Escape closes a menu and returns focus to its trigger.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((v) => !v);
       }
-      if (e.key === "Escape") { setMenuOpen(false); setNavOpen(false); }
+      if (e.key === "Escape") {
+        setMenuOpen((open) => { if (open) menuTrigger.current?.focus(); return false; });
+        setNavOpen((open) => { if (open) navTrigger.current?.focus(); return false; });
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -79,18 +94,22 @@ export function Shell(props: { children: ReactNode }) {
   useEffect(() => {
     setNavOpen(false);
     mainRef.current?.scrollTo(0, 0);
-    mainRef.current?.focus({ preventScroll: true });
-    document.title = screenLabel(state.screen) + " · Lyceum";
+    focusMainHeading();
   }, [state.screen]);
   // Switching course scrolls to the top but leaves focus where it is, so a
   // course selector keeps focus while its value changes.
   useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [state.selectedSubjectId]);
+
+  const step = effectiveStep(state);
+  const crumb = step && state.selectedSubjectId ? state.selectedSubjectId + " · " + stepDef(step).label : screenLabel(state.screen);
+  useEffect(() => { document.title = crumb + " · Lyceum"; }, [crumb]);
 
   if (!person) return <>{props.children}</>;
 
   const nav = navFor(person, state.assignments);
   const mySubjects = subjectsForPerson(person.id, state.assignments);
   const unread = unreadFor(person.id).length;
+  const railCourse = nav.includes("studio") ? (state.selectedSubjectId && mySubjects.includes(state.selectedSubjectId) ? state.selectedSubjectId : mySubjects[0] ?? null) : null;
 
   const roleLine =
     person.orgRole === "management"
@@ -100,305 +119,142 @@ export function Shell(props: { children: ReactNode }) {
         : "Academic";
 
   return (
-    <div className={"app-shell" + (navOpen ? " nav-open" : "")} style={{ display: "flex", height: "100%", overflow: "hidden" }}>
+    <div className={"app-shell" + (navOpen ? " nav-open" : "")}>
       <a className="skip-link" href="#main-content">Skip to main content</a>
-      <div className="mobile-navigation"><span className="page-title">Lyceum</span><button aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="primary-sidebar" onClick={() => setNavOpen((open) => !open)}><Menu size={20} /> Navigation</button></div>
-      {/* ---------- sidebar ---------- */}
-      <aside
-        id="primary-sidebar"
-        className="app-sidebar"
-        onClick={(event) => { if ((event.target as HTMLElement).closest("button")) setNavOpen(false); }}
-        style={{
-          width: SIDEBAR_W,
-          flexShrink: 0,
-          borderRight: "1px solid var(--border)",
-          background: "var(--surface)",
-          display: "flex",
-          flexDirection: "column",
-          overflowY: "auto",
-        }}
-      >
-        <div style={{ padding: "18px 16px 10px" }}>
-          <button
-            className="page-title"
-            style={{ fontSize: 21, cursor: "pointer", border: 0, padding: 0, background: "none", color: "var(--ink)" }}
-            onClick={() => navigate("inbox")}
-          >
-            Lyceum
-          </button>
-          <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 2 }}>
-            Course decisions, with receipts
-          </div>
-        </div>
 
-        <nav aria-label="Main navigation" style={{ padding: "6px 8px", flex: 1 }}>
-          {nav
-            .filter((s) => !UNDERSTAND.includes(s) && !SANDBOX.includes(s) && s !== "guide")
-            .map((s) => (
+      {/* ---------- header: the one forest band ---------- */}
+      <header className="app-header on-forest">
+        <button ref={navTrigger} type="button" className="header-icon-btn nav-toggle" aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="primary-sidebar" onClick={() => setNavOpen((open) => !open)}><Menu size={20} /></button>
+        <button type="button" className="wordmark" onClick={() => navigate("inbox")} aria-label="Lyceum, go to Home"><Mark size={30} tone="white" leaf />Lyceum</button>
+        <span className="header-crumb" aria-hidden>{crumb}</span>
+        <div className="header-spacer" />
+
+        <button type="button" className="header-search search-trigger" onClick={() => setPaletteOpen(true)} aria-label="Search or jump to, Ctrl+K">
+          <Search size={16} />
+          <span>Search or jump to</span>
+          <Kbd>Ctrl K</Kbd>
+        </button>
+
+        <button type="button" data-demo-id="topbar-bell" className="header-icon-btn" onClick={() => navigate("inbox")} aria-label={`Notifications, ${unread} unread`}>
+          <Bell size={18} />
+          {unread > 0 ? <span className="header-badge num">{unread}</span> : null}
+        </button>
+
+        {/* account menu */}
+        <div ref={menuRef} className="account">
+          <button
+            ref={menuTrigger}
+            type="button"
+            className="account-trigger"
+            aria-label={"Account: " + person.name}
+            aria-expanded={menuOpen}
+            aria-controls="account-options"
+            data-demo-id="account-menu"
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            <Avatar name={person.name} />
+            <span className="account-name">{person.name}</span>
+            {person.verified ? <ShieldCheck size={14} aria-label="Verified" /> : null}
+            <ChevronDown size={14} />
+          </button>
+          {menuOpen ? (
+            <div id="account-options" className="menu-popover on-light fade-up">
+              <div className="menu-person">
+                <div className="menu-person-name">{person.name}</div>
+                <div className="muted">{roleLine}{person.email ? ` · ${person.email}` : ""}</div>
+                <div className={person.verified ? "menu-person-flag" : "menu-person-flag is-warn"}>
+                  {person.verified
+                    ? "Marked verified in the demo data; no institutional verification yet"
+                    : "Unverified: edits carry an unverified tag"}
+                </div>
+              </div>
+              <div className="menu-label">Switch person</div>
+              {state.people.map((p) => (
+                <button key={p.id} type="button" data-demo-id={`switch-${p.id}`} className="menu-item" onClick={() => { switchUser(p.id); setMenuOpen(false); }}>
+                  <Avatar name={p.name} />
+                  <span className="menu-item-label">{p.name}</span>
+                  {p.id === person.id ? <Check size={14} aria-label="Current person" /> : null}
+                </button>
+              ))}
+              <div className="menu-divider">
+                <button type="button" className="menu-item" onClick={() => {
+                  if (window.confirm("Reset this browser's workspace? This removes saved teaching plans, drafts and uploads. Export any plan you want to keep first.")) resetWorkspace();
+                  setMenuOpen(false);
+                }}>
+                  <RotateCcw size={14} />
+                  <span className="menu-item-label">Reset workspace</span>
+                </button>
+                <button type="button" className="menu-item" onClick={() => { logout(); setMenuOpen(false); }}>
+                  <LogOut size={14} />
+                  <span className="menu-item-label">Sign out</span>
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </header>
+
+      <div className="app-body">
+        {/* ---------- sidebar ---------- */}
+        <aside
+          id="primary-sidebar"
+          className="app-sidebar"
+          onClick={(event) => { if ((event.target as HTMLElement).closest("button")) setNavOpen(false); }}
+        >
+          <nav aria-label="Main navigation" className="sidebar-nav">
+            {MAIN.filter((s) => nav.includes(s)).map((s) => (
               <NavItem key={s} screen={s} active={state.screen === s} badge={s === "inbox" ? unread : 0} />
             ))}
 
-          {mySubjects.length > 0 ? (
-            <>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "var(--ink-3)",
-                  letterSpacing: "0.03em",
-                  padding: "16px 10px 4px",
-                }}
-              >
-                MY SUBJECTS
-              </div>
-              {mySubjects.map((sid) => {
-                const hats = hatsOn(person.id, sid, state.assignments);
-                return (
-                  <button
-                    key={sid}
-                    data-demo-id={`subject-${sid}`}
-                    onClick={() => {
-                      selectSubject(sid);
-                      navigate("studio");
-                    }}
-                    style={{
-                      width: "100%", border: "none", minHeight: 36,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "6px 10px",
-                      borderRadius: "var(--radius-s)",
-                      cursor: "pointer",
-                      color: "var(--ink-2)",
-                      fontSize: 13,
-                      background:
-                        state.selectedSubjectId === sid && state.screen === "studio"
-                          ? "var(--accent-soft)"
-                          : "transparent",
-                    }}
-                  >
-                    <span className="num">{sid}</span>
-                    <span style={{ display: "flex", gap: 3 }}>
-                      {hats.includes("coordinator") ? <HatBadge label="C" title="Coordinator" /> : null}
-                      {hats.includes("lecturer") ? <HatBadge label="L" title="Lecturer" /> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </>
-          ) : null}
-
-          <div className="nav-group-label">UNDERSTAND</div>
-          {UNDERSTAND.filter((s) => nav.includes(s)).map((s) => (
-            <NavItem key={s} screen={s} active={state.screen === s} badge={0} />
-          ))}
-          <NavItem screen="guide" active={state.screen === "guide"} badge={0} />
-          {SANDBOX.some((s) => nav.includes(s)) ? (
-            <>
-              <div className="nav-group-label">RESEARCH SANDBOX <span className="nav-group-note">illustrative</span></div>
-              {SANDBOX.filter((s) => nav.includes(s)).map((s) => (
-                <NavItem key={s} screen={s} active={state.screen === s} badge={0} />
-              ))}
-            </>
-          ) : null}
-        </nav>
-
-        <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", fontSize: 11.5, color: "var(--ink-3)" }}>
-          Local prototype. Your work stays in this browser.
-          <br />
-          Sandbox screens use synthetic data and say so.
-        </div>
-      </aside>
-
-      {/* ---------- main column ---------- */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
-        <header
-          className="app-topbar"
-          style={{
-            height: TOPBAR_H,
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "0 20px",
-            borderBottom: "1px solid var(--border)",
-            background: "var(--surface)",
-          }}
-        >
-          <div style={{ fontWeight: 600, fontSize: 15 }}>{screenLabel(state.screen)}</div>
-          <div style={{ flex: 1 }} />
-
-          <button
-            className="search-trigger"
-            onClick={() => setPaletteOpen(true)}
-            aria-label="Search or jump to, Ctrl+K"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              height: 34,
-              padding: "0 12px",
-              borderRadius: "var(--radius-s)",
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--ink-3)",
-              cursor: "pointer",
-              fontSize: 13,
-              minWidth: 200,
-            }}
-          >
-            <Search size={15} />
-            <span style={{ flex: 1, textAlign: "left" }}>Search or jump to</span>
-            <Kbd>Ctrl K</Kbd>
-          </button>
-
-          <button
-            data-demo-id="topbar-bell"
-            onClick={() => navigate("inbox")}
-            aria-label={`Notifications, ${unread} unread`}
-            style={{
-              position: "relative",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 36,
-              height: 36,
-              borderRadius: "var(--radius-s)",
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              cursor: "pointer",
-              color: "var(--ink-2)",
-            }}
-          >
-            <Bell size={17} />
-            {unread > 0 ? (
-              <span
-                className="num"
-                style={{
-                  position: "absolute",
-                  top: -5,
-                  right: -5,
-                  minWidth: 17,
-                  height: 17,
-                  padding: "0 4px",
-                  borderRadius: 999,
-                  background: "var(--accent)",
-                  color: "var(--accent-ink)",
-                  fontSize: 10.5,
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {unread}
-              </span>
+            {railCourse && mySubjects.length > 0 ? (
+              <>
+                <div className="nav-group-label">Your courses</div>
+                <div className="course-chips">
+                  {mySubjects.map((sid) => {
+                    const hats = hatsOn(person.id, sid, state.assignments);
+                    const role = hats.includes("coordinator") && hats.includes("lecturer") ? "coordinator and lecturer" : hats.includes("coordinator") ? "coordinator" : "lecturer";
+                    return (
+                      <button
+                        key={sid}
+                        type="button"
+                        data-demo-id={`subject-${sid}`}
+                        className="course-chip tabular"
+                        aria-pressed={sid === railCourse}
+                        aria-label={sid + ", you are " + role}
+                        title={"You are " + role}
+                        onClick={() => openStep(sid, "course")}
+                      >
+                        {sid}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             ) : null}
-          </button>
 
-          {/* account menu */}
-          <div ref={menuRef} style={{ position: "relative" }}>
-            <button
-              className="account-trigger"
-              aria-label={"Account: " + person.name}
-              aria-expanded={menuOpen}
-              aria-controls="account-options"
-              data-demo-id="account-menu"
-              onClick={() => setMenuOpen((v) => !v)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                height: 36,
-                padding: "0 10px",
-                borderRadius: "var(--radius-s)",
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                cursor: "pointer",
-              }}
-            >
-              <Avatar name={person.name} />
-              <span className="account-name" style={{ fontSize: 13, fontWeight: 500 }}>{person.name}</span>
-              {person.verified ? (
-                <ShieldCheck size={14} color="var(--ok)" aria-label="Verified" />
-              ) : null}
-              <ChevronDown size={14} color="var(--ink-3)" />
-            </button>
-            {menuOpen ? (
-              <div
-                id="account-options"
-                className="fade-up"
-                style={{
-                  position: "absolute",
-                  right: 0,
-                  top: 42,
-                  width: 260,
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-m)",
-                  boxShadow: "var(--shadow-2)",
-                  padding: 6,
-                  zIndex: 60,
-                }}
-              >
-                <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)" }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{person.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--ink-2)" }}>
-                    {roleLine}
-                    {person.email ? ` · ${person.email}` : ""}
-                  </div>
-                  <div style={{ fontSize: 11.5, marginTop: 3, color: person.verified ? "var(--ok)" : "var(--warn)" }}>
-                    {person.verified
-                      ? "Marked verified in the demo data; no institutional verification yet"
-                      : "Unverified: edits carry an unverified tag"}
-                  </div>
-                </div>
-                <div style={{ padding: "6px 10px 2px", fontSize: 11, fontWeight: 600, color: "var(--ink-3)" }}>
-                  SWITCH PERSON
-                </div>
-                {state.people.map((p) => (
-                  <button
-                    key={p.id}
-                    data-demo-id={`switch-${p.id}`}
-                    onClick={() => {
-                      switchUser(p.id);
-                      setMenuOpen(false);
-                    }}
-                    style={menuItemStyle}
-                  >
-                    <Avatar name={p.name} />
-                    <span style={{ flex: 1, textAlign: "left" }}>{p.name}</span>
-                    {p.id === person.id ? <Check size={14} color="var(--accent)" /> : null}
-                  </button>
+            <div className="nav-group-label">Explore</div>
+            {EXPLORE.filter((s) => s === "guide" || nav.includes(s)).map((s) => (
+              <NavItem key={s} screen={s} active={state.screen === s} badge={0} />
+            ))}
+            {SANDBOX.some((s) => nav.includes(s)) ? (
+              <details className="nav-fold" open={SANDBOX.includes(state.screen) || undefined}>
+                <summary className="nav-group-label" data-demo-id="nav-sandbox">Sandbox <span className="nav-group-note">illustrative</span><ChevronDown size={16} className="disclosure-chevron" aria-hidden /></summary>
+                {SANDBOX.filter((s) => nav.includes(s)).map((s) => (
+                  <NavItem key={s} screen={s} active={state.screen === s} badge={0} />
                 ))}
-                <div style={{ borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 4 }}>
-                  <button
-                    onClick={() => {
-                      if (window.confirm("Reset this browser's workspace? This removes saved teaching plans, drafts and uploads. Export any plan you want to keep first.")) resetWorkspace();
-                      setMenuOpen(false);
-                    }}
-                    style={menuItemStyle}
-                  >
-                    <RotateCcw size={14} />
-                    <span>Reset workspace</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      logout();
-                      setMenuOpen(false);
-                    }}
-                    style={menuItemStyle}
-                  >
-                    <LogOut size={14} />
-                    <span>Sign out</span>
-                  </button>
-                </div>
-              </div>
+              </details>
             ) : null}
-          </div>
-        </header>
+          </nav>
 
-        <main ref={mainRef} id="main-content" tabIndex={-1} style={{ flex: 1, overflowY: "auto", minWidth: 0 }} data-demo-id="main-scroll">
+          <div className="sidebar-foot">
+            Local prototype. Your work stays in this browser.
+            <br />
+            Sandbox screens use synthetic data and say so.
+          </div>
+        </aside>
+
+        {/* ---------- main column ---------- */}
+        <main ref={mainRef} id="main-content" tabIndex={-1} className="app-main" data-demo-id="main-scroll">
           {NOTICE_SCREENS.includes(state.screen) ? <PrototypeNotice /> : null}
           {state.persistenceStatus === "unavailable" ? <div role="alert" className="storage-warning">Browser storage is unavailable. Changes only last while this page is open. Export your teaching plan before closing.</div> : null}
           <SectionHelp screen={state.screen} />
@@ -410,25 +266,7 @@ export function Shell(props: { children: ReactNode }) {
       {paletteOpen ? <CommandPalette onClose={() => setPaletteOpen(false)} /> : null}
       <AgentPanel />
       {state.toast ? (
-        <div
-          className="fade-up"
-          role="status"
-          aria-live="polite"
-          style={{
-            position: "fixed",
-            bottom: 22,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--ink)",
-            color: "#fff",
-            padding: "9px 16px",
-            borderRadius: "var(--radius-m)",
-            boxShadow: "var(--shadow-2)",
-            fontSize: 13.5,
-            zIndex: 80,
-            maxWidth: 520,
-          }}
-        >
+        <div className="toast fade-up" role="status" aria-live="polite">
           {state.toast}
         </div>
       ) : null}
@@ -436,91 +274,22 @@ export function Shell(props: { children: ReactNode }) {
   );
 }
 
-const menuItemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  width: "100%",
-  padding: "7px 10px",
-  border: "none",
-  background: "transparent",
-  borderRadius: "var(--radius-s)",
-  cursor: "pointer",
-  fontSize: 13,
-  color: "var(--ink)",
-};
-
 function NavItem(props: { screen: Screen; active: boolean; badge: number }) {
   if (props.screen === "login") return null;
   const meta = NAV_META[props.screen];
   const Icon = meta.icon;
   return (
     <button
+      type="button"
       data-demo-id={`nav-${props.screen}`}
+      className="nav-item"
       onClick={() => navigate(props.screen)}
       aria-current={props.active ? "page" : undefined}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        width: "100%",
-        padding: "7px 10px",
-        marginBottom: 1,
-        borderRadius: "var(--radius-s)",
-        border: "none",
-        cursor: "pointer",
-        fontSize: 13.5,
-        fontWeight: props.active ? 600 : 400,
-        color: props.active ? "var(--accent)" : "var(--ink-2)",
-        background: props.active ? "var(--accent-soft)" : "transparent",
-        transition: "background 150ms ease-out",
-      }}
     >
-      <Icon size={16} strokeWidth={1.75} />
-      <span style={{ flex: 1, textAlign: "left" }}>{meta.label}</span>
-      {props.badge > 0 ? (
-        <span
-          className="num"
-          style={{
-            minWidth: 18,
-            height: 18,
-            padding: "0 5px",
-            borderRadius: 999,
-            background: "var(--accent)",
-            color: "var(--accent-ink)",
-            fontSize: 11,
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {props.badge}
-        </span>
-      ) : null}
+      <Icon size={20} strokeWidth={1.75} aria-hidden />
+      <span className="nav-item-label">{meta.label}</span>
+      {props.badge > 0 ? <span className="nav-badge num" aria-label={props.badge + " unread"}>{props.badge}</span> : null}
     </button>
-  );
-}
-
-function HatBadge(props: { label: string; title: string }) {
-  return (
-    <span
-      title={props.title}
-      style={{
-        width: 16,
-        height: 16,
-        borderRadius: 4,
-        background: "var(--surface-2)",
-        color: "var(--ink-3)",
-        fontSize: 10,
-        fontWeight: 600,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      {props.label}
-    </span>
   );
 }
 
@@ -530,24 +299,5 @@ function Avatar(props: { name: string }) {
     .map((w) => w[0])
     .slice(0, 2)
     .join("");
-  return (
-    <span
-      aria-hidden
-      style={{
-        width: 24,
-        height: 24,
-        borderRadius: "50%",
-        background: "var(--accent-soft)",
-        color: "var(--accent)",
-        fontSize: 10.5,
-        fontWeight: 600,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      {initials}
-    </span>
-  );
+  return <span aria-hidden className="avatar">{initials}</span>;
 }

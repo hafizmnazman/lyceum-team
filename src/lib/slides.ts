@@ -6,6 +6,7 @@
 
 import type { CLO, EvidenceBrief, EvidenceSource, Person, SkillMention, Subject, TeachingSession } from "../types.ts";
 import { RECOMMENDATION_LABEL, STAGE_LABEL, skillKey, type EvidenceReport } from "./evidence.ts";
+import { bareHex } from "../theme/tokens.ts";
 
 export interface DeckTable { header: string[]; rows: string[][]; widths?: number[] }
 /** One series, one hue, labels on the bars: the count over the reviewed denominator, with the axis ending at that denominator. */
@@ -111,7 +112,10 @@ async function loadPptx(): Promise<PptxCtor> {
   const mod = (await import("pptxgenjs")) as unknown as { default?: PptxCtor } & PptxCtor;
   return (mod.default ?? mod) as PptxCtor;
 }
-const NAVY = "14213D", INK = "1F2937", MUTED = "6A7179", LIGHT = "FBFBF8", PANEL = "F1F3EF", ACCENT = "3B5BDB";
+// Colours come from the theme tokens. The decks name Calibri, which every PowerPoint has, because pptxgenjs
+// cannot embed the bundled faces and a lecturer's machine may not have them (docs/decisions.md).
+const FOREST = bareHex("forest"), INK = bareHex("ink"), MUTED = bareHex("ink2"), PAPER = bareHex("white"), PANEL = bareHex("tint2"), BAR = bareHex("emerald"), ON_FOREST = bareHex("onForest"), RULE = bareHex("border");
+const FACE = "Calibri";
 
 export async function renderDeck(spec: DeckSpec, Pptx: PptxCtor): Promise<PptxInstance> {
   const pptx = new Pptx();
@@ -121,38 +125,38 @@ export async function renderDeck(spec: DeckSpec, Pptx: PptxCtor): Promise<PptxIn
   spec.slides.forEach((slide, index) => {
     const s = pptx.addSlide();
     if (slide.kind === "title") {
-      s.background = { color: NAVY };
-      s.addText(slide.title, { x: 0.6, y: 1.4, w: 8.8, h: 1.3, fontSize: 34, bold: true, color: LIGHT, fontFace: "Georgia", valign: "bottom", fit: "shrink" });
-      if (slide.subtitle) s.addText(slide.subtitle, { x: 0.6, y: 2.8, w: 8.8, h: 0.7, fontSize: 20, color: "BFD8D5", fontFace: "Calibri", fit: "shrink" });
-      if (slide.paragraphs?.length) s.addText(slide.paragraphs.join("\n"), { x: 0.6, y: 3.6, w: 8.8, h: 1.2, fontSize: 14, color: "BFD8D5", fontFace: "Calibri", valign: "top", fit: "shrink" });
-      s.addText(spec.footer, { x: 0.6, y: 5.05, w: 8.8, h: 0.35, fontSize: 10, color: "9AD4A8", fontFace: "Calibri" });
+      s.background = { color: FOREST };
+      s.addText(slide.title, { x: 0.6, y: 1.4, w: 8.8, h: 1.3, fontSize: 34, bold: true, color: PAPER, fontFace: FACE, valign: "bottom", fit: "shrink" });
+      if (slide.subtitle) s.addText(slide.subtitle, { x: 0.6, y: 2.8, w: 8.8, h: 0.7, fontSize: 20, color: ON_FOREST, fontFace: FACE, fit: "shrink" });
+      if (slide.paragraphs?.length) s.addText(slide.paragraphs.join("\n"), { x: 0.6, y: 3.6, w: 8.8, h: 1.2, fontSize: 14, color: ON_FOREST, fontFace: FACE, valign: "top", fit: "shrink" });
+      s.addText(spec.footer, { x: 0.6, y: 5.05, w: 8.8, h: 0.35, fontSize: 10, color: ON_FOREST, fontFace: FACE });
     } else {
-      s.background = { color: LIGHT };
-      s.addText(slide.title, { x: 0.5, y: 0.3, w: 9, h: 0.8, fontSize: 26, bold: true, color: NAVY, fontFace: "Georgia", valign: "middle", fit: "shrink" });
+      s.background = { color: PAPER };
+      s.addText(slide.title, { x: 0.5, y: 0.3, w: 9, h: 0.8, fontSize: 26, bold: true, color: FOREST, fontFace: FACE, valign: "middle", fit: "shrink" });
       let y = 1.25;
       if (slide.paragraphs?.length) {
         const h = slide.table || slide.bullets?.length ? 1.0 : 3.7;
-        s.addText(slide.paragraphs.join("\n\n"), { x: 0.5, y, w: 9, h, fontSize: 16, color: INK, fontFace: "Calibri", valign: "top", fit: "shrink" });
+        s.addText(slide.paragraphs.join("\n\n"), { x: 0.5, y, w: 9, h, fontSize: 16, color: INK, fontFace: FACE, valign: "top", fit: "shrink" });
         y += h + 0.1;
       }
       if (slide.table) {
-        const rows = [slide.table.header.map((text) => ({ text, options: { bold: true, fill: { color: PANEL }, color: NAVY } })), ...slide.table.rows];
+        const rows = [slide.table.header.map((text) => ({ text, options: { bold: true, fill: { color: PANEL }, color: FOREST } })), ...slide.table.rows];
         const widths = slide.table.widths ?? slide.table.header.map(() => 9 / slide.table!.header.length);
-        s.addTable(rows, { x: 0.5, y, w: 9, colW: widths, fontSize: 11, fontFace: "Calibri", color: INK, border: { type: "solid", pt: 0.5, color: "CBD5E1" }, valign: "middle", autoPage: false });
+        s.addTable(rows, { x: 0.5, y, w: 9, colW: widths, fontSize: 11, fontFace: FACE, color: INK, border: { type: "solid", pt: 0.5, color: RULE }, valign: "middle", autoPage: false });
       } else if (slide.bullets?.length) {
         s.addText(slide.bullets.map((text) => ({ text, options: { bullet: !text.startsWith("  "), breakLine: true, color: text.startsWith("  ") ? MUTED : INK, indentLevel: text.startsWith("  ") ? 1 : 0 } })),
-          { x: 0.5, y, w: 9, h: 5.0 - y, fontSize: 14, fontFace: "Calibri", valign: "top", paraSpaceAfter: 6, fit: "shrink" });
+          { x: 0.5, y, w: 9, h: 5.0 - y, fontSize: 14, fontFace: FACE, valign: "top", paraSpaceAfter: 6, fit: "shrink" });
       }
       if (slide.chart) {
         s.addChart(pptx.ChartType.bar, [{ name: "Postings", labels: slide.chart.categories, values: slide.chart.values }], {
-          x: 0.5, y, w: 9, h: 4.5 - y, barDir: "bar", chartColors: [ACCENT], barGapWidthPct: 60, showLegend: false, showTitle: false,
+          x: 0.5, y, w: 9, h: 4.5 - y, barDir: "bar", chartColors: [BAR], barGapWidthPct: 60, showLegend: false, showTitle: false,
           showValue: true, dataLabelColor: INK, dataLabelFontSize: 11, dataLabelFontFace: "Calibri", dataLabelPosition: "outEnd", dataLabelFormatCode: "0",
           catAxisLabelColor: INK, catAxisLabelFontSize: 12, catAxisLabelFontFace: "Calibri", catAxisOrientation: "maxMin", catAxisLineShow: false,
           valAxisHidden: true, valAxisMinVal: 0, valAxisMaxVal: Math.max(1, slide.chart.max), valGridLine: { style: "none" }, catGridLine: { style: "none" },
         });
-        s.addText(slide.chart.caption, { x: 0.5, y: 4.6, w: 9, h: 0.45, fontSize: 11, color: MUTED, fontFace: "Calibri", valign: "top" });
+        s.addText(slide.chart.caption, { x: 0.5, y: 4.6, w: 9, h: 0.45, fontSize: 11, color: MUTED, fontFace: FACE, valign: "top" });
       }
-      s.addText(spec.footer + "  " + (index + 1) + " / " + spec.slides.length, { x: 0.5, y: 5.15, w: 9, h: 0.3, fontSize: 9, color: MUTED, fontFace: "Calibri" });
+      s.addText(spec.footer + "  " + (index + 1) + " / " + spec.slides.length, { x: 0.5, y: 5.15, w: 9, h: 0.3, fontSize: 9, color: MUTED, fontFace: FACE });
     }
     if (slide.notes) s.addNotes(slide.notes);
   });

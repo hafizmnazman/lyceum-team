@@ -30,9 +30,14 @@ export type Screen =
   | "new-subject"
   | "assignments"
   | "courses"
-  | "studio"
+  | "studio" // the course's Course, Update, Teach and History steps
+  | "watch" // the loop's Watch step
+  | "report" // the loop's Report step, with its Quote, Review, Count, Map and Brief sub-steps
+  | "decide" // the loop's Decide step: the decision record
+  | "proposal" // the old change proposal, in the illustrative sandbox
   | "acceptance"
   | "upload"
+  | "learn"
   | "backtest"
   | "dataroom"
   | "office" // how Lyceum works: the roles in order and the real run record
@@ -48,7 +53,9 @@ export type Capability =
   | "draft-change"
   | "review-draft"
   | "run-test"
-  | "approve";
+  | "approve"
+  | "decide" // record adopt, retain, defer or return on a brief (plan Section 4.2)
+  | "adopt"; // make a checked revision the local course version
 
 /** All hats a person holds on a subject (0, 1, or 2). */
 export function hatsOn(
@@ -116,6 +123,13 @@ export function can(
       return person.orgRole === "academic" && (isCoordHere || isLecturerHere);
     case "approve":
       return person.orgRole === "management";
+    // Section 4.2, mapped onto today's hats until positions exist as data (Track B): the coordinator
+    // decides and adopts, the lecturer does neither, and the programme owner (the department tier)
+    // decides on every course. The store adds the personal-workspace owner, who holds both.
+    case "decide":
+      return person.orgRole === "department" || (person.orgRole === "academic" && isCoordHere);
+    case "adopt":
+      return person.orgRole === "academic" && isCoordHere;
     default:
       return false;
   }
@@ -130,15 +144,15 @@ export function navFor(person: Person, assignments: RoleAssignment[]): Screen[] 
     return ["inbox", "trends", "approval", ...shared];
   }
   if (person.orgRole === "department") {
-    return ["inbox", "programme", "new-subject", "assignments", "trends", ...shared];
+    return ["inbox", "programme", "new-subject", "assignments", "decide", "trends", ...shared];
   }
   // academic: union of coordinator + lecturer screens
   const nav: Screen[] = ["inbox"];
   const isCoord = isCoordinatorAnywhere(person.id, assignments);
   const isLect = isLecturerAnywhere(person.id, assignments);
-  if (isCoord || isLect) nav.push("upload");
-  nav.push("courses", "studio");
-  if (isCoord || isLect) nav.push("acceptance");
+  if (isCoord || isLect) nav.push("upload", "learn");
+  nav.push("courses", "studio", "watch", "report", "decide");
+  if (isCoord || isLect) nav.push("proposal", "acceptance");
   if (isCoord) nav.push("trends");
   return [...nav, ...shared];
 }

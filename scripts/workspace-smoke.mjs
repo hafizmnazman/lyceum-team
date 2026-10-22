@@ -43,22 +43,25 @@ try {
 
   await page.goto(origin, { waitUntil: "networkidle0" });
   await click("login-P-SOBRI");
-  await textIncludes("Your work queue");
+  await textIncludes("Briefs waiting for a decision");
   await click("nav-courses");
   await page.type(selector("course-search"), "no matching course");
   await textIncludes("No courses match");
   await clickText("Clear filters");
   await click("course-open-CS310");
   await textIncludes("Current learning outcomes");
-  assert.equal(await page.$eval(selector("tab-overview"), (e) => e.getAttribute("aria-selected")), "true");
-  await page.focus(selector("tab-overview"));
-  await page.keyboard.press("ArrowRight");
-  assert.equal(await page.$eval(selector("tab-curriculum"), (e) => e.getAttribute("aria-selected")), "true");
-  await page.keyboard.press("ArrowRight");
-  assert.equal(await page.$eval(selector("tab-evidence"), (e) => e.getAttribute("aria-selected")), "true");
-  await page.keyboard.press("ArrowRight");
-  assert.equal(await page.$eval(selector("tab-plan"), (e) => e.getAttribute("aria-selected")), "true");
-  console.log("PASS course without a proposal has an overview and keyboard-accessible teaching plan");
+  assert.equal(await page.$eval(selector("rail-course"), (e) => e.getAttribute("aria-current")), "page");
+  assert.equal(await page.evaluate(() => location.hash), "#/course/CS310");
+  // The step path is reached by keyboard: Tab walks the steps in order and Enter opens one.
+  await page.focus(selector("rail-course"));
+  for (const step of ["watch", "report", "decide", "update", "teach"]) {
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-demo-id")), "rail-" + step);
+  }
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => location.hash === "#/course/CS310/teach");
+  assert.equal(await page.$eval(selector("rail-teach"), (e) => e.getAttribute("aria-current")), "page");
+  console.log("PASS course without a proposal has an overview and a keyboard-accessible step path to the teaching plan");
 
   await click("plan-add");
   await page.type(selector("session-topic"), "Designing clear visual encodings");
@@ -83,7 +86,7 @@ try {
   await page.waitForFunction(() => window.__lyceum.getState().teachingPlans[0]?.sessions.length === 1);
   await page.reload({ waitUntil: "networkidle0" });
   assert.equal(await page.evaluate(() => window.__lyceum.getState().teachingPlans[0].sessions[0].topic), "Designing clear visual encodings");
-  await click("tab-plan");
+  await click("rail-teach");
   await clickText("Edit course notes");
   await fillLabel("Teaching term", "September 2026");
   await fillLabel("Course notes", "Students have completed the introductory statistics module.");
@@ -101,12 +104,17 @@ try {
   await click("nav-inbox");
   await textIncludes("Continue teaching plan");
   await page.screenshot({ path: join(output, "home-desktop.png"), fullPage: true });
-  await page.click('[aria-label="Open proposal for CS220"]');
+  // The old proposal chain lives in the illustrative sandbox, folded away in the sidebar, not in the loop.
+  await click("nav-sandbox");
+  await click("nav-proposal");
+  await page.waitForFunction(() => document.querySelector(".page-eyebrow")?.textContent === "Sandbox · illustrative");
+  await page.select('[aria-label="Choose course for the proposal"]', "CS220");
   await page.waitForSelector(selector("mode-hybrid"), { visible: true });
-  assert.equal(await page.$eval(selector("tab-content"), (e) => e.getAttribute("aria-selected")), "true");
+  await page.select('[aria-label="Choose course for the proposal"]', "CS310");
   await click("nav-inbox");
   await click("home-resume");
-  assert.equal(await page.$eval(selector("tab-plan"), (e) => e.getAttribute("aria-selected")), "true");
+  await page.waitForFunction(() => location.hash === "#/course/CS310/teach");
+  assert.equal(await page.$eval(selector("rail-teach"), (e) => e.getAttribute("aria-current")), "page");
   await clickText("Edit session");
   await page.select(selector("session-status"), "delivered");
   await click("session-save");
@@ -114,7 +122,7 @@ try {
   await click("nav-guide");
   await textIncludes("What has not been built yet");
   await clickText("All roles");
-  assert.equal(await page.$$(".guide-entry").then((entries) => entries.length), 15);
+  assert.equal(await page.$$(".guide-entry").then((entries) => entries.length), 20);
   await page.type('input[type="search"]', "slide");
   assert.ok(await page.$$(".guide-entry").then((entries) => entries.length) > 0);
   console.log("PASS resume path, session updates and all-role section guide");
@@ -127,7 +135,7 @@ try {
   await page.screenshot({ path: join(output, "home-mobile.png"), fullPage: true });
   await click("home-resume");
   await noPageOverflow("mobile teaching plan");
-  await click("tab-overview");
+  await click("strip-course");
   await noPageOverflow("mobile course overview");
   await page.waitForFunction(() => window.__lyceum.getState().persistenceStatus === "saved");
   await page.screenshot({ path: join(output, "course-mobile.png"), fullPage: true });
@@ -140,7 +148,7 @@ try {
   const courseOptions = await page.$$eval('[aria-label="Choose course"] option', (options) => options.map((o) => o.value));
   assert.deepEqual(courseOptions, ["CS310", "CS340"]);
   await page.evaluate(() => { Storage.prototype.setItem = function () { throw new DOMException("Storage quota test", "QuotaExceededError"); }; });
-  await click("tab-plan");
+  await click("rail-teach");
   await page.waitForFunction(() => window.__lyceum.getState().persistenceStatus === "unavailable");
   await textIncludes("Browser storage is unavailable.");
   assert.equal(await page.evaluate(() => window.__lyceum.getState().teachingPlans[0].sessions.length), 1);

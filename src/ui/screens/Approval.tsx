@@ -32,13 +32,13 @@ import {
 function Snippet(props: { label: string; text: string }) {
   return (
     <div style={{ marginTop: 12, maxWidth: 680 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-3)", marginBottom: 4 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)", marginBottom: 4 }}>
         {props.label}
       </div>
       <div
         style={{
-          background: "var(--surface-2)",
-          borderRadius: "var(--radius-s)",
+          background: "var(--tint-1)",
+          borderRadius: "var(--radius-chip)",
           padding: "8px 12px",
           fontSize: 13,
         }}
@@ -95,7 +95,7 @@ export function ApprovalScreen() {
               {doc.subjectId}
             </span>
           </div>
-          <p style={{ margin: "0 0 10px", fontSize: 14.5, maxWidth: 520 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 14, maxWidth: 520 }}>
             {subject?.title ?? doc.subjectId} is approved. A prediction of{" "}
             <span className="num" style={{ fontWeight: 600 }}>
               {(prediction?.predictedMastery ?? report.projectedMastery).toFixed(2)}
@@ -129,21 +129,21 @@ export function ApprovalScreen() {
       <div style={{ maxWidth: 720 }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span className="num" style={{ fontSize: 15, fontWeight: 600 }}>
+          <span className="num" style={{ fontSize: 16, fontWeight: 600 }}>
             {doc.subjectId}
           </span>
-          <span style={{ fontSize: 15, fontWeight: 600 }}>{subject?.title ?? ""}</span>
+          <span style={{ fontSize: 16, fontWeight: 600 }}>{subject?.title ?? ""}</span>
           <Tag tone="accent">awaiting approval</Tag>
           {!author?.verified ? <Tag tone="warn">unverified author</Tag> : null}
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginTop: 2 }}>
+        <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>
           Proposed by {author?.name ?? doc.authorId}
         </div>
 
         {/* what changes */}
         <SectionLabel>What changes</SectionLabel>
         {(doc.draft.cloChanges ?? []).length === 0 ? (
-          <div style={{ fontSize: 13, color: "var(--ink-3)" }}>No outcome changes.</div>
+          <div style={{ fontSize: 13, color: "var(--ink-2)" }}>No outcome changes.</div>
         ) : (
           (doc.draft.cloChanges ?? []).map((ch, i) => {
             const current = ch.cloId ? state.clos.find((c) => c.id === ch.cloId) : undefined;
@@ -156,7 +156,7 @@ export function ApprovalScreen() {
                     <div
                       style={{
                         fontSize: 13,
-                        color: "var(--ink-3)",
+                        color: "var(--ink-2)",
                         textDecoration: "line-through",
                       }}
                     >
@@ -164,7 +164,7 @@ export function ApprovalScreen() {
                     </div>
                   ) : null}
                   {ch.op !== "remove" ? <div style={{ fontSize: 14 }}>{ch.text}</div> : null}
-                  <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                  <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>
                     {ch.cloId ?? "new outcome"} · Bloom: {ch.bloomLevel}
                   </div>
                 </div>
@@ -174,10 +174,10 @@ export function ApprovalScreen() {
         )}
         {doc.draft.topics && doc.draft.topics.length > 0 ? (
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-3)", marginBottom: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)", marginBottom: 4 }}>
               Topics
             </div>
-            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5 }}>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
               {doc.draft.topics.map((t) => (
                 <li key={t}>{t}</li>
               ))}
@@ -221,10 +221,10 @@ export function ApprovalScreen() {
         <SectionLabel>The evaluator's read</SectionLabel>
         <div
           style={{
-            background: "var(--surface-2)",
-            borderRadius: "var(--radius-m)",
+            background: "var(--tint-1)",
+            borderRadius: "var(--radius-card)",
             padding: 16,
-            fontSize: 13.5,
+            fontSize: 14,
             maxWidth: 680,
             marginBottom: 14,
           }}

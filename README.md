@@ -1,63 +1,88 @@
-# Lyceum
+<p align="center">
+  <a href="#hafizlyceum-team-npm-run-proveall"><img src="https://img.shields.io/badge/checks-185_passing-8BC34A?style=for-the-badge&labelColor=161b22" alt="checks: 185 passing"></a>
+  <a href="#hafizlyceum-team-cat-how-we-work"><img src="https://img.shields.io/badge/repo-private_team_sandbox-B8F23A?style=for-the-badge&labelColor=161b22" alt="repo: private team sandbox"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-proprietary-B9CDBF?style=for-the-badge&labelColor=161b22" alt="licence: proprietary"></a>
+</p>
 
-Lyceum is a course workspace for university lecturers. It collects what employers ask for from job postings, keeps every requirement as an exact quote from its source, counts honestly, and turns that into a meeting brief, a revised course outline and teaching materials (slides and quiz items) mapped to the Course Learning Outcomes. The lecturer stays in charge: nothing changes a course until a person approves it.
+```text
+hafiz@lyceum-team:~$ cat ./about
+lyceum turns real job postings into a course decision with receipts,
+every semester. this is the team's copy of the working code: branch off
+main, build, check, and open a pull request when something is worth a look.
 
-This is the team repo, and it is private. Lyceum is a working local prototype today: the app runs in the browser with a small local API, and no AI key is needed.
-
-## Run it
-
-You need Node 24 or newer, and Chrome or Edge for the browser checks.
-
+hafiz@lyceum-team:~$ npm run prove:journey | grep -E "^ℹ (tests|pass|fail)"
+ℹ tests 9
+ℹ pass 9
+ℹ fail 0
 ```
+
+### <samp>hafiz@lyceum-team:~$ npm run dev</samp>
+
+Node.js 24 or newer (the scripts run TypeScript directly), and Chrome or Edge for the browser checks. On Windows PowerShell, use `npm.cmd` if the execution policy blocks `npm.ps1`.
+
+```bash
 npm install
-npm run dev
+npm run dev        # the workspace on http://localhost:5173 and the local API on :8787
 ```
 
-On Windows PowerShell, use `npm.cmd` if `npm` is blocked. Open the URL it prints and choose Dr Sobri on the sign-in screen for the full lecturer workflow, or press **Play demo** there for the self-driving tour (about six minutes).
+Choose **Dr Sobri** on the sign-in screen for the whole lecturer workflow, or **Play demo** for the self-driving tour (about 7 minutes). Work is saved in the browser; the core needs no AI key and no account. Live board collection (Greenhouse and Lever) and document parsing go through the local API; the dated saved sample works without it. Copy `.env.example` to `.env` only for the optional model features, and never commit `.env`.
 
-`npm run dev` also starts the local API, which live job-board collection and file parsing need. Copy `.env.example` to `.env` only if you want the optional model features, and never commit `.env`.
+### <samp>hafiz@lyceum-team:~$ npm run prove:all</samp>
 
-## Check your work
-
-```
+```bash
 npm run typecheck
-npm run prove:all     # 160 checks today
+npm run prove:all          # 185 checks in seventeen suites
 npm run build
-npm run smoke         # the full demo tour in a headless browser
+npm run smoke              # the whole tour in a headless browser
+npm run smoke:integrity    # also smoke:workspace and smoke:curriculum, after a build
 ```
 
-More browser checks: `npm run smoke:integrity`, `npm run smoke:workspace`, `npm run smoke:curriculum` (run `npm run build` first).
+The guide, the palette and the prose have their own checks: `node scripts/generate-guide.mjs --check`, `node scripts/contrast-check.mjs`, `node scripts/dash-scan.mjs`. The pitch builds and checks itself with `npm run deck`. Run these before a pull request; consolidation runs the same.
 
-## Read these first
+### <samp>hafiz@lyceum-team:~$ tree ./src</samp>
+
+```text
+src/
+  ui/screens/     one file per loop step, plus Home, Courses, How it works, Evaluation, the landing page and the sandbox
+  ui/shell/       the header, the sidebar and the loop's path across the top of every step (LoopRail.tsx)
+  ui/primitives/  shared components: buttons, fields, tags, the ring, the handoff card
+  ui/mascots/     the host and the seven helpers, drawn in code
+  theme/          tokens.ts, the only source of colour and type, and the generated global.css
+  app/            the store, roles, the loop and its ring, routes, the event log, moods
+  lib/            the deterministic core: evidence maths, collection, curriculum checks, slides, benchmark
+  data/           seed data, sourced figures, the labelled scan benchmark
+  demo/           the self-driving tour
+  prove-*.ts      the automated checks
+server/           the local API: file parsing, job-board collection, optional model streaming
+mcp/              the local door: a read-only MCP server over an exported workspace
+scripts/          browser smokes, the screenshot, deck, brief and poster generators
+deck/             the pitch, an HTML deck with its PDF and PPTX export
+video/            the film: script, storyboard, style, the capture and the Remotion project
+```
+
+### <samp>hafiz@lyceum-team:~$ cat ./ui-rules</samp>
+
+- Colours and type come from `src/theme/tokens.ts` only; a hand-written hex anywhere else fails the contrast check. Fonts are bundled, never fetched.
+- Lime sits on forest surfaces only. Anything outlined with a lip is a control; a flat pill is a label. The look lives in one block at the end of `src/theme/global.css`.
+- Every step screen reads the same way: the path, the helper's question in a bubble, the work, the handoff to the next step (`src/ui/screens/StepFrame.tsx`).
+- Honesty labels on every surface: real, prototype, illustrative, planned. Synthetic data says synthetic, and every number on a surface is registered with its source in `docs/claims.md`.
+- Nothing moves without a real request or a saved record, and the characters never appear on an error.
+- No en or em dashes, anywhere.
+
+### <samp>hafiz@lyceum-team:~$ ls docs</samp>
 
 | file | what it is |
 |:--|:--|
-| [FEEDBACK.md](FEEDBACK.md) | what the organizer said, what's done and what's open, on one page |
-| [docs/lyceum-improvement-plan.md](docs/lyceum-improvement-plan.md) | the master plan: Section 29 is the review, Section 18 the work packages (W14 to W17 are the newest) |
-| [docs/lyceum-v3-as-built-2026-10-09.md](docs/lyceum-v3-as-built-2026-10-09.md) | what is built and verified, with the 11 October addendum |
-| [DECISIONS.md](DECISIONS.md) | why things are the way they are |
-| [docs/presentation/lyceum-brief.pdf](docs/presentation/lyceum-brief.pdf) | a three-page summary of the idea and the review |
-| [docs/research/pain-and-market-2026-10-11.md](docs/research/pain-and-market-2026-10-11.md) | the problem and the market, with sources |
-| [docs/lecturer-guide.md](docs/lecturer-guide.md) | how each screen is used |
-| [JUDGES.md](JUDGES.md) | the five-minute walkthrough |
+| [FEEDBACK.md](FEEDBACK.md) | what the organizer said, what is done and what is open |
+| [docs/claims.md](docs/claims.md) | every number on every surface, with its source and the check that holds it |
+| [docs/research/](docs/research/) | the dated research notes behind the figures; the proofs read them |
+| [docs/lecturer-guide.md](docs/lecturer-guide.md) | how each screen is used, generated by `scripts/generate-guide.mjs` |
+| [docs/design/](docs/design/) | the palette poster and its WCAG audit, the source of `tokens.ts` |
+| [docs/doors.md](docs/doors.md) | the local door: setting it up in Claude Desktop or Claude Code, and a recorded session |
+| [docs/brand-use.md](docs/brand-use.md) | each third-party mark, its source and its terms |
+| `docs/presentation/` | generated: the screenshots, the architecture diagram, the brief, the poster and the sample decks |
 
-## Where the code is
-
-```
-src/
-  ui/screens/     one file per screen (Evidence, Studio, How it works, Evaluation, Landing, ...)
-  ui/primitives/  shared components
-  app/            the store, roles, the journey, the run timeline
-  lib/            the deterministic core: evidence maths, collection, curriculum checks, slides, benchmark
-  data/           seed data, sourced figures, the labelled scan benchmark
-  demo/           the self-driving demo
-  prove-*.ts      the automated checks
-server/           the local API: file parsing, job-board collection, optional model streaming
-scripts/          browser smokes, screenshot and document generators
-docs/             plan, as-built, research, presentation material, history
-```
-
-## How we work
+### <samp>hafiz@lyceum-team:~$ cat ./how-we-work</samp>
 
 We work swarm style: everyone builds in their own branches, and Hafiz consolidates.
 
@@ -66,11 +91,4 @@ We work swarm style: everyone builds in their own branches, and Hafiz consolidat
 - Overlap is fine. If two people try the same thing, the better version wins, or the best parts of both.
 - When something is worth a look, open a pull request into `main` and fill in the template. Hafiz reviews it and takes what helps into `main`, sometimes only part of it, then closes the PR. A closed PR is not a rejected idea.
 - When `main` moves, merge it into your branch before you carry on.
-- Good places to start: the open work in [FEEDBACK.md](FEEDBACK.md).
-
-Ground rules:
-
 - No secrets, keys or personal data in the repo. `.env` is ignored for a reason.
-- Keep claims honest. Synthetic data is labelled synthetic, numbers come with their source, and anything not built yet is called planned.
-- Keep the checks green on your branch, or say in the PR what is broken.
-- One idea per branch keeps review quick.

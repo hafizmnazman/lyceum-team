@@ -5,7 +5,9 @@ import { adoptCurriculumRevision, checkCurriculumRevision, definitionForCourse, 
 import { BLOOM_LEVELS, curriculumChanges, curriculumImpact, curriculumMarkdown, validateCourseDefinition } from "../../lib/curriculum.ts";
 import { downloadText } from "../../lib/download.ts";
 import type { BloomLevel, CourseDefinition, CourseOutcome, CourseTopic, CurriculumDraft, Person, Subject } from "../../types.ts";
-import { Button, Field, Input, Select, Tag, Textarea } from "../primitives/index.tsx";
+import { Button, Disclosure, Field, Input, Select, Tag, Textarea } from "../primitives/index.tsx";
+import { DecisionCard, Meter } from "../primitives/loop.tsx";
+import { briefDecisionState } from "../../lib/decisions.ts";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
 
 type Props = { state: AppState; person: Person; subject: Subject };
@@ -39,11 +41,21 @@ export function CurriculumPanel({ state, person, subject }: Props) {
   </div>;
 }
 
+/** Outlined hours against the budgets, as meters; an unknown budget is said in words, never guessed. */
+function HoursMeters({ definition }: { definition: CourseDefinition }) {
+  const contact = definition.topics.reduce((n,t) => n + t.contactHours, 0), self = definition.topics.reduce((n,t) => n + t.selfStudyHours, 0);
+  const meter = (label: string, value: number, budget: number | null) => budget !== null
+    ? <Meter value={value} max={budget} over={value > budget} label={<><strong className="tabular">{value}</strong> of <span className="tabular">{budget}</span> {label} hours outlined</>} note={value > budget ? "Over the budget: the check blocks this version." : undefined} />
+    : <p className="muted"><span className="tabular">{value}</span> {label} hours outlined; the {label}-hour budget is not supplied.</p>;
+  return <div className="hours-meters" data-demo-id="hours-meters">{meter("contact", contact, definition.brief.contactHours)}{meter("self-study", self, definition.brief.selfStudyHours)}</div>;
+}
+
 function DefinitionSummary({ definition }: { definition: CourseDefinition }) {
   return <div>
     <dl className="context-list"><div><dt>Programme</dt><dd>{definition.brief.programmeTitle || "Not supplied"}</dd></div>
       <div><dt>Contact hours</dt><dd>{definition.topics.reduce((n,t) => n + t.contactHours, 0)} outlined · budget {definition.brief.contactHours ?? "not supplied"}</dd></div>
       <div><dt>Self-study hours</dt><dd>{definition.topics.reduce((n,t) => n + t.selfStudyHours, 0)} outlined · budget {definition.brief.selfStudyHours ?? "not supplied"}</dd></div></dl>
+    <HoursMeters definition={definition} />
     <h4>Course learning outcomes</h4>
     {definition.outcomes.length ? <ol className="outcome-list">{definition.outcomes.map(c => <li key={c.id}><strong>{c.label}</strong> · {c.bloomLevel}<p>{c.text}</p>
       <p className="muted">Achievement: {c.assessmentEvidence || "Not recorded"}</p></li>)}</ol> : <p>Add your course learning outcomes to begin.</p>}
@@ -95,9 +107,14 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
     if (next < 0 || next >= topics.length) return d;
     [topics[at],topics[next]] = [topics[next],topics[at]]; return { ...d, topics };
   });
+  const errors = issues.filter(i => i.severity === "error").length, warnings = issues.length - errors;
   return <div>
     <div className="revision-toolbar"><span><strong>Candidate revision {draft.revision}</strong> · based on {draft.baselineVersionId}</span>
       <Tag tone={dirty || draft.checkedRevision !== draft.revision ? "warn" : "ok"}>{dirty ? "Unsaved edits" : draft.checkedRevision === draft.revision ? "Constraints checked" : "Saved draft"}</Tag></div>
+    <section className="workspace-panel revision-summary" aria-label="Hours, changes and checks">
+      <HoursMeters definition={definition} />
+      <p className="revision-status"><strong className="tabular">{changes.length}</strong> {changes.length === 1 ? "change" : "changes"} against {draft.baselineVersionId} · {errors ? errors + " to fix" : "nothing to fix"} · {warnings ? warnings + " to review" : "nothing to review"} · {dirty ? "save, then check" : draft.checkedRevision === draft.revision ? "checked, ready for your decision below" : "saved, check it next"}</p>
+    </section>
     {stale ? <p role="alert" className="form-error">The active course version changed. Export this candidate, discard it and start from the current version.</p> : null}
     {feedback ? <div role="status" tabIndex={-1} ref={alertRef} className="save-status">{feedback}</div> : null}
     <fieldset disabled={!mayEdit || stale} className="curriculum-fields">
@@ -161,7 +178,13 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
     <section className="workspace-panel" aria-labelledby="revision-checks"><h3 id="revision-checks">Constraints and review points</h3>
       <div className="preparation-summary"><span><strong>{definition.topics.reduce((n,t) => n + t.contactHours,0)}</strong> contact hours</span><span><strong>{definition.topics.reduce((n,t) => n + t.selfStudyHours,0)}</strong> self-study hours</span><span><strong>{changes.length}</strong> changes</span></div>
       {issues.length ? <ul className="revision-issues">{issues.map((i,n) => <li key={n}><Tag tone={i.severity === "error" ? "danger" : "warn"}>{i.severity === "error" ? "Fix" : "Review"}</Tag><span>{i.message}</span></li>)}</ul> : <p>No configured constraint issues found. The lecturer still reviews educational quality.</p>}
-      <p className="muted">{impact.sessions.length} teaching sessions and {impact.assessments.length} assessments will be flagged for review. Existing work is retained.</p>
+      <Disclosure summary={impact.sessions.length + " teaching sessions and " + impact.assessments.length + " assessments will be flagged for review"}>
+        {impact.sessions.length || impact.assessments.length ? <ul className="impact-list">
+          {impact.sessions.map(s => <li key={s.id}>Week {s.week}: {s.topic}</li>)}
+          {impact.assessments.map(a => <li key={a.id}>Assessment {a.id}, {a.items.length} template items</li>)}
+        </ul> : <p className="muted">No saved session or assessment depends on what changed.</p>}
+        <p className="muted">Existing work is retained; each flagged item asks for your review before reuse.</p>
+      </Disclosure>
     </section>
     <section className="workspace-panel"><h3>Before and after</h3>{changes.length ? <div className="revision-diff">{changes.map((c,i) => <article key={i}><div className="button-row"><Tag>{c.kind}</Tag><strong>{c.area}: {c.label}</strong></div>
       <div className="session-content"><div><h4>Current version</h4><p className="preserve-lines">{c.before || "Not present"}</p></div><div><h4>Candidate</h4><p className="preserve-lines">{c.after || "Removed"}</p></div></div></article>)}</div> : <p>The candidate matches the current course. Make a change to compare it here.</p>}</section>
@@ -175,15 +198,50 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
   </div>;
 }
 
+/** History (plan Section 5.3): the course versions and the decisions on briefs on one timeline, newest
+ *  first; each entry opens to its outline or its reason, and exports sit inside the entry. */
 export function CurriculumHistoryPanel({ state, subject }: { state: AppState; subject: Subject }) {
-  const versions = [...state.subjectVersions].filter(v => v.subjectId === subject.id).reverse();
+  const versions = state.subjectVersions.filter(v => v.subjectId === subject.id);
   const revisions = [...state.curriculumDrafts].filter(d => d.subjectId === subject.id).reverse();
+  const decisions = state.briefDecisions.filter(d => d.subjectId === subject.id);
+  const name = (id: string) => state.people.find(p => p.id === id)?.name ?? id;
+  // Newest first. At one moment (the pinned demo clock) the event log's order decides; without an event, a version
+  // sits above a decision, because the change follows the decision in the loop.
+  const seq = new Map<string, number>();
+  state.events.forEach((e, i) => { if (e.refs.subjectId !== subject.id) return; if (e.kind === "decision-recorded" && e.refs.decisionId) seq.set(e.refs.decisionId, i); if (e.kind === "version-adopted" && e.refs.versionId) seq.set(e.refs.versionId, i); });
+  const entries = [
+    ...versions.map((v, i) => ({ at: v.changedAt, order: i, kind: "version" as const, seq: seq.get(v.id), v })),
+    ...decisions.map((d, i) => ({ at: d.at, order: i, kind: "decision" as const, seq: seq.get(d.id), d })),
+  ].sort((a, b) => b.at.localeCompare(a.at)
+    || (a.seq !== undefined && b.seq !== undefined ? b.seq - a.seq : a.kind !== b.kind ? (a.kind === "version" ? -1 : 1) : b.order - a.order));
   return <div>
-    <section className="workspace-panel"><h2>Course versions</h2><p className="muted">Local course versions preserve the outline, decision and teaching term. They do not attest university approval.</p>
-      {versions.length ? versions.map(v => <details className="guide-entry" key={v.id}><summary><span>{v.id} · {v.effectiveTerm || "Term not recorded"}</span><Tag>{v.id === subject.currentVersionId ? "Current" : "Previous"}</Tag></summary>
-        <div className="guide-entry-body"><p>{v.reason}</p><p className="muted">{v.changedAt} · {state.people.find(p => p.id === v.changedBy)?.name ?? v.changedBy}</p>
-          {v.definition ? <><DefinitionSummary definition={v.definition} /><Button onClick={() => downloadText(subject.id + "-" + v.id + ".md",curriculumMarkdown(subject,v.definition!,v.id))}>Export this version</Button></> : <ul>{v.cloSnapshot.map(c => <li key={c.id}>{c.text}</li>)}</ul>}</div></details>) : <p>Start a revision to preserve the current baseline and record a version history.</p>}
+    <section className="workspace-panel" aria-labelledby="history-title"><h2 id="history-title">Versions and decisions</h2>
+      <p className="muted">One timeline, newest first: every local course version and every decision recorded on a brief. Local versions preserve the outline, the reason and the teaching term; they do not attest university approval.</p>
+      {entries.length ? <ol className="history-timeline" data-demo-id="history-timeline">{entries.map(e => e.kind === "version"
+        ? <li key={"v" + e.v.id} className="history-entry">
+          <span className="history-time mono">{e.at.slice(0, 16).replace("T", " ")}</span>
+          <div className="history-body">
+            <div className="button-row"><Tag tone="accent">Version</Tag><strong className="tabular">{e.v.id}</strong><span className="muted">{e.v.effectiveTerm || "Term not recorded"} · {name(e.v.changedBy)}</span><Tag>{e.v.id === subject.currentVersionId ? "Current" : "Previous"}</Tag></div>
+            <p>{e.v.reason}</p>
+            <details className="history-open"><summary>Open</summary>
+              {e.v.definition ? <><DefinitionSummary definition={e.v.definition} /><Button onClick={() => downloadText(subject.id + "-" + e.v.id + ".md",curriculumMarkdown(subject,e.v.definition!,e.v.id))}>Export this version</Button></> : <ul>{e.v.cloSnapshot.map(c => <li key={c.id}>{c.text}</li>)}</ul>}
+            </details>
+          </div>
+        </li>
+        : <li key={"d" + e.d.id} className="history-entry">
+          <span className="history-time mono">{e.at.slice(0, 16).replace("T", " ")}</span>
+          <div className="history-body">
+            <div className="button-row"><Tag tone="ok">Decision</Tag><span className="muted">on the brief of {state.evidenceBriefs.find(b => b.id === e.d.briefId)?.createdAt.slice(0, 10) ?? "an earlier date"}</span></div>
+            <DecisionCard decision={e.d} name={name(e.d.byPersonId)} self={!subject.workspaceOnly && state.evidenceBriefs.find(b => b.id === e.d.briefId)?.createdBy === e.d.byPersonId}
+              amended={decisions.some((x, i) => i > decisions.indexOf(e.d) && x.briefId === e.d.briefId && x.byPersonId === e.d.byPersonId)}
+              superseded={(() => { const brief = state.evidenceBriefs.find(b => b.id === e.d.briefId); return brief ? Boolean(briefDecisionState(brief, state.evidenceBriefs, state.briefDecisions, Boolean(subject.workspaceOnly)).supersededBy) : false; })()} />
+          </div>
+        </li>)}</ol> : <p>Start a revision to preserve the current baseline and record a version history. Decisions recorded in Decide appear here too.</p>}
     </section>
-    <section className="workspace-panel"><h2>Revision decisions</h2>{revisions.length ? revisions.map(d => <details key={d.id} className="guide-entry"><summary><span>{d.id}</span><Tag>{d.status}</Tag></summary><div className="guide-entry-body"><ol className="journey-list">{d.history.map((e,i) => <li key={i}><strong>{e.action}</strong> · revision {e.revision}<p>{e.note}</p><span className="muted">{state.people.find(p => p.id === e.byPersonId)?.name ?? e.byPersonId} · {e.at}</span></li>)}</ol></div></details>) : <p>No revision decisions recorded yet.</p>}</section>
+    <section className="workspace-panel" aria-label="Revision decisions">
+      <Disclosure summary="Revision decisions: each revision started, saved, checked, adopted or discarded" count={revisions.length}>
+        {revisions.length ? revisions.map(d => <details key={d.id} className="guide-entry"><summary><span>{d.id}</span><Tag>{d.status}</Tag></summary><div className="guide-entry-body"><ol className="journey-list">{d.history.map((e,i) => <li key={i}><strong>{e.action}</strong> · revision {e.revision}<p>{e.note}</p><span className="muted">{name(e.byPersonId)} · {e.at}</span></li>)}</ol></div></details>) : <p>No revision decisions recorded yet.</p>}
+      </Disclosure>
+    </section>
   </div>;
 }

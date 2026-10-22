@@ -101,7 +101,7 @@ export function CommandPalette(props: { onClose: () => void }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(25,28,31,0.35)",
+        background: "var(--scrim)",
         zIndex: 90,
         display: "flex",
         justifyContent: "center",
@@ -127,10 +127,10 @@ export function CommandPalette(props: { onClose: () => void }) {
           width: 560,
           maxWidth: "90vw",
           alignSelf: "flex-start",
-          background: "var(--surface)",
-          borderRadius: "var(--radius-l)",
+          background: "var(--white)",
+          borderRadius: "var(--radius-card)",
           border: "1px solid var(--border)",
-          boxShadow: "var(--shadow-2)",
+          boxShadow: "var(--depth-menu)",
           overflow: "hidden",
         }}
       >
@@ -158,13 +158,13 @@ export function CommandPalette(props: { onClose: () => void }) {
             padding: "0 16px",
             border: "none",
             borderBottom: "1px solid var(--border)",
-            fontSize: 15,
-            background: "var(--surface)",
+            fontSize: 16,
+            background: "var(--white)",
           }}
         />
         <div style={{ maxHeight: 360, overflowY: "auto", padding: 6 }}>
           {filtered.length === 0 ? (
-            <div style={{ padding: 16, color: "var(--ink-3)", fontSize: 13 }}>
+            <div style={{ padding: 16, color: "var(--ink-2)", fontSize: 13 }}>
               Nothing matches "{query}".
             </div>
           ) : (
@@ -180,18 +180,18 @@ export function CommandPalette(props: { onClose: () => void }) {
                   width: "100%",
                   padding: "9px 12px",
                   border: "none",
-                  borderRadius: "var(--radius-s)",
-                  background: i === cursor ? "var(--accent-soft)" : "transparent",
+                  borderRadius: "var(--radius-chip)",
+                  background: i === cursor ? "var(--tint-2)" : "transparent",
                   cursor: "pointer",
-                  fontSize: 13.5,
+                  fontSize: 14,
                   color: "var(--ink)",
                   textAlign: "left",
                 }}
               >
-                <ArrowRight size={14} color="var(--ink-3)" />
+                <ArrowRight size={14} color="var(--ink-2)" />
                 <span style={{ flex: 1 }}>{c.label}</span>
-                <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{c.hint}</span>
-                {i === cursor ? <CornerDownLeft size={13} color="var(--ink-3)" /> : null}
+                <span style={{ fontSize: 13, color: "var(--ink-2)" }}>{c.hint}</span>
+                {i === cursor ? <CornerDownLeft size={13} color="var(--ink-2)" /> : null}
               </button>
             ))
           )}

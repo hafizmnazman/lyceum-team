@@ -14,8 +14,8 @@ export function ShareBar({ share, low, high, width = 160 }: { share: number | nu
   const interval = intervalText(low, high);
   const label = pct(share) + (interval ? " (" + interval + ")" : "");
   return <svg className="share-bar" viewBox={"0 0 " + width + " " + h} width={width} height={h} role="img" aria-label={label} style={{ "--bar-width": width + "px" } as React.CSSProperties}><title>{label}</title>
-    <rect x={1} y={y} width={width - 2} height={bar} rx={2} fill="var(--surface-2)" />
-    {share > 0 ? <rect x={1} y={y} width={Math.max(2, x(share) - 1)} height={bar} rx={2} fill="var(--accent)" /> : null}
+    <rect x={1} y={y} width={width - 2} height={bar} rx={2} fill="var(--tint-1)" />
+    {share > 0 ? <rect x={1} y={y} width={Math.max(2, x(share) - 1)} height={bar} rx={2} fill="var(--emerald)" /> : null}
     {hasInterval ? <>
       <line x1={x(low!)} x2={x(high!)} y1={wy} y2={wy} stroke="var(--ink)" strokeWidth={1.5} />
       <line x1={x(low!)} x2={x(low!)} y1={wy - 3} y2={wy + 3} stroke="var(--ink)" strokeWidth={1.5} />

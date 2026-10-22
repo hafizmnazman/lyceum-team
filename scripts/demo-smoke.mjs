@@ -1,8 +1,11 @@
 // Headless demo smoke: play the entire self-driving demo under ?demoTurbo
 // (paced holds shrink; the end state is identical) and assert what the
-// recording would show: real sample postings imported for CS310, exact
-// quotations confirmed, a reviewed denominator, a coverage mapping, a meeting
-// brief sent to the programme owner and read by him, and no page errors.
+// recording would show, step by step of the loop: real postings kept for CS310,
+// exact quotations confirmed, a reviewed denominator, a frozen snapshot, a
+// coverage mapping, a brief sent to the programme owner and read by him, his
+// decision recorded with a reason, the revision adopted after it, a session and
+// its pack, the sample results filed against the version taught, both decks
+// downloaded, the ring closed on Home, and no page errors.
 //
 // Run `npm run build` first, then `npm run smoke`.
 
@@ -78,7 +81,7 @@ try {
   await page.waitForSelector('[data-demo-id="play-demo"]', { timeout: 8000 });
   await page.click('[data-demo-id="play-demo"]');
 
-  // Poll the store until the programme owner has read the brief or we time out.
+  // Poll the store until the tour has filed the results and come back to Home, or we time out.
   const t0 = Date.now();
   let end = null;
   while (Date.now() - t0 < 300000) {
@@ -94,30 +97,45 @@ try {
         reviewed: sources.filter((x) => x.reviewed && !x.duplicateOf).length,
         mentions: s.skillMentions.filter((m) => m.subjectId === "CS310").length,
         mappings: s.skillMappings.filter((m) => m.subjectId === "CS310" && m.cloIds.includes("CLO5")).length,
+        snapshots: s.evidenceSnapshots.filter((x) => x.subjectId === "CS310").length,
         briefSent: Boolean(brief?.sentAt), briefRecipients: brief?.recipients ?? [], briefMarkdown: brief?.markdown ?? "",
         read: Boolean(notification?.read), currentPerson: s.currentPersonId,
         adopted: s.curriculumDrafts.filter((d) => d.subjectId === "CS310" && d.status === "adopted").length,
         versions: s.subjectVersions.filter((v) => v.subjectId === "CS310").length,
         sessions: s.teachingPlans.find((p) => p.subjectId === "CS310")?.sessions.length ?? 0,
-        items: s.testDrafts.find((t) => t.subjectId === "CS310")?.items.length ?? 0,
+        sessionVersion: s.teachingPlans.find((p) => p.subjectId === "CS310")?.sessions.at(-1)?.courseVersionId ?? null,
+        decisions: s.briefDecisions.filter((d) => d.subjectId === "CS310").map((d) => ({ by: d.byPersonId, outcome: d.outcome, note: d.note, briefId: d.briefId, version: d.courseVersionId })),
+        briefId: brief?.id ?? null,
+        firstVersion: s.subjectVersions.filter((v) => v.subjectId === "CS310")[0]?.id ?? null,
+        eventKinds: s.events.filter((e) => e.refs.subjectId === "CS310").map((e) => e.kind),
+        results: s.resultUploads.filter((u) => u.subjectId === "CS310" && u.uploadedBy === "P-SOBRI").map((u) => ({ version: u.courseVersionId ?? null, file: u.sourceFileName ?? "" })),
+        screen: s.screen,
+        closedText: document.body.innerText.includes("The loop is closed for this term"),
       };
     });
-    if (snap && snap.read) { end = snap; break; }
+    if (snap && snap.results.length && snap.screen === "inbox") { end = snap; break; }
     await sleep(500);
   }
 
-  check("the programme owner read the brief", Boolean(end));
+  check("the tour ran the whole loop and came back to Home", Boolean(end));
   if (end) {
     check("real postings were imported as collected sources (live board or saved sample)", end.collected >= 3 && end.collected === end.sources, end.sources + "/" + end.collected);
     check("the reviewed denominator is non-empty", end.reviewed >= 3, String(end.reviewed));
     check("exact quotations were confirmed", end.mentions >= 5, String(end.mentions));
     check("a coverage mapping links a skill to CLO5", end.mappings === 1, String(end.mappings));
+    check("an evidence snapshot was frozen for the next window", end.snapshots === 1, String(end.snapshots));
     check("the brief was sent to Dr Rahman", end.briefSent && end.briefRecipients.includes("P-RAHMAN"), JSON.stringify(end.briefRecipients));
     check("the brief carries the table and the receipts", /Small refresh within existing hours \(recommended\)/.test(end.briefMarkdown) && /## Appendix: evidence report with receipts/.test(end.briefMarkdown) && /convenience sample/.test(end.briefMarkdown));
-    check("the reader is Dr Rahman", end.currentPerson === "P-RAHMAN", String(end.currentPerson));
-    check("a course revision was checked and adopted with the baseline kept", end.adopted === 1 && end.versions >= 2, end.adopted + "/" + end.versions);
-    check("a teaching session was saved", end.sessions === 1, String(end.sessions));
-    check("template assessment items were generated", end.items > 0, String(end.items));
+    check("Dr Rahman read the brief", end.read);
+    const decision = end.decisions.find((d) => d.by === "P-RAHMAN");
+    check("Dr Rahman recorded a decision with a reason, on the brief, bound to the course version", Boolean(decision) && decision.outcome === "adopt" && decision.note.trim().length > 0 && decision.briefId === end.briefId && decision.version === end.firstVersion, JSON.stringify(end.decisions));
+    const order = end.eventKinds;
+    check("the event log reads brief prepared, sent, read, decision, then the adoption", order.indexOf("brief-prepared") < order.indexOf("brief-sent") && order.indexOf("brief-sent") < order.indexOf("brief-read") && order.indexOf("brief-read") < order.indexOf("decision-recorded") && order.indexOf("decision-recorded") < order.indexOf("version-adopted"), order.join(", "));
+    check("a course revision was checked and adopted after the decision, with the baseline kept", end.adopted === 1 && end.versions >= 2, end.adopted + "/" + end.versions);
+    check("a teaching session was saved on the adopted version", end.sessions === 1 && Boolean(end.sessionVersion) && end.sessionVersion !== end.firstVersion, end.sessions + " / " + end.sessionVersion);
+    check("the sample results were filed and matched to the version taught", end.results.length === 1 && end.results[0].version === end.sessionVersion, JSON.stringify(end.results));
+    check("Home shows the ring closed for the term", end.closedText);
+    check("the tour ends as Dr Sobri", end.currentPerson === "P-SOBRI", String(end.currentPerson));
     await sleep(1500);
     const files = readdirSync(downloads);
     check("the teaching pack deck was downloaded", files.some((f) => /^CS310-week-\d+-teaching-pack\.pptx$/.test(f)), files.join(", "));

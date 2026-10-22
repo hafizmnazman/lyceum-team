@@ -1,6 +1,8 @@
-// Lyceum v3 UI primitives (spec Section 3). Every screen builds from these so
-// the app stays on-system without a per-screen design pass. No ad-hoc hex: all
-// colour comes through the CSS variables set in theme/global.css.
+// Lyceum UI primitives (plan Section 6.6). Every screen builds from these so the
+// app stays on the system without a per-screen design pass. The look lives in
+// theme/global.css as classes, so hover, focus-visible, active, disabled and
+// loading states are defined once; no colour value is written here, only the
+// CSS custom properties generated from theme/tokens.ts.
 
 import type {
   ButtonHTMLAttributes,
@@ -11,97 +13,63 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 import { cloneElement, forwardRef, isValidElement, useId } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, XCircle } from "lucide-react";
+
+const cx = (...names: Array<string | false | null | undefined>) => names.filter(Boolean).join(" ");
 
 // ---------- layout ----------
 
 /** The content column: left-aligned, capped width, generous padding. */
 export function Page(props: { children: ReactNode; wide?: boolean }) {
-  return (
-    <div
-      className="page-content"
-      style={{
-        maxWidth: props.wide ? 1320 : 1120,
-        padding: "28px 32px 64px",
-        margin: 0,
-      }}
-    >
-      {props.children}
-    </div>
-  );
+  return <div className={cx("page-content", props.wide && "page-wide")}>{props.children}</div>;
 }
 
-/** Page header: serif title, quiet context line, optional right-side actions.
- *  One per screen; the serif appears here and nowhere else. */
+/** Page header: the display title, the question the screen answers, a quiet
+ *  context line and optional actions. One per screen. The heading takes focus
+ *  on every route change (Shell). */
 export function PageHead(props: {
   title: string;
+  eyebrow?: ReactNode;
+  question?: string;
   context?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
-    <div
-      className="page-heading"
-      style={{
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "space-between",
-        gap: 16,
-        marginBottom: 24,
-      }}
-    >
-      <div>
-        <h1 className="page-title">{props.title}</h1>
-        {props.context ? (
-          <div style={{ color: "var(--ink-2)", marginTop: 4, maxWidth: 640 }}>
-            {props.context}
-          </div>
-        ) : null}
+    <div className="page-heading">
+      <div className="page-heading-text">
+        {props.eyebrow ? <span className="eyebrow page-eyebrow">{props.eyebrow}</span> : null}
+        <h1 className="page-title" tabIndex={-1}>{props.title}</h1>
+        {props.question ? <p className="page-question">{props.question}</p> : null}
+        {props.context ? <div className="page-context">{props.context}</div> : null}
       </div>
-      {props.actions ? (
-        <div className="page-heading-actions" style={{ display: "flex", gap: 8, flexShrink: 0 }}>{props.actions}</div>
-      ) : null}
+      {props.actions ? <div className="page-heading-actions">{props.actions}</div> : null}
     </div>
   );
 }
 
-/** A quiet single section label. Use sparingly (one or two per screen). */
+/** A section eyebrow: JetBrains Mono, uppercase, tracked. Use sparingly. */
 export function SectionLabel(props: { children: ReactNode; style?: CSSProperties }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        color: "var(--ink-3)",
-        letterSpacing: "0.02em",
-        margin: "24px 0 8px",
-        ...props.style,
-      }}
-    >
-      {props.children}
-    </div>
-  );
+  return <div className="section-label eyebrow" style={props.style}>{props.children}</div>;
 }
 
-/** A card is earned: it wraps one actionable object, never used as wallpaper. */
+/** A card is earned: it wraps one actionable object, never used as wallpaper.
+ *  Light on white, tint for receipts and agent tiles, forest only on the
+ *  landing page, the header and the tools (the restraint rule). */
 export function Card(props: {
   children: ReactNode;
   style?: CSSProperties;
   onClick?: () => void;
   focal?: boolean;
+  variant?: "light" | "tint" | "forest";
+  className?: string;
   "data-demo-id"?: string;
 }) {
   return (
     <div
       data-demo-id={props["data-demo-id"]}
       onClick={props.onClick}
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-m)",
-        boxShadow: props.focal ? "var(--shadow-2)" : "var(--shadow-1)",
-        padding: props.focal ? 24 : 16,
-        cursor: props.onClick ? "pointer" : undefined,
-        ...props.style,
-      }}
+      className={cx("card", props.variant === "tint" && "card-tint", props.variant === "forest" && "card-forest on-forest", props.focal && "card-focal", props.onClick && "is-clickable", props.className)}
+      style={props.style}
     >
       {props.children}
     </div>
@@ -122,6 +90,7 @@ export function Row(props: {
       onClick={props.onClick}
       role={props.onClick ? "button" : undefined}
       tabIndex={props.onClick ? 0 : undefined}
+      aria-pressed={props.onClick && props.selected !== undefined ? props.selected : undefined}
       onKeyDown={
         props.onClick
           ? (e) => {
@@ -129,125 +98,66 @@ export function Row(props: {
             }
           : undefined
       }
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "12px 12px",
-        borderBottom: "1px solid var(--border)",
-        borderRadius: props.selected ? "var(--radius-s)" : 0,
-        background: props.selected ? "var(--accent-soft)" : "transparent",
-        cursor: props.onClick ? "pointer" : undefined,
-        transition: "background 150ms ease-out",
-        ...props.style,
-      }}
-      onMouseEnter={(e) => {
-        if (props.onClick && !props.selected)
-          (e.currentTarget as HTMLElement).style.background = "var(--surface-2)";
-      }}
-      onMouseLeave={(e) => {
-        if (props.onClick && !props.selected)
-          (e.currentTarget as HTMLElement).style.background = "transparent";
-      }}
+      className={cx("row", props.onClick && "is-clickable", props.selected && "is-selected")}
+      style={props.style}
     >
       {props.children}
     </div>
   );
 }
 
+/** Show or hide secondary content: how-to text, options, full tables (plan Section 5.3). */
+export function Disclosure(props: { summary: ReactNode; children: ReactNode; count?: ReactNode; defaultOpen?: boolean; "data-demo-id"?: string }) {
+  return (
+    <details className="disclosure" open={props.defaultOpen} data-demo-id={props["data-demo-id"]}>
+      <summary><ChevronDown className="disclosure-chevron" size={16} aria-hidden /><span>{props.summary}</span>{props.count !== undefined ? <Tag>{props.count}</Tag> : null}</summary>
+      <div className="disclosure-body">{props.children}</div>
+    </details>
+  );
+}
+
 // ---------- buttons ----------
 
-type ButtonVariant = "primary" | "quiet" | "outline" | "danger";
-
-const buttonBase: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-  minHeight: 40,
-  height: "auto",
-  padding: "7px 14px",
-  borderRadius: "var(--radius-s)",
-  fontSize: 14,
-  fontWeight: 500,
-  cursor: "pointer",
-  border: "1px solid transparent",
-  transition: "background 150ms ease-out, border-color 150ms ease-out, opacity 150ms",
-  whiteSpace: "normal",
-};
-
-const buttonStyles: Record<ButtonVariant, CSSProperties> = {
-  primary: {
-    background: "var(--accent)",
-    color: "var(--accent-ink)",
-  },
-  quiet: {
-    background: "transparent",
-    color: "var(--ink-2)",
-  },
-  outline: {
-    background: "var(--surface)",
-    color: "var(--ink)",
-    borderColor: "var(--border)",
-  },
-  danger: {
-    background: "var(--surface)",
-    color: "var(--danger)",
-    borderColor: "var(--border)",
-  },
-};
+/** primary: emerald with white text (5.2). lime: forest text on lime, on forest surfaces only.
+ *  ghost: a secondary action on forest. outline: the default secondary on light surfaces. */
+type ButtonVariant = "primary" | "outline" | "quiet" | "danger" | "lime" | "ghost";
 
 export const Button = forwardRef<
   HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }
->(function Button({ variant = "outline", style, disabled, ...rest }, ref) {
+  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; loading?: boolean }
+>(function Button({ variant = "outline", loading, disabled, className, children, type, ...rest }, ref) {
   return (
     <button
       ref={ref}
-      disabled={disabled}
-      style={{
-        ...buttonBase,
-        ...buttonStyles[variant],
-        opacity: disabled ? 0.45 : 1,
-        cursor: disabled ? "default" : "pointer",
-        ...style,
-      }}
+      type={type ?? "button"}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className={cx("btn", "btn-" + variant, className)}
       {...rest}
-    />
+    >
+      {loading ? <Spinner size={14} decorative /> : null}
+      {children}
+    </button>
   );
 });
 
 // ---------- tags ----------
 
+type TagTone = "neutral" | "accent" | "ok" | "warn" | "danger" | "planned" | "forest";
+const TONE_ICON = { ok: CheckCircle2, warn: AlertTriangle, danger: XCircle } as const;
+
+/** A chip. ok, warn and danger always carry an icon beside their word (never colour alone);
+ *  planned carries the dashed "coming next" border and must say "Planned" in its words. */
 export function Tag(props: {
   children: ReactNode;
-  tone?: "neutral" | "accent" | "ok" | "warn" | "danger";
+  tone?: TagTone;
   style?: CSSProperties;
 }) {
   const tone = props.tone ?? "neutral";
-  const map = {
-    neutral: { bg: "var(--surface-2)", fg: "var(--ink-2)" },
-    accent: { bg: "var(--accent-soft)", fg: "var(--accent)" },
-    ok: { bg: "var(--ok-soft)", fg: "var(--ok)" },
-    warn: { bg: "var(--warn-soft)", fg: "var(--warn)" },
-    danger: { bg: "var(--danger-soft)", fg: "var(--danger)" },
-  } as const;
+  const Icon = tone === "ok" || tone === "warn" || tone === "danger" ? TONE_ICON[tone] : null;
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "2px 8px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 500,
-        background: map[tone].bg,
-        color: map[tone].fg,
-        whiteSpace: "nowrap",
-        ...props.style,
-      }}
-    >
+    <span className={cx("tag", "tag-" + tone)} style={props.style}>
+      {Icon ? <Icon size={14} strokeWidth={2} aria-hidden /> : null}
       {props.children}
     </span>
   );
@@ -267,152 +177,91 @@ export function Field(props: {
   const descriptionId = id + "-description";
   const describedBy = [child?.props["aria-describedby"], props.error || props.hint ? descriptionId : null].filter(Boolean).join(" ") || undefined;
   return (
-    <div className="form-field" style={{ display: "block", marginBottom: 14 }}>
-      <label htmlFor={id} style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 5 }}>{props.label}</label>
+    <div className="form-field">
+      <label htmlFor={id} className="field-label">{props.label}</label>
       {child ? cloneElement(child, { id, "aria-describedby": describedBy, "aria-invalid": props.error ? true : child.props["aria-invalid"] }) : props.children}
       {props.error ? (
-        <div id={descriptionId} style={{ fontSize: 12, color: "var(--danger)", marginTop: 4 }}>{props.error}</div>
+        <div id={descriptionId} className="field-error"><XCircle size={14} aria-hidden />{props.error}</div>
       ) : props.hint ? (
-        <div id={descriptionId} style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>{props.hint}</div>
+        <div id={descriptionId} className="field-hint">{props.hint}</div>
       ) : null}
     </div>
   );
 }
 
-const inputBase: CSSProperties = {
-  width: "100%",
-  height: 40,
-  padding: "0 10px",
-  borderRadius: "var(--radius-s)",
-  border: "1px solid var(--control-border)",
-  background: "var(--surface)",
-};
-
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
-  function Input({ style, ...rest }, ref) {
-    return <input ref={ref} style={{ ...inputBase, ...style }} {...rest} />;
+  function Input({ className, ...rest }, ref) {
+    return <input ref={ref} className={cx("control", className)} {...rest} />;
   },
 );
 
 export const Textarea = forwardRef<
   HTMLTextAreaElement,
   TextareaHTMLAttributes<HTMLTextAreaElement>
->(function Textarea({ style, ...rest }, ref) {
-  return (
-    <textarea
-      ref={ref}
-      style={{ ...inputBase, height: "auto", minHeight: 88, padding: 10, resize: "vertical", ...style }}
-      {...rest}
-    />
-  );
+>(function Textarea({ className, ...rest }, ref) {
+  return <textarea ref={ref} className={cx("control", "control-area", className)} {...rest} />;
 });
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  function Select({ style, ...rest }, ref) {
-    return <select ref={ref} style={{ ...inputBase, ...style }} {...rest} />;
+  function Select({ className, ...rest }, ref) {
+    return <select ref={ref} className={cx("control", "control-select", className)} {...rest} />;
   },
 );
 
 // ---------- feedback ----------
 
-export function Spinner(props: { size?: number }) {
+/** A spinner for a real request in flight. Inside a button it is decorative (the button is aria-busy). */
+export function Spinner(props: { size?: number; decorative?: boolean; label?: string }) {
   const s = props.size ?? 16;
   return (
     <span
-      aria-label="Loading"
-      style={{
-        display: "inline-block",
-        width: s,
-        height: s,
-        border: "2px solid var(--border)",
-        borderTopColor: "var(--accent)",
-        borderRadius: "50%",
-        animation: "spin 700ms linear infinite",
-      }}
+      className="spinner"
+      role={props.decorative ? undefined : "status"}
+      aria-hidden={props.decorative || undefined}
+      aria-label={props.decorative ? undefined : props.label ?? "Loading"}
+      style={{ width: s, height: s }}
     />
   );
 }
 
-/** Every list's empty state teaches: what will appear here + the action that
- *  creates it (spec 3.2). */
+/** Every empty state teaches: an action-led title, what will appear here, and
+ *  the one action that creates it (plan Section 5.4). */
 export function EmptyState(props: {
   title: string;
   body?: string;
   action?: ReactNode;
+  art?: ReactNode;
 }) {
   return (
-    <div
-      style={{
-        padding: "40px 24px",
-        textAlign: "center",
-        color: "var(--ink-2)",
-        border: "1px dashed var(--border)",
-        borderRadius: "var(--radius-m)",
-      }}
-    >
-      <div style={{ fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>{props.title}</div>
-      {props.body ? <div style={{ fontSize: 13, maxWidth: 420, margin: "0 auto" }}>{props.body}</div> : null}
-      {props.action ? <div style={{ marginTop: 14 }}>{props.action}</div> : null}
+    <div className="empty-state">
+      {props.art ? <div className="empty-state-art">{props.art}</div> : null}
+      <div className="empty-state-title">{props.title}</div>
+      {props.body ? <div className="empty-state-body">{props.body}</div> : null}
+      {props.action ? <div className="empty-state-action">{props.action}</div> : null}
     </div>
   );
 }
 
-/** A single stat, tabular, quiet label under a strong number. */
+/** A single stat: a tabular number at body size beside its label (working screens keep numbers at body size). */
 export function Stat(props: { label: string; value: ReactNode; tone?: "ok" | "warn" | "danger" }) {
-  const color =
-    props.tone === "ok"
-      ? "var(--ok)"
-      : props.tone === "warn"
-        ? "var(--warn)"
-        : props.tone === "danger"
-          ? "var(--danger)"
-          : "var(--ink)";
   return (
-    <div>
-      <div className="num" style={{ fontSize: 22, fontWeight: 600, color }}>
-        {props.value}
-      </div>
-      <div style={{ fontSize: 12, color: "var(--ink-3)" }}>{props.label}</div>
+    <div className={cx("stat", props.tone && "stat-" + props.tone)}>
+      <div className="stat-number num">{props.value}</div>
+      <div className="stat-caption">{props.label}</div>
     </div>
   );
 }
 
 /** Keyboard hint chip (for the command palette affordance). */
 export function Kbd(props: { children: ReactNode }) {
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "1px 6px",
-        fontSize: 11,
-        color: "var(--ink-3)",
-        border: "1px solid var(--border)",
-        borderBottomWidth: 2,
-        borderRadius: 4,
-        background: "var(--surface)",
-      }}
-    >
-      {props.children}
-    </span>
-  );
+  return <span className="kbd">{props.children}</span>;
 }
 
 /** The provenance line: the grounding, stated in words, linking to the data
- *  room. Used on every verdict and rating (spec Sections 0 and 8). */
+ *  room. Used on every verdict and rating. */
 export function Provenance(props: { children: ReactNode; onOpen?: () => void }) {
   return (
-    <div
-      style={{
-        fontSize: 12.5,
-        color: "var(--ink-2)",
-        background: "var(--surface-2)",
-        borderRadius: "var(--radius-s)",
-        padding: "7px 10px",
-        display: "inline-flex",
-        gap: 6,
-        alignItems: "center",
-      }}
-    >
+    <div className="provenance">
       <span>{props.children}</span>
       {props.onOpen ? (
         <a
@@ -421,7 +270,6 @@ export function Provenance(props: { children: ReactNode; onOpen?: () => void }) 
             props.onOpen?.();
           }}
           href="#"
-          style={{ fontWeight: 500 }}
         >
           View the ground
         </a>

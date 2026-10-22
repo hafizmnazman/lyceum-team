@@ -44,7 +44,7 @@ function RevealRail(props: { sim: SignalSimState }) {
         sim.sources.length > 0 ? (
           <div>
             {sim.sources.map((s) => (
-              <div key={s} className="fade-in" style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+              <div key={s} className="fade-in" style={{ fontSize: 13, color: "var(--ink-2)" }}>
                 {s}
               </div>
             ))}
@@ -57,8 +57,8 @@ function RevealRail(props: { sim: SignalSimState }) {
         sim.skills.length > 0 ? (
           <div>
             {sim.skills.map((s, i) => (
-              <div key={s} className="fade-in" style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
-                <span className="num" style={{ color: "var(--ink-3)", marginRight: 6 }}>
+              <div key={s} className="fade-in" style={{ fontSize: 13, color: "var(--ink-2)" }}>
+                <span className="num" style={{ color: "var(--ink-2)", marginRight: 6 }}>
                   {i + 1}
                 </span>
                 {s}
@@ -76,7 +76,7 @@ function RevealRail(props: { sim: SignalSimState }) {
               style={{
                 height: 4,
                 maxWidth: 320,
-                background: "var(--surface-2)",
+                background: "var(--tint-1)",
                 borderRadius: 2,
                 overflow: "hidden",
               }}
@@ -85,12 +85,12 @@ function RevealRail(props: { sim: SignalSimState }) {
                 style={{
                   width: `${Math.round(sim.mapProgress * 100)}%`,
                   height: "100%",
-                  background: "var(--accent)",
+                  background: "var(--emerald)",
                   borderRadius: 2,
                 }}
               />
             </div>
-            <div style={{ fontSize: 12.5, marginTop: 6, color: "var(--ink-2)" }}>
+            <div style={{ fontSize: 13, marginTop: 6, color: "var(--ink-2)" }}>
               Widest gap <span className="num">{sim.gapDisplayed.toFixed(2)}</span>
             </div>
           </div>
@@ -107,7 +107,7 @@ function RevealRail(props: { sim: SignalSimState }) {
           <div key={step.label} style={{ display: "flex", gap: 12, paddingBottom: 18 }}>
             <div style={{ width: 20, display: "flex", justifyContent: "center", paddingTop: 2 }}>
               {done ? (
-                <Check size={15} color="var(--ok)" />
+                <Check size={15} color="var(--emerald-text)" />
               ) : isActive ? (
                 <Spinner size={14} />
               ) : (
@@ -126,9 +126,9 @@ function RevealRail(props: { sim: SignalSimState }) {
             <div style={{ flex: 1 }}>
               <div
                 style={{
-                  fontSize: 13.5,
+                  fontSize: 14,
                   fontWeight: isActive ? 600 : 500,
-                  color: done || isActive ? "var(--ink)" : "var(--ink-3)",
+                  color: done || isActive ? "var(--ink)" : "var(--ink-2)",
                 }}
               >
                 {step.label}
@@ -140,7 +140,7 @@ function RevealRail(props: { sim: SignalSimState }) {
           </div>
         );
       })}
-      <div style={{ fontSize: 12.5, color: "var(--ink-3)" }}>{sim.caption}</div>
+      <div style={{ fontSize: 13, color: "var(--ink-2)" }}>{sim.caption}</div>
     </div>
   );
 }
@@ -148,7 +148,7 @@ function RevealRail(props: { sim: SignalSimState }) {
 /** One thin horizontal bar, filled to a 0..1 value. */
 function GapBar(props: { value: number; color: string }) {
   return (
-    <div style={{ height: 5, background: "var(--surface-2)", borderRadius: 3 }}>
+    <div style={{ height: 5, background: "var(--tint-1)", borderRadius: 3 }}>
       <div
         style={{
           width: `${Math.round(props.value * 100)}%`,
@@ -215,7 +215,7 @@ export function TrendsScreen() {
       ) : (
         <>
           <Card focal style={{ maxWidth: 680 }} data-demo-id="trends-focal">
-            <p style={{ fontSize: 17, margin: 0, maxWidth: 620, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 18, margin: 0, maxWidth: 620, lineHeight: 1.5 }}>
               <span className="num">{subject.id}</span> {subject.title} is drifting from demand.
               The widest gap is <span className="num">{clo.id}</span>, {clo.text.toLowerCase()},
               at{" "}
@@ -232,8 +232,8 @@ export function TrendsScreen() {
                     display: "flex",
                     gap: 12,
                     padding: "0 12px 4px",
-                    fontSize: 11,
-                    color: "var(--ink-3)",
+                    fontSize: 13,
+                    color: "var(--ink-2)",
                   }}
                 >
                   <span style={{ flex: 1 }}>Demand for {topSkill}, by source</span>
@@ -247,8 +247,8 @@ export function TrendsScreen() {
                   return (
                     <Row key={src.id}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 500 }}>{src.name}</div>
-                        <div style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                        <div style={{ fontSize: 14, fontWeight: 500 }}>{src.name}</div>
+                        <div style={{ fontSize: 13, color: "var(--ink-2)" }}>
                           synthetic fixture, example date {src.snapshotDate}
                         </div>
                       </div>
@@ -266,7 +266,7 @@ export function TrendsScreen() {
                               width: 60,
                               textAlign: "right",
                               fontSize: 13,
-                              color: ev.delta12m >= 0 ? "var(--ok)" : "var(--danger)",
+                              color: ev.delta12m >= 0 ? "var(--emerald-text)" : "var(--danger)",
                             }}
                           >
                             {ev.delta12m >= 0 ? "+" : ""}
@@ -274,7 +274,7 @@ export function TrendsScreen() {
                           </span>
                         </>
                       ) : (
-                        <span style={{ fontSize: 12, color: "var(--ink-3)" }}>no signal</span>
+                        <span style={{ fontSize: 13, color: "var(--ink-2)" }}>no signal</span>
                       )}
                     </Row>
                   );
@@ -285,8 +285,8 @@ export function TrendsScreen() {
                     alignItems: "center",
                     gap: 8,
                     marginTop: 10,
-                    fontSize: 12,
-                    color: "var(--ink-3)",
+                    fontSize: 13,
+                    color: "var(--ink-2)",
                   }}
                 >
                   <span>
@@ -308,7 +308,7 @@ export function TrendsScreen() {
                   Route to coordinator
                 </Button>
               ) : (
-                <span style={{ fontSize: 12.5, color: "var(--ink-3)" }}>
+                <span style={{ fontSize: 13, color: "var(--ink-2)" }}>
                   Routing is a management action. You are seeing the same facts, read only.
                 </span>
               )}
@@ -348,12 +348,12 @@ export function TrendsScreen() {
                     <span className="num" style={{ width: 48, fontWeight: 600, fontSize: 13 }}>
                       {r.cloId}
                     </span>
-                    <span style={{ fontSize: 13.5 }}>{r.clo?.text ?? r.cloId}</span>
-                    <span className="num" style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                    <span style={{ fontSize: 14 }}>{r.clo?.text ?? r.cloId}</span>
+                    <span className="num" style={{ fontSize: 13, color: "var(--ink-2)" }}>
                       {r.clo?.subjectId ?? ""}
                     </span>
                     <span style={{ flex: 1 }} />
-                    <span className="num" style={{ fontSize: 12, color: "var(--ink-2)" }}>
+                    <span className="num" style={{ fontSize: 13, color: "var(--ink-2)" }}>
                       gap {r.info.gap.toFixed(2)}
                     </span>
                   </div>
@@ -363,12 +363,12 @@ export function TrendsScreen() {
                       gridTemplateColumns: "64px 1fr 44px",
                       gap: "4px 8px",
                       alignItems: "center",
-                      fontSize: 11,
-                      color: "var(--ink-3)",
+                      fontSize: 13,
+                      color: "var(--ink-2)",
                     }}
                   >
                     <span>demand</span>
-                    <GapBar value={r.info.demand} color="var(--accent)" />
+                    <GapBar value={r.info.demand} color="var(--emerald-text)" />
                     <span className="num" style={{ textAlign: "right" }}>
                       {r.info.demand.toFixed(2)}
                     </span>

@@ -1,0 +1,25 @@
+{
+  "name": "lyceum-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lyceum: the film, two cuts from one Remotion project (plan Section 16)",
+  "license": "UNLICENSED",
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "studio": "node scripts/sync.mjs && remotion studio",
+    "render:loop90": "node scripts/sync.mjs && node scripts/render.mjs Loop90",
+    "render:afternoon": "node scripts/sync.mjs && node scripts/render.mjs Afternoon",
+    "check:determinism": "node scripts/sync.mjs && node scripts/determinism.mjs Loop90",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.537",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.537"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "typescript": "5.9.3"
+  }
+}

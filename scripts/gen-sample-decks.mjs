@@ -1,35 +1,43 @@
-// Generates two sample decks into docs/presentation/ from the saved sample
-// postings, the same way the app does: a meeting brief deck and a teaching
-// pack. Useful to open in PowerPoint before a presentation.
+// Generates the two sample decks into docs/presentation/ the way the app builds
+// them, a meeting brief deck and a teaching pack, from the one dataset every
+// presentation artefact uses (plan Section 15): mcp/sample-workspace.json, the
+// tour's end state on CS310, which the screenshots and the local door read too.
+// On Windows with PowerPoint installed, the teaching pack is then opened in
+// PowerPoint and its slides exported as PNGs (docs/presentation/pack/), so the
+// deck shows the pack as PowerPoint draws it.
 //   node scripts/gen-sample-decks.mjs
-import { readFileSync, writeFileSync } from "node:fs";
-import { PEOPLE_IDS } from "../src/data/seed.ts";
-import {
-  confirmProposals, evidenceReportForCourse, getState, importCollectedPostings, login, prepareEvidenceBrief, resetDemoState, runCollection,
-  saveTeachingSession, scanForRequirements, setSkillLexicon, setSkillMapping, setSourcesReviewed,
-} from "../src/app/store.ts";
-import { filterPostings } from "../src/lib/collect.ts";
+import { spawnSync } from "node:child_process";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { loadWorkspace } from "../mcp/workspace.ts";
+import { SAMPLE_PATH } from "../mcp/sample.ts";
+import { PEOPLE } from "../src/data/seed.ts";
+import { evidenceReport } from "../src/lib/evidence.ts";
 import { briefDeck, deckBuffer, sessionDeck } from "../src/lib/slides.ts";
 
-const sample = JSON.parse(readFileSync(new URL("../public/demo/collected-sample.json", import.meta.url), "utf8"));
-resetDemoState(); login(PEOPLE_IDS.sobri);
-await runCollection("CS310", { provider: "sample", board: "", query: "analyst", inText: false }, async (run) => ({
-  ok: true, postings: filterPostings(sample.postings, run.query), retrievedAt: sample.retrievedAt, cached: false, total: sample.postings.length, label: sample.label,
-}));
-importCollectedPostings("CS310", getState().collectRun.postings.map((p) => p.id));
-setSkillLexicon("CS310", ["SQL", "Python", "dashboards|dashboard", "stakeholders|stakeholder", "statistics|statistical"]);
-scanForRequirements("CS310"); confirmProposals("CS310", getState().scanProposals);
-setSourcesReviewed("CS310", getState().evidenceSources.map((s) => s.id), true);
-setSkillMapping("CS310", { skill: "dashboards", cloIds: ["CLO5"], stage: "introduced", target: "practised", evidence: "Week 6 lab covers charts; no dashboard exercise yet." });
-const brief = prepareEvidenceBrief("CS310", { recommendation: "refresh", notes: "Add a dashboard exercise in week 6 within existing hours; keep the statistics foundation." });
-saveTeachingSession("CS310", { week: 6, topic: "Dashboard lab: from a messy dataset to a decision", minutes: 90, cloIds: ["CLO5"],
-  activity: "In pairs, build a dashboard from the sample dataset and defend one design choice.", learningCheck: "Exit question: which chart here would mislead a stakeholder, and why?",
-  resources: "Course notes chapter 6; the postings quoted in this pack.", status: "ready" });
-const s = getState(), subject = s.subjects.find((x) => x.id === "CS310"), clos = s.clos.filter((c) => c.subjectId === "CS310"), at = new Date().toISOString();
-const report = evidenceReportForCourse("CS310");
-const briefSpec = briefDeck(subject, s.evidenceBriefs.find((x) => x.id === brief.briefId), report, s.evidenceSources, s.skillMentions, clos, s.people, at);
-const packSpec = sessionDeck(subject, s.teachingPlans.find((p) => p.subjectId === "CS310").sessions[0], clos, report, s.skillMentions, s.evidenceSources, s.people, at);
-const out = new URL("../docs/presentation/", import.meta.url);
-writeFileSync(new URL("sample-" + briefSpec.fileName, out), await deckBuffer(briefSpec));
-writeFileSync(new URL("sample-" + packSpec.fileName, out), await deckBuffer(packSpec));
+const OUT = new URL("../docs/presentation/", import.meta.url);
+const loaded = loadWorkspace(SAMPLE_PATH);
+if (!loaded.ok) throw new Error(loaded.error);
+const { backup } = loaded, d = backup.data, at = backup.exportedAt; // the export time, so a rerun writes the same slides
+const subject = d.subjects.find((s) => s.id === "CS310"), clos = d.clos.filter((c) => c.subjectId === "CS310");
+const report = evidenceReport("CS310", d.evidenceSources, d.skillMentions, d.skillMappings, clos);
+const brief = d.evidenceBriefs.filter((b) => b.subjectId === "CS310").at(-1);
+const session = d.teachingPlans.find((p) => p.subjectId === "CS310").sessions[0];
+const briefSpec = briefDeck(subject, brief, report, d.evidenceSources, d.skillMentions, clos, PEOPLE, at);
+const packSpec = sessionDeck(subject, session, clos, report, d.skillMentions, d.evidenceSources, PEOPLE, at);
+writeFileSync(new URL("sample-" + briefSpec.fileName, OUT), await deckBuffer(briefSpec));
+writeFileSync(new URL("sample-" + packSpec.fileName, OUT), await deckBuffer(packSpec));
 console.log("wrote sample-" + briefSpec.fileName + " (" + briefSpec.slides.length + " slides) and sample-" + packSpec.fileName + " (" + packSpec.slides.length + " slides)");
+
+// The pack as PowerPoint draws it.
+const powerpoint = ["C:/Program Files/Microsoft Office/root/Office16/POWERPNT.EXE", "C:/Program Files (x86)/Microsoft Office/root/Office16/POWERPNT.EXE"].some(existsSync);
+if (process.platform === "win32" && powerpoint) {
+  const dir = join("docs", "presentation", "pack");
+  rmSync(dir, { recursive: true, force: true });
+  const run = spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/render-pptx.ps1", "-In", join("docs", "presentation", "sample-" + packSpec.fileName), "-Out", dir, "-Width", "1920"],
+    { encoding: "utf8", timeout: 120000 });
+  if (run.status !== 0) throw new Error("PowerPoint could not render the pack: " + (run.stderr || run.stdout).slice(0, 400));
+  const read = JSON.parse(run.stdout);
+  if (read.slides !== packSpec.slides.length) throw new Error("PowerPoint read " + read.slides + " slides; the pack has " + packSpec.slides.length + ".");
+  console.log("PowerPoint opened the pack: " + read.slides + " slides, each with its notes; exported to " + dir);
+} else console.log("PowerPoint is not installed here, so the pack's slides were not exported; the deck keeps the last export.");

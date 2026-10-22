@@ -1,9 +1,13 @@
-// The Inbox: home for every role (spec 6.1). Opens on the one thing that needs
-// this person now; everything else is a quiet list below. The calm empty state
-// is the honest resting state of a working system.
+// Home for every role (plan Section 5.3): one visual, the ring for the course in
+// view with the next step lit, and one action, "Continue". The work queue, the
+// notifications and the courses sit behind disclosures that open by themselves
+// when something is waiting. A brief opened here carries its receipts and, for
+// a recipient who decides, the four decisions with a required note.
 
+import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
-import { can, subjectsForPerson } from "../../app/roles.ts";
+import { subjectsForPerson } from "../../app/roles.ts";
+import { loopState, stepDef } from "../../app/loop.ts";
 import { planSummary } from "../../lib/teachingPlan.ts";
 import { RECOMMENDATION_LABEL } from "../../lib/evidence.ts";
 import { downloadText } from "../../lib/download.ts";
@@ -11,17 +15,19 @@ import type { Notification } from "../../types.ts";
 import {
   currentPerson,
   inboxFor,
-  openNotification,
-  personWithHat,
+  mayDecide,
   navigate,
+  openNotification,
+  openStep,
+  personWithHat,
   selectBrief,
-  selectSubject,
   selectProposal,
-  selectStudioTab,
   useStore,
 } from "../../app/store.ts";
-import { Button, Card, Page, PageHead, Row, Tag } from "../primitives/index.tsx";
-import { JourneyCard } from "../primitives/Journey.tsx";
+import { Button, Card, Disclosure, Page, PageHead, Row, Tag } from "../primitives/index.tsx";
+import { RingPanel } from "../primitives/loop.tsx";
+import { Mascot, useCourseMoods } from "../mascots/index.tsx";
+import { BriefDecisionPanel } from "./Decide.tsx";
 
 const KIND_LABEL: Record<Notification["kind"], string> = {
   "ping-update": "Update requested",
@@ -31,6 +37,7 @@ const KIND_LABEL: Record<Notification["kind"], string> = {
   approved: "Change approved",
   rejected: "Change rejected",
   "evidence-brief": "Evidence brief",
+  "brief-decision": "Decision on your brief",
 };
 
 const KIND_TONE: Record<Notification["kind"], "accent" | "warn" | "ok" | "danger"> = {
@@ -41,6 +48,7 @@ const KIND_TONE: Record<Notification["kind"], "accent" | "warn" | "ok" | "danger
   approved: "ok",
   rejected: "danger",
   "evidence-brief": "accent",
+  "brief-decision": "ok",
 };
 
 export function InboxScreen() {
@@ -53,13 +61,9 @@ export function InboxScreen() {
   const rest = items.filter((n) => n.id !== top?.id);
   const ownIds = subjectsForPerson(person.id, state.assignments);
   const ownCourses = state.subjects.filter((s) => ownIds.includes(s.id));
-  const work = state.proposals.filter((p) => {
-    if (person.orgRole === "management") return p.status === "management-approval";
-    if (!ownIds.includes(p.subjectId)) return false;
-    return ((p.status === "drafting" || p.status === "testing") && p.authorId === person.id)
-      || (p.status === "coordinator-review" && can(person, "review-draft", { subjectId: p.subjectId, assignments: state.assignments }));
-  });
   const recentCourse = [...ownCourses].sort((a, b) => {
+    if (a.id === state.selectedSubjectId) return -1;
+    if (b.id === state.selectedSubjectId) return 1;
     const aDate = state.teachingPlans.find((p) => p.subjectId === a.id)?.updatedAt ?? "";
     const bDate = state.teachingPlans.find((p) => p.subjectId === b.id)?.updatedAt ?? "";
     return bDate.localeCompare(aDate);
@@ -67,9 +71,16 @@ export function InboxScreen() {
   const recentPlan = recentCourse && state.teachingPlans.find((p) => p.subjectId === recentCourse.id);
   const nextSession = recentPlan && planSummary(recentPlan, state.clos.filter((c) => c.subjectId === recentCourse?.id)).next;
   const brief = state.evidenceBriefs.find((b) => b.id === state.selectedBriefId && (b.createdBy === person.id || b.recipients.includes(person.id)));
-  function openCourse(subjectId: string, tab: "overview" | "plan" | "content" = "overview") {
-    selectSubject(subjectId); selectStudioTab(tab); navigate("studio");
-  }
+  // Briefs waiting for this person: received with the capability to decide and no decision of theirs yet,
+  // or prepared by them and still waiting for a second person.
+  const waiting = state.evidenceBriefs.filter((b) => {
+    const latest = loopState(state, b.subjectId).latestBrief;
+    if (latest?.id !== b.id) return false;
+    const mine = state.briefDecisions.some((d) => d.briefId === b.id && d.byPersonId === person.id);
+    if (b.recipients.includes(person.id)) return mayDecide(b.subjectId, person) && !mine;
+    return b.createdBy === person.id && Boolean(b.sentAt) && !state.briefDecisions.some((d) => d.briefId === b.id && d.byPersonId !== person.id);
+  });
+  const legacy = person.orgRole === "management" ? state.proposals.filter((p) => p.status === "management-approval") : [];
 
   return (
     <Page wide>
@@ -86,85 +97,72 @@ export function InboxScreen() {
       {brief ? <section className="workspace-panel" data-demo-id="inbox-brief" aria-labelledby="inbox-brief-title">
         <div className="section-heading"><div><h2 id="inbox-brief-title">Evidence brief: {brief.subjectId}</h2>
           <p className="muted">{RECOMMENDATION_LABEL[brief.recommendation]} · prepared {brief.createdAt} by {state.people.find((p) => p.id === brief.createdBy)?.name ?? brief.createdBy}. Receipts are attached; the decision remains with people.</p></div>
-          <div className="button-row"><Button onClick={() => downloadText(brief.subjectId + "-meeting-brief.md", brief.markdown)}>Download (.md)</Button><Button onClick={() => selectBrief(null)}>Close</Button></div></div>
+          <div className="button-row"><Button onClick={() => downloadText(brief.subjectId + "-meeting-brief.md", brief.markdown)}>Download (.md)</Button><Button onClick={() => openStep(brief.subjectId, "decide")}>Open Decide</Button><Button onClick={() => selectBrief(null)}>Close</Button></div></div>
         {brief.notes ? <p className="preserve-lines">{brief.notes}</p> : null}
-        <pre className="brief-body">{brief.markdown}</pre>
+        <details><summary>Read the full brief with its receipts</summary><pre className="brief-body">{brief.markdown}</pre></details>
+        <BriefDecisionPanel brief={brief} subjectId={brief.subjectId} compact />
       </section> : null}
-      {person.orgRole === "academic" ? <JourneyCard state={state} subjectId={recentCourse?.id ?? null} /> : null}
-      <div className="home-columns">
-        <section className="workspace-panel home-focus" aria-labelledby="resume-heading">
-          <span className="eyebrow">{recentPlan ? "Continue preparation" : person.orgRole === "academic" ? "Your teaching workspace" : "Your review workspace"}</span>
-          <h2 id="resume-heading">{recentCourse ? recentCourse.id + " · " + recentCourse.title : person.orgRole === "management" ? "Review proposed curriculum changes" : person.orgRole === "department" ? "Coordinate the programme" : "Start with an assigned course"}</h2>
-          <p>{nextSession ? "Week " + nextSession.week + ": " + nextSession.topic + ". Continue preparing the activity, learning check and materials." : recentCourse ? "Check the current outcomes, prepare your next class and keep formal curriculum changes in a separate proposal." : person.orgRole === "management" ? "Read the proposal, its review history and the limitations of its scenario report before recording a decision." : person.orgRole === "department" ? "Review course coverage, create proposed subjects and assign lecturer or coordinator responsibilities." : "The department can assign a course so you can start planning teaching sessions."}</p>
-          <div className="button-row">{recentCourse ? <><Button variant="primary" onClick={() => openCourse(recentCourse.id, recentPlan ? "plan" : "overview")} data-demo-id="home-resume">{recentPlan ? "Continue teaching plan" : "Open course workspace"} <ArrowRight size={15} /></Button><Button onClick={() => navigate("courses")}>All my courses</Button></> : <Button variant="primary" onClick={() => navigate(person.orgRole === "management" ? "approval" : person.orgRole === "department" ? "programme" : "guide")}>{person.orgRole === "management" ? "Open approvals" : person.orgRole === "department" ? "Open programme" : "Read the guide"}</Button>}</div>
-          <p className="muted">{recentPlan ? recentPlan.sessions.length + " saved sessions · " + (recentPlan.term || "Teaching term not set") : "Preparation is stored in this browser. Export a teaching plan to keep a portable copy."}</p>
-        </section>
-        <section className="workspace-panel" aria-labelledby="work-queue">
-          <div className="section-heading"><h2 id="work-queue">Your work queue</h2><Tag>{work.length} {work.length === 1 ? "item" : "items"}</Tag></div>
-          {work.length ? <ul className="work-list">{work.map((p) => <li key={p.id}><div><strong>{p.subjectId}</strong><span>{p.status === "coordinator-review" ? "Lecturer draft needs your review" : p.status === "management-approval" ? "Proposal awaits your decision" : p.status === "testing" ? "Reviewed proposal ready for a scenario run" : "Curriculum draft in progress"}</span></div><Button aria-label={"Open proposal for " + p.subjectId} onClick={() => { selectProposal(p.id); if (person.orgRole === "management") navigate("approval"); else openCourse(p.subjectId, "content"); }}>Open</Button></li>)}</ul> : <p>No proposal currently needs your action. You can still prepare teaching sessions, inspect course materials or read the section guide.</p>}
-        </section>
-      </div>
 
-      {ownCourses.length ? <section aria-labelledby="home-courses"><div className="section-heading"><h2 id="home-courses">Your courses at a glance</h2><Button variant="quiet" onClick={() => navigate("courses")}>Browse courses <ArrowRight size={15} /></Button></div><div className="course-grid">{ownCourses.map((course) => {
-        const summary = planSummary(state.teachingPlans.find((p) => p.subjectId === course.id), state.clos.filter((c) => c.subjectId === course.id));
-        return <article className="workspace-panel" key={course.id}><span className="eyebrow">{course.id} · Year {course.year}, semester {course.semester}</span><h3>{course.title}</h3><p className="muted">{summary.sessions.length} teaching sessions · {summary.ready} ready · {summary.delivered} delivered</p><p>{summary.unmapped.length ? "Outcomes without a planned session: " + summary.unmapped.map((c) => c.id).join(", ") : summary.sessions.length ? "Review the activities and learning checks in your plan." : "Start a plan for your next class."}</p><Button onClick={() => openCourse(course.id)}>Open {course.id}</Button></article>;
-      })}</div></section> : null}
+      {person.orgRole === "academic" && recentCourse ? <StartHere subjectId={recentCourse.id}
+        resume={<Button onClick={() => openStep(recentCourse.id, recentPlan ? "teach" : "course")} data-demo-id="home-resume">{recentPlan ? "Continue teaching plan" : "Open course workspace"}</Button>}
+        resumeNote={nextSession ? "Next class: week " + nextSession.week + ", " + nextSession.topic + "." : recentPlan ? recentPlan.sessions.length + " saved sessions · " + (recentPlan.term || "teaching term not set") : undefined} />
+        : <section className="workspace-panel home-focus" aria-labelledby="resume-heading">
+          <span className="eyebrow">{person.orgRole === "academic" ? "Your teaching workspace" : "Your review workspace"}</span>
+          <h2 id="resume-heading">{person.orgRole === "management" ? "The illustrative approval sandbox" : person.orgRole === "department" ? "Decide on the briefs your colleagues send" : "Start with an assigned course"}</h2>
+          <p>{person.orgRole === "management" ? "The approval chain is kept in the research sandbox and labelled illustrative. Course decisions are recorded in each course's Decide step." : person.orgRole === "department" ? "As programme owner you record decisions on the briefs lecturers send, and assign positions." : "The department can assign a course so you can start planning teaching sessions."}</p>
+          <div className="button-row"><Button variant="primary" onClick={() => navigate(person.orgRole === "management" ? "approval" : person.orgRole === "department" ? "programme" : "guide")}>{person.orgRole === "management" ? "Open the approvals sandbox" : person.orgRole === "department" ? "Open programme" : "Read the guide"}</Button></div>
+        </section>}
 
-      <div className="section-heading"><h2>Notifications</h2><span className="muted">{unread.length} unread</span></div>
+      <section className="home-queues" aria-label="Your work">
+        <Disclosure summary="Briefs waiting for a decision" count={waiting.length + (waiting.length === 1 ? " brief" : " briefs")} defaultOpen={waiting.length > 0} data-demo-id="home-briefs">
+          {waiting.length ? <ul className="work-list">{waiting.map((b) => <li key={b.id}><div><strong>{b.subjectId}</strong><span>{b.recipients.includes(person.id) ? "From " + (state.people.find((p) => p.id === b.createdBy)?.name ?? b.createdBy) + ": " + RECOMMENDATION_LABEL[b.recommendation] : "Your brief: waiting for a second person's decision"}</span></div><Button aria-label={"Open the brief for " + b.subjectId} data-demo-id={"waiting-" + b.id} onClick={() => { if (b.recipients.includes(person.id)) selectBrief(b.id); else openStep(b.subjectId, "decide"); }}>Open</Button></li>)}</ul>
+            : <p>No brief is waiting for you. Briefs a colleague sends you, and your own briefs waiting for a second person, appear here.</p>}
+          {legacy.length ? <><h3>Illustrative sandbox</h3><ul className="work-list">{legacy.map((p) => <li key={p.id}><div><strong>{p.subjectId}</strong><span>Proposal awaits the sandbox approval</span></div><Button aria-label={"Open proposal for " + p.subjectId} onClick={() => { selectProposal(p.id); navigate("approval"); }}>Open</Button></li>)}</ul></> : null}
+        </Disclosure>
 
-      {top ? (
-        <Card focal data-demo-id="inbox-top">
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <Tag tone={KIND_TONE[top.kind]}>{KIND_LABEL[top.kind]}</Tag>
-            {top.subjectId ? <span className="num" style={{ fontSize: 13, color: "var(--ink-2)" }}>{top.subjectId}</span> : null}
-          </div>
-          {top.agentFindings ? (
-            <p style={{ margin: "0 0 14px", fontSize: 14, maxWidth: 620 }}>{top.agentFindings}</p>
+        <Disclosure summary="Notifications" count={unread.length + " unread"} defaultOpen={unread.length > 0} data-demo-id="home-notifications">
+          {top ? (
+            <Card focal data-demo-id="inbox-top">
+              <div className="button-row" style={{ marginBottom: 8 }}>
+                <Tag tone={KIND_TONE[top.kind]}>{KIND_LABEL[top.kind]}</Tag>
+                {top.subjectId ? <span className="num muted">{top.subjectId}</span> : null}
+              </div>
+              {top.agentFindings ? <p style={{ margin: "0 0 14px", maxWidth: 620 }}>{top.agentFindings}</p> : null}
+              <div className="button-row">
+                <Button variant="primary" data-demo-id="inbox-open-top" onClick={() => openNotification(top.id)}>
+                  {top.kind === "evidence-brief" ? "Read brief" : top.kind === "brief-decision" ? "Open Decide" : "Open " + (top.subjectId ?? "it")} <ArrowRight size={15} />
+                </Button>
+                {sender(top) ? <span className="muted">{sender(top)}</span> : null}
+              </div>
+            </Card>
+          ) : (
+            <p className="muted">No unread notifications. Briefs, decisions on your briefs and sandbox results appear here when someone completes a step.</p>
+          )}
+          {rest.length > 0 ? (
+            <div style={{ marginTop: 16 }}>
+              {rest.map((n) => (
+                <Row key={n.id} onClick={() => openNotification(n.id)} data-demo-id={`inbox-${n.id}`}>
+                  <Tag tone={KIND_TONE[n.kind]}>{KIND_LABEL[n.kind]}</Tag>
+                  <span className="num muted" style={{ width: 56 }}>{n.subjectId ?? ""}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: n.read ? "var(--ink-2)" : "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {n.agentFindings ?? KIND_LABEL[n.kind]}
+                  </span>
+                  {!n.read ? <span className="tag tag-accent">Unread</span> : null}
+                </Row>
+              ))}
+            </div>
           ) : null}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Button
-              variant="primary"
-              data-demo-id="inbox-open-top"
-              onClick={() => openNotification(top.id)}
-            >
-              {top.kind === "evidence-brief" ? "Read brief" : "Open " + (top.subjectId ?? "it")} <ArrowRight size={15} />
-            </Button>
-            {sender(top) ? (
-              <span style={{ fontSize: 12.5, color: "var(--ink-3)" }}>{sender(top)}</span>
-            ) : null}
-          </div>
-        </Card>
-      ) : (
-        <p className="muted">No unread notifications. Update requests, reviews and scenario results appear here when someone completes a workflow step.</p>
-      )}
+        </Disclosure>
 
-      {rest.length > 0 ? (
-        <div style={{ marginTop: 28 }}>
-          {rest.map((n) => (
-            <Row key={n.id} onClick={() => openNotification(n.id)} data-demo-id={`inbox-${n.id}`}>
-              <Tag tone={KIND_TONE[n.kind]}>{KIND_LABEL[n.kind]}</Tag>
-              <span className="num" style={{ fontSize: 13, color: "var(--ink-2)", width: 56 }}>
-                {n.subjectId ?? ""}
-              </span>
-              <span
-                style={{
-                  flex: 1,
-                  fontSize: 13,
-                  color: n.read ? "var(--ink-3)" : "var(--ink)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {n.agentFindings ?? KIND_LABEL[n.kind]}
-              </span>
-              {!n.read ? (
-                <span aria-label="Unread" style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)" }} />
-              ) : null}
-            </Row>
-          ))}
-        </div>
-      ) : null}
+        {ownCourses.length ? <Disclosure summary="Your courses at a glance" count={ownCourses.length} data-demo-id="home-courses">
+          <div className="course-grid">{ownCourses.map((course) => {
+            const summary = planSummary(state.teachingPlans.find((p) => p.subjectId === course.id), state.clos.filter((c) => c.subjectId === course.id));
+            const loop = loopState(state, course.id);
+            return <article className="workspace-panel" key={course.id}><span className="eyebrow">{course.id} · Year {course.year}, semester {course.semester}</span><h3>{course.title}</h3><p className="muted">{loop.summary}</p><p className="muted">{summary.sessions.length} teaching sessions · {summary.ready} ready · {summary.delivered} delivered</p><Button onClick={() => openStep(course.id, loop.next ?? "course")}>Open {course.id}</Button></article>;
+          })}</div>
+          <Button variant="quiet" onClick={() => navigate("courses")}>Browse courses <ArrowRight size={15} /></Button>
+        </Disclosure> : null}
+      </section>
     </Page>
   );
 
@@ -175,10 +173,26 @@ export function InboxScreen() {
       return coord && coord.id === person!.id ? "From the subject's lecturer." : "From the coordinator.";
     }
     if (n.kind === "test-done") return "From the Cohort agent.";
-    if (n.kind === "evidence-brief" && n.briefId) {
+    if ((n.kind === "evidence-brief" || n.kind === "brief-decision") && n.briefId) {
       const author = state.evidenceBriefs.find((b) => b.id === n.briefId)?.createdBy;
-      return author ? "From " + (state.people.find((p) => p.id === author)?.name ?? author) + ", with receipts." : null;
+      return n.kind === "brief-decision" ? "On your brief, recorded as data." : author ? "From " + (state.people.find((p) => p.id === author)?.name ?? author) + ", with receipts." : null;
     }
     return null;
   }
+}
+
+/** Start here (plan Section 5.3): the host, the ring with the next step lit, and one action. */
+function StartHere({ subjectId, resume, resumeNote }: { subjectId: string; resume?: ReactNode; resumeNote?: string }) {
+  const state = useStore();
+  const loop = loopState(state, subjectId);
+  const moods = useCourseMoods(subjectId);
+  return <section className="workspace-panel start-here" aria-labelledby="start-here-title" data-demo-id="journey-card">
+    <div className="start-here-host">{moods ? <Mascot who="host" mood={moods.host} size={88} /> : null}</div>
+    <div className="start-here-body">
+      <div className="section-heading"><div><span className="eyebrow">Start here · {subjectId}</span><h2 id="start-here-title">{loop.closed ? "The loop is closed for this term" : "Continue the loop on " + subjectId}</h2></div>
+        {loop.next ? <Button variant="primary" data-demo-id="journey-next" onClick={() => openStep(subjectId, loop.next!)}>Continue: {stepDef(loop.next).label} <ArrowRight size={15} /></Button> : null}</div>
+      <RingPanel loop={loop} onStep={(step) => openStep(subjectId, step)} />
+      {resume ? <div className="start-here-resume button-row">{resume}{resumeNote ? <span className="muted">{resumeNote}</span> : null}</div> : null}
+    </div>
+  </section>;
 }

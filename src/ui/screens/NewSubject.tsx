@@ -171,10 +171,10 @@ export function NewSubjectScreen() {
         <div
           style={{
             marginTop: 20,
-            background: "var(--surface-2)",
-            borderRadius: "var(--radius-m)",
+            background: "var(--tint-1)",
+            borderRadius: "var(--radius-card)",
             padding: "12px 14px",
-            fontSize: 12.5,
+            fontSize: 13,
             color: "var(--ink-2)",
           }}
         >

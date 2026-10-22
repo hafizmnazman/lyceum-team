@@ -30,7 +30,7 @@ function fmtDate(iso: string): string {
 /** A thin horizontal bar for the predicted-vs-actual comparison. */
 function Bar(props: { value: number; color: string }) {
   return (
-    <div style={{ flex: 1, height: 5, background: "var(--surface-2)", borderRadius: 3, overflow: "hidden" }}>
+    <div style={{ flex: 1, height: 5, background: "var(--tint-1)", borderRadius: 3, overflow: "hidden" }}>
       <div
         style={{
           width: `${Math.max(0, Math.min(1, props.value)) * 100}%`,
@@ -94,7 +94,7 @@ export function BacktestScreen() {
                 ) : (
                   <Tag>open, awaiting next term's results</Tag>
                 )}
-                <span className="num" style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-3)" }}>
+                <span className="num" style={{ marginLeft: "auto", fontSize: 13, color: "var(--ink-2)" }}>
                   {fmtDate(p.madeAt)}
                 </span>
               </Row>
@@ -109,7 +109,7 @@ export function BacktestScreen() {
       </div>
 
       <SectionLabel style={{ marginTop: 40 }}>Synthetic backtest example</SectionLabel>
-      <p style={{ margin: "0 0 14px", fontSize: 13.5, color: "var(--ink-2)", maxWidth: 560 }}>
+      <p style={{ margin: "0 0 14px", fontSize: 14, color: "var(--ink-2)", maxWidth: 560 }}>
         A reproducible calculation on a generated example cohort, not empirical validation:{" "}
         <span className="num">{backtest.n}</span> learners from intake{" "}
         <span className="num">{HISTORICAL_BACKTEST.intake}</span>, predicted from their before-ratings
@@ -146,21 +146,21 @@ export function BacktestScreen() {
                   {pt.cloId}
                 </span>
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
-                  <Bar value={pt.predicted} color="var(--accent)" />
-                  <Bar value={pt.actual} color="var(--ok)" />
+                  <Bar value={pt.predicted} color="var(--emerald-text)" />
+                  <Bar value={pt.actual} color="var(--emerald-text)" />
                 </div>
-                <span className="num" style={{ width: 130, fontSize: 12, color: "var(--ink-2)", textAlign: "right" }}>
+                <span className="num" style={{ width: 130, fontSize: 13, color: "var(--ink-2)", textAlign: "right" }}>
                   {pt.predicted.toFixed(3)} vs {pt.actual.toFixed(3)}
                 </span>
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 14, fontSize: 11.5, color: "var(--ink-3)", marginTop: 6 }}>
+          <div style={{ display: "flex", gap: 14, fontSize: 13, color: "var(--ink-2)", marginTop: 6 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 10, height: 5, borderRadius: 3, background: "var(--accent)" }} /> predicted
+              <span style={{ width: 10, height: 5, borderRadius: 3, background: "var(--emerald)" }} /> predicted
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 10, height: 5, borderRadius: 3, background: "var(--ok)" }} /> actual
+              <span style={{ width: 10, height: 5, borderRadius: 3, background: "var(--emerald)" }} /> actual
             </span>
           </div>
 
@@ -177,7 +177,7 @@ export function BacktestScreen() {
         </div>
       )}
 
-      <p style={{ marginTop: 28, fontSize: 13, color: "var(--ink-3)", maxWidth: 560 }}>
+      <p style={{ marginTop: 28, fontSize: 13, color: "var(--ink-2)", maxWidth: 560 }}>
         Every approval above will be scored the same way. The system grades its own homework.
       </p>
     </Page>

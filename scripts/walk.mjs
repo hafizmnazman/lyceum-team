@@ -1,6 +1,7 @@
-// Headless integration walk: open the built app, sign in, visit every screen,
-// exercise the real upload pipeline on a sample file, and fail on any page
-// error. Screenshots land in docs/screenshots. Run `npm run build` first, then
+// Headless integration walk: open the built app, sign in, visit every screen
+// and every step of the course loop through its path, exercise the real upload
+// pipeline on a sample file from Learn, and fail on any page error. Screenshots
+// land in docs/screenshots. Run `npm run build` first, then
 // `node scripts/walk.mjs` (it serves dist/ itself).
 //
 // Uses the system Chrome/Edge via puppeteer-core (no Chromium download).
@@ -87,7 +88,7 @@ try {
   await click("view-index");
   await sleep(400);
   await shot("02-index-public");
-  check("public index renders", (await page.$$('[data-demo-id="claim-programme"], .page-title')).length > 0);
+  check("public landing renders", await page.evaluate(() => document.body.innerText.includes("Course decisions, with receipts")));
   await page.evaluate(() => (window.location.hash = "#/login"));
   await sleep(300);
 
@@ -96,9 +97,12 @@ try {
   await sleep(400);
   await shot("03-inbox");
 
-  // Visit every screen in his nav plus shared ones.
-  const screens = ["courses", "studio", "acceptance", "trends", "backtest", "dataroom", "office", "index", "upload", "inbox"];
+  // Visit every screen in his navigation plus the shared ones (the sandbox in its fold), then every
+  // step of the loop through its path, entered from the sidebar's selected course chip.
+  const screens = ["courses", "acceptance", "trends", "backtest", "dataroom", "office", "evaluation", "index", "inbox"];
+  const sandbox = new Set(["acceptance", "trends", "backtest", "dataroom", "index"]);
   for (const s of screens) {
+    if (sandbox.has(s) && !(await page.$eval(".nav-fold", (fold) => fold.open))) await click("nav-sandbox");
     const selector = `[data-demo-id="nav-${s}"]`;
     const el = await page.$(selector);
     if (!el) {
@@ -108,12 +112,21 @@ try {
     await el.click();
     await sleep(s === "trends" ? 1200 : 450);
     await shot(`10-${s}`);
-    check(`screen ${s} renders`, true);
+    check(`screen ${s} renders`, await page.evaluate((target) => window.__lyceum.getState().screen === target, s));
+  }
+  const steps = { course: "studio", watch: "watch", report: "report", decide: "decide", update: "studio", teach: "studio", learn: "learn", history: "studio" };
+  await click(await page.$eval('.course-chip[aria-pressed="true"]', (chip) => chip.dataset.demoId));
+  for (const [step, screen] of Object.entries(steps)) {
+    await click("rail-" + step);
+    await sleep(450);
+    await shot(`11-${step}`);
+    const hash = await page.evaluate(() => location.hash);
+    check(`loop step ${step} renders at its address`, await page.evaluate((target) => window.__lyceum.getState().screen === target, screen) && (step === "course" ? /^#\/course\/[^/]+$/.test(hash) : hash.includes("/" + step)), hash);
   }
 
-  // The real upload pipeline on a sample file (xlsx parses in-browser here,
-  // since there is no api server: the fallback path under test).
-  await click("nav-upload");
+  // The real upload pipeline on a sample file, from Learn (xlsx parses in-browser
+  // here, since there is no api server: the fallback path under test).
+  await click("rail-learn");
   await sleep(300);
   await click("sample-results");
   await page.waitForSelector('[data-demo-id="upload-confirm"]', { timeout: 15000 });

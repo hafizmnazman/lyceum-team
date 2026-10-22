@@ -111,9 +111,9 @@ export function ProgrammeScreen() {
                   <span style={{ fontWeight: 500 }}>{s.title}</span>
                   {bandTag(bandOf(s))}
                 </div>
-                <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginTop: 2 }}>{detail}</div>
+                <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>{detail}</div>
               </div>
-              <ChevronRight size={15} color="var(--ink-3)" />
+              <ChevronRight size={15} color="var(--ink-2)" />
             </Row>
           );
         })
@@ -154,7 +154,7 @@ export function ProgrammeScreen() {
                         {s.id}
                       </span>
                       <span style={{ flex: 1, minWidth: 0, fontWeight: 500 }}>{s.title}</span>
-                      <span className="num" style={{ fontSize: 12, color: "var(--ink-3)" }}>
+                      <span className="num" style={{ fontSize: 13, color: "var(--ink-2)" }}>
                         Semester {s.semester}
                       </span>
                       {s.status === "proposed" ? <Tag tone="neutral">proposed</Tag> : null}
@@ -163,8 +163,8 @@ export function ProgrammeScreen() {
                         style={{
                           width: 110,
                           textAlign: "right",
-                          fontSize: 12.5,
-                          color: coordinator ? "var(--ink-2)" : "var(--ink-3)",
+                          fontSize: 13,
+                          color: coordinator ? "var(--ink-2)" : "var(--ink-2)",
                         }}
                       >
                         {coordinator?.name ?? "unassigned"}

@@ -49,7 +49,7 @@ export function AssignmentsScreen() {
               <Tag tone={a.hat === "coordinator" ? "accent" : "neutral"}>{a.hat}</Tag>
               <span style={{ flex: 1 }} />
               {person?.verified ? (
-                <ShieldCheck size={15} color="var(--ok)" aria-label="Verified" />
+                <ShieldCheck size={15} color="var(--emerald-text)" aria-label="Verified" />
               ) : (
                 <Tag tone="warn">unverified</Tag>
               )}
