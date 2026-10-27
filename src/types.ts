@@ -40,6 +40,7 @@ export interface Person {
   // their edits carry an "unverified" tag and the approval gate shows it.
   email?: string;
   verified?: boolean;
+  account?: boolean; // a real account signed in on the local API (server/auth.ts), not one of the demo's people
 }
 
 export interface RoleAssignment {

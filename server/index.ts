@@ -20,6 +20,7 @@ import { filterPostings } from "../src/lib/collect.ts";
 import { missingSettings, publicSettings } from "../src/lib/agentSettings.ts";
 import { ENV_PATH, liveDeps, loadAgentSettings, openAiChat, runAgentSearch, TOOLS } from "./agentSearch.ts";
 import { searchWeb } from "./webTools.ts";
+import { AuthStore, authRoutes } from "./auth.ts";
 import { createHash } from "node:crypto";
 import { networkInterfaces } from "node:os";
 
@@ -44,6 +45,13 @@ app.use("/api/*", async (c, next) => {
   await next();
 });
 app.use("/api/*", cors());
+
+// Accounts (email and password, and Google when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set), sessions and each
+// account's workspace (server/auth.ts), in SQLite at data/lyceum.db.
+authRoutes(app, new AuthStore(), {
+  appUrl: process.env.APP_URL || "http://localhost:5173",
+  google: { clientId: process.env.GOOGLE_CLIENT_ID ?? "", clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "" },
+});
 
 app.get("/api/health", (c) =>
   c.json({ ok: true, live: hasKey(), model: hasKey() ? MODEL : null }),

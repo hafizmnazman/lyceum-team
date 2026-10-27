@@ -3,10 +3,12 @@
 // scope. The public landing page (how Lyceum works) is reachable from here
 // without signing in.
 
+import { useEffect, useState } from "react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
+import { authProviders, googleErrorText, signIn, signUp } from "../../app/account.ts";
 import { hatsOn, subjectsForPerson } from "../../app/roles.ts";
-import { login, navigate, useStore } from "../../app/store.ts";
-import { Button } from "../primitives/index.tsx";
+import { enterAccount, login, navigate, useStore } from "../../app/store.ts";
+import { Button, Field, Input } from "../primitives/index.tsx";
 import type { Person } from "../../types.ts";
 
 export function LoginScreen() {
@@ -48,9 +50,12 @@ export function LoginScreen() {
           </p>
         </section>
 
-        {/* role picker */}
+        <div className="signin-column">
+        <AccountPanel />
+
+        {/* the demo's people: the tour, the judge's walk and the tests sign in here */}
         <section className="signin-people card card-focal" aria-labelledby="signin-people-title">
-          <div id="signin-people-title" className="eyebrow">Sign in as</div>
+          <div id="signin-people-title" className="eyebrow">Or explore the demo as</div>
           <div className="people-list">
             {state.people.map((p) => (
               <button key={p.id} type="button" className="person-row" data-demo-id={`login-${p.id}`} onClick={() => login(p.id)}>
@@ -72,9 +77,63 @@ export function LoginScreen() {
               </button>
             ))}
           </div>
-          <p className="muted">Five local personas, no passwords. Start with Dr Sobri for the whole loop.</p>
+          <p className="muted">Five local personas, no passwords, saved in this browser only. Start with Dr Sobri for the whole loop.</p>
         </section>
+        </div>
       </div>
     </div>
   );
 }
+
+/** A real account on the local API: sign in, or create one and go to onboarding. */
+function AccountPanel() {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [google, setGoogle] = useState(false);
+  useEffect(() => {
+    void authProviders().then((r) => setGoogle(r.ok && r.google));
+    // Google's callback comes back with ?auth_error=<reason> when a sign in failed; say why once, then tidy the address.
+    const reason = new URLSearchParams(window.location.search).get("auth_error");
+    if (reason) {
+      setError(googleErrorText(reason));
+      window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+    }
+  }, []);
+  async function submit() {
+    setBusy(true); setError("");
+    const result = mode === "signup" ? await signUp(name, email, password) : await signIn(email, password);
+    const opened = result.ok ? await enterAccount(result.user) : result;
+    setBusy(false);
+    if (!opened.ok) setError(opened.error);
+  }
+  const switchTo = (next: "signin" | "signup") => { setMode(next); setError(""); };
+  return (
+    <section className="signin-account card card-focal" aria-labelledby="signin-account-title">
+      <div className="signin-tabs" role="tablist" aria-label="Your account">
+        <button type="button" role="tab" aria-selected={mode === "signin"} className={mode === "signin" ? "is-active" : ""} onClick={() => switchTo("signin")}>Sign in</button>
+        <button type="button" role="tab" aria-selected={mode === "signup"} className={mode === "signup" ? "is-active" : ""} onClick={() => switchTo("signup")}>Create account</button>
+      </div>
+      <h2 id="signin-account-title" className="sr-only">{mode === "signin" ? "Sign in to your account" : "Create an account"}</h2>
+      <form className="signin-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+        {mode === "signup" ? <Field label="Your name"><Input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></Field> : null}
+        <Field label="Email"><Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={254} /></Field>
+        <Field label="Password" hint={mode === "signup" ? "At least 10 characters." : undefined}>
+          <Input type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={mode === "signup" ? 10 : undefined} maxLength={200} />
+        </Field>
+        {error ? <p role="alert" className="form-error pop-in">{error}</p> : null}
+        <Button type="submit" variant="primary" loading={busy}>{mode === "signin" ? "Sign in" : "Create account"} <ArrowRight size={15} /></Button>
+      </form>
+      {google ? <>
+        <div className="signin-or" aria-hidden="true"><span>or</span></div>
+        {/* a real navigation, not a fetch: Google's pages and its redirect back must load in this window */}
+        <a className="btn btn-outline signin-google" href="/api/auth/google">Continue with Google</a>
+      </> : null}
+      <p className="muted signin-account-note">Accounts and their workspaces are kept by the local API on this computer.</p>
+    </section>
+  );
+}
+

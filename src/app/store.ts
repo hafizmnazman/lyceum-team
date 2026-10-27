@@ -114,6 +114,7 @@ import { DEMO_LINE } from "../data/sample-course/index.ts";
 import { listedStudents, obeReport } from "../lib/attainment.ts";
 import { templateItems } from "../lib/items.ts";
 import { PRIOR_SURVEYS, PRIOR_SURVEY_RESPONSES } from "../data/sample-course/surveys.ts";
+import { loadWorkspace, renameAccount, saveWorkspace, signOut, whoAmI, type AccountUser } from "./account.ts";
 import {
   CANONICAL_PROPOSAL,
   CLOS,
@@ -228,6 +229,7 @@ export interface AppState {
   flashUpload: ResultUpload | null; // last filed upload, for the Upload receipt
   toast: string | null;
   persistenceStatus: "pending" | "saved" | "unavailable";
+  account: { user: AccountUser; version: number } | null; // a signed-in real account: its workspace saves to the server, never to this browser
   collectRun: CollectRun | null; // the current research run, never persisted
   scanProposals: MentionProposal[]; // proposed quotations awaiting the lecturer
   selectedBriefId: string | null;
@@ -308,6 +310,7 @@ function seedState(): AppState {
     flashUpload: null,
     toast: null,
     persistenceStatus: "saved",
+    account: null,
     collectRun: null,
     scanProposals: [],
     selectedBriefId: null,
@@ -386,6 +389,8 @@ export function flushPersistence() {
   if (typeof window === "undefined") return;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
+  // A real account's workspace goes to the server; the demo's browser copy is never touched while one is open.
+  if (state.account) { syncAccountWorkspace(); return; }
   let status: AppState["persistenceStatus"] = "saved";
   try {
     const out: Record<string, unknown> = {};
@@ -689,7 +694,112 @@ export function login(personId: PersonId) {
 }
 export function logout() {
   if (!confirmLeaveEditor()) return;
+  if (state.account) { void signOutAccount(); return; }
   set({ currentPersonId: null, screen: "login", courseStep: null });
+}
+
+// ---------- real accounts (server/auth.ts, app/account.ts) ----------
+/** Change state and tell the screens without scheduling a save: for what the save itself reports back. */
+function setQuiet(patch: Partial<AppState>) {
+  state = { ...state, ...patch };
+  for (const l of listeners) l();
+}
+/** A new account's workspace: this person alone, no course yet, and an institution and programme named in onboarding.
+ *  The demo's courses, people, surveys and sandbox data are left out. */
+function freshWorkspace(me: Person): Partial<AppState> {
+  return {
+    programme: { id: "PRG-" + me.id, title: "My programme", departmentOwnerId: me.id, subjectIds: [] },
+    institution: { ...structuredClone(DEMO_INSTITUTION), name: "My institution", shortName: "Mine", demo: false, showMark: false },
+    assignments: [], subjects: [], clos: [], survey: [], proposals: [], notifications: [], predictions: [], resultUploads: [], dataSources: [],
+    subjectVersions: [], testDrafts: [], teachingPlans: [], courseDefinitions: {}, rubrics: [], curriculumDrafts: [], evidenceSources: [],
+    skillMentions: [], skillMappings: [], evidenceBriefs: [], evidenceSnapshots: [], briefDecisions: [], events: [], surveys: [],
+    surveyResponses: [], obeReports: [], cqiNotes: [], skillLexicon: {}, relevanceRatings: [], idSeq: 1,
+  };
+}
+const accountPerson = (user: AccountUser): Person => ({ id: user.personId, name: user.name, orgRole: "academic", email: user.email, verified: false, account: true });
+/** Open a signed-in account's workspace: the saved one, or a fresh one that starts at onboarding. */
+export function openAccountWorkspace(user: AccountUser, saved: { backup: string; version: number } | null): SaveResult {
+  const me = accountPerson(user);
+  let data: Partial<AppState> = freshWorkspace(me);
+  if (saved) {
+    const parsed = parseWorkspaceBackup(saved.backup, [me.id]);
+    if (!parsed.ok) return parsed;
+    data = structuredClone(parsed.backup.data);
+  }
+  resetAgents();
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  const onboarded = Boolean(saved) && (data.subjects?.length ?? 0) > 0;
+  state = { ...seedState(), ...data, people: [me], account: { user, version: saved?.version ?? 0 }, currentPersonId: me.id,
+    screen: onboarded ? "inbox" : "onboarding", selectedSubjectId: null, selectedProposalId: null, persistenceStatus: "saved", toast: null };
+  for (const l of listeners) l();
+  return { ok: true };
+}
+/** After a sign in or sign up: load the account's saved workspace from the server and open it. */
+export async function enterAccount(user: AccountUser): Promise<SaveResult> {
+  const saved = await loadWorkspace();
+  if (!saved.ok) return saved;
+  return openAccountWorkspace(user, saved.workspace);
+}
+/** On page load: a session cookie from an earlier visit opens that account again; without one the demo stays as it was. */
+export async function restoreAccountSession(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const me = await whoAmI();
+  if (me.ok && me.user && !state.account) await enterAccount(me.user);
+}
+/** Back to the demo workspace kept in this browser, signed out. */
+function closeAccountWorkspace() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  const persisted = loadPersisted();
+  state = { ...seedState(), ...(persisted ?? {}), currentPersonId: null, screen: "login", account: null };
+  for (const l of listeners) l();
+}
+export async function signOutAccount() {
+  flushPersistence();
+  await accountSync;
+  await signOut();
+  closeAccountWorkspace();
+}
+let accountSync: Promise<void> | null = null, accountDirty = false;
+/** Save the open account's workspace over the version it was loaded at. One save at a time; edits made meanwhile go in
+ *  the next. When another window saved first, its copy is loaded here and the person is told. */
+function syncAccountWorkspace() {
+  const account = state.account;
+  if (!account) return;
+  if (accountSync) { accountDirty = true; return; }
+  accountSync = saveWorkspace(serializeWorkspaceBackup(state, nowIso()), account.version).then(async (result) => {
+    if (state.account?.user.id !== account.user.id) return;
+    if (result.ok) setQuiet({ account: { ...state.account, version: result.version }, persistenceStatus: "saved" });
+    else if (result.status === 409) {
+      const latest = await loadWorkspace();
+      if (latest.ok && latest.workspace) {
+        openAccountWorkspace(account.user, latest.workspace);
+        setQuiet({ toast: "This workspace was saved from another window, so its newer copy is open here. Your last change in this window was not kept." });
+      }
+    } else setQuiet({ persistenceStatus: "unavailable", toast: "Not saved: " + result.error });
+  }).finally(() => {
+    accountSync = null;
+    if (accountDirty) { accountDirty = false; syncAccountWorkspace(); }
+  });
+}
+/** Onboarding's first step: the person's name (kept on the account), their institution and their programme. */
+export async function saveOnboardingProfile(input: { name: string; institution: string; programme: string }): Promise<SaveResult> {
+  const account = state.account;
+  if (!account) return { ok: false, error: "Sign in first." };
+  const name = input.name.trim(), institution = input.institution.trim(), programme = input.programme.trim();
+  if (!name || name.length > 100) return { ok: false, error: "Enter your name, up to 100 characters." };
+  if (!institution || institution.length > 200) return { ok: false, error: "Enter your institution's name." };
+  if (!programme || programme.length > 200) return { ok: false, error: "Enter the programme your courses belong to." };
+  if (name !== account.user.name) {
+    const renamed = await renameAccount(name);
+    if (!renamed.ok) return renamed;
+  }
+  const user = { ...account.user, name };
+  const shortName = institution.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).map((w) => w[0]).join("").toUpperCase().slice(0, 10) || institution.slice(0, 10);
+  set((s) => ({ account: { ...account, user }, people: s.people.map((p) => (p.id === user.personId ? { ...p, name } : p)),
+    institution: { ...s.institution, name: institution, shortName }, programme: { ...s.programme, title: programme } }));
+  return { ok: true };
 }
 /** Person switch (the account menu): change who we are, clamp the screen. */
 export function switchUser(personId: PersonId) {
@@ -1878,6 +1988,14 @@ export function setAgentState(agent: AgentId, st: AgentState) {
 /** Reset the mutable world to seed and stop every timer. Used by the account
  *  menu's "Reset workspace" and by the self-driving demo on each Play. */
 export function resetDemoState() {
+  // A real account's reset empties its own workspace and starts onboarding again; it never loads the demo into the account.
+  if (state.account) {
+    const user = state.account.user, version = state.account.version;
+    openAccountWorkspace(user, null);
+    state = { ...state, account: { user, version } };
+    emit();
+    return;
+  }
   if (simTimer) clearInterval(simTimer);
   simTimer = null;
   if (signalTimer) clearInterval(signalTimer);
@@ -2060,10 +2178,10 @@ export function restoreWorkspaceBackup(raw: string, expectedFingerprint: string,
   const parsed = parseWorkspaceBackup(raw, state.people.map(p => p.id));
   if (!parsed.ok) return parsed;
   const recovery = exportWorkspaceBackup();
-  const next: AppState = { ...seedState(), ...structuredClone(parsed.backup.data),
+  const next: AppState = { ...seedState(), ...structuredClone(parsed.backup.data), people: state.people, account: state.account,
     currentPersonId: state.currentPersonId, screen: "guide", persistenceStatus: "saved",
     selectedSubjectId: null, selectedProposalId: null, toast: "Workspace restored. A pre-restore recovery backup is available." };
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !state.account) {
     try {
       localStorage.setItem(RECOVERY_KEY, recovery);
       const persisted = Object.fromEntries(PERSISTED_KEYS.map(k => [k, next[k]]));

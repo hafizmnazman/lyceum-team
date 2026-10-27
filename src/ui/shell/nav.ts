@@ -54,6 +54,7 @@ export const NAV_META: Record<Exclude<Screen, "login">, { label: string; icon: L
   index: { label: "Relevance Index", icon: Globe },
   guide: { label: "Guide & progress", icon: BookMarked },
   settings: { label: "Settings", icon: Settings },
+  onboarding: { label: "Getting started", icon: PlusSquare },
   judge: { label: "For judges", icon: Footprints },
   kiosk: { label: "Kiosk", icon: MonitorPlay },
   recap: { label: "Term recap", icon: ScrollText },

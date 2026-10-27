@@ -1,0 +1,16 @@
+# SearXNG: keyless web search on this computer, for agent web search (Watch > Research run).
+#   Start: npm run search:up      (docker compose up -d searxng)
+#   Stop:  npm run search:down
+# Then in .env: LYCEUM_SEARCH_PROVIDER=searxng and LYCEUM_SEARCH_URL=http://localhost:8080, and Settings > Test the search.
+services:
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: lyceum-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080" # this computer only; nothing else on the network can use it
+    volumes:
+      - ./searxng:/etc/searxng # settings.yml turns on the JSON output Lyceum reads
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-lyceum-local-only-change-me}

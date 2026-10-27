@@ -10,6 +10,11 @@ video/remotion/src/generated/
 video/out/
 video/install.log
 .env
+# Accounts, sessions and workspaces (server/auth.ts).
+data/
+# SearXNG writes its own files next to settings.yml; only settings.yml is ours.
+searxng/*
+!searxng/settings.yml
 .env.*
 !.env.example
 *.local

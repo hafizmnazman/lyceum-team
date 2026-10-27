@@ -56,7 +56,7 @@ export function SettingsScreen() {
         </section>
 
         <section className="workspace-panel" aria-labelledby="settings-search">
-          <div className="section-heading"><div><h2 id="settings-search">Web search</h2><p className="muted">Tavily, Brave, Serper or Google need a key; SearXNG needs its address.</p></div></div>
+          <div className="section-heading"><div><h2 id="settings-search">Web search</h2><p className="muted">Tavily, Brave, Serper or Google need a key from their website. SearXNG needs no key: <code>npm run search:up</code> starts one on this computer with Docker, at http://localhost:8080.</p></div></div>
           <dl className="context-list">
             {row("Provider", ENV.searchProvider, SEARCH_PROVIDERS[s.search.provider].label + " (" + s.search.provider + ")")}
             {SEARCH_PROVIDERS[s.search.provider].needs.includes("apiKey") ? row("API key", ENV.searchKey, s.search.keyHint ? "Set, " + s.search.keyHint : "") : null}

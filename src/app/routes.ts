@@ -9,7 +9,7 @@ import type { AppState } from "./store.ts";
 
 export const HASH_SCREENS: Screen[] = [
   "login", "index", "inbox", "trends", "approval", "programme", "new-subject", "assignments", "courses",
-  "studio", "watch", "report", "decide", "proposal", "acceptance", "upload", "learn", "backtest", "dataroom", "office", "evaluation", "guide", "settings", "judge", "kiosk",
+  "studio", "watch", "report", "decide", "proposal", "acceptance", "upload", "learn", "backtest", "dataroom", "office", "evaluation", "guide", "settings", "onboarding", "judge", "kiosk",
 ];
 
 export interface CourseRoute { subjectId: string; step: CourseStep; reportTab?: ReportTab }

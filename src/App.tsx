@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { navAllows, subjectsForPerson } from "./app/roles.ts";
 import { stepDef } from "./app/loop.ts";
 import { hashFor, parseRoute, type CourseRoute } from "./app/routes.ts";
-import { currentPerson, getState, navigate, openRecap, useStore } from "./app/store.ts";
+import { currentPerson, getState, navigate, openRecap, restoreAccountSession, useStore } from "./app/store.ts";
 import { Shell } from "./ui/shell/Shell.tsx";
 import { SCREENS } from "./ui/screens/index.ts";
 import { DemoOverlay } from "./demo/DemoOverlay.tsx";
@@ -77,6 +77,9 @@ export default function App() {
     };
   }, []);
 
+  // A session cookie from an earlier visit opens that account's workspace again (server/auth.ts).
+  useEffect(() => { void restoreAccountSession(); }, []);
+
   // The student's survey page renders on its own, outside the workspace and without the tour or the walk.
   const [hash, setHash] = useState(() => window.location.hash);
   useEffect(() => { const on = () => setHash(window.location.hash); window.addEventListener("hashchange", on); return () => window.removeEventListener("hashchange", on); }, []);
@@ -98,6 +101,9 @@ export default function App() {
   } else if (state.screen === "login") {
     const Login = SCREENS.login;
     content = <Login />;
+  } else if (state.screen === "onboarding") {
+    // A new account's first steps render bare, like sign in.
+    content = <SCREENS.onboarding />;
   } else if (state.screen === "judge") {
     // The judge's page is the same bare page signed in or out (depth plan Section 9.1).
     content = <JudgeScreen />;
