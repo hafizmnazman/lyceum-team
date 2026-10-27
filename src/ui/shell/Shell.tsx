@@ -34,7 +34,7 @@ import { SectionHelp } from "../primitives/SectionHelp.tsx";
 /** The first screens in the sidebar: where work starts. */
 const MAIN: Screen[] = ["inbox", "courses", "programme", "new-subject", "assignments"];
 /** Screens that explain the product rather than do the work. */
-const EXPLORE: Screen[] = ["office", "evaluation", "guide"];
+const EXPLORE: Screen[] = ["office", "evaluation", "guide", "settings"];
 /** The earlier illustrative screens: synthetic data, kept behind sign-in and labelled. */
 const SANDBOX: Screen[] = ["proposal", "acceptance", "approval", "trends", "backtest", "dataroom", "index"];
 /** Where the prototype-data notice shows: every sandbox screen, the old approval chain included. */

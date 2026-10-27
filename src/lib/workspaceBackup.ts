@@ -88,7 +88,7 @@ const predicates: Record<typeof WORKSPACE_DATA_KEYS[number], Check> = {
     history: array(shape({ at: str, byPersonId: id, action: one("created","saved","checked","adopted","discarded"), note: str, revision: integer })) })),
   evidenceSources: array(shape({ id, subjectId: id, kind: one(...EVIDENCE_KINDS), title: str, organisation: str, url: str, sourceDate: str, text: str,
     textHash: str, duplicateOf: x => x === null || id(x), provenance: one("lecturer-supplied", "collected"),
-    collection: opt(shape({ provider: one("sample", "greenhouse", "lever"), board: str, postingId: str, retrievedAt: str, label: str })), reviewed: boolean, addedBy: id, addedAt: str }), 10000),
+    collection: opt(shape({ provider: one("sample", "greenhouse", "lever", "agent"), board: str, postingId: str, retrievedAt: str, label: str })), reviewed: boolean, addedBy: id, addedAt: str }), 10000),
   skillMentions: array(shape({ id, sourceId: id, subjectId: id, skill: str, excerpt: str, requirement: one(...REQUIREMENT_LEVELS), addedBy: id, addedAt: str })),
   skillMappings: array(shape({ subjectId: id, skill: str, cloIds: strings, stage: one(...COVERAGE_STAGES), target: one(...COVERAGE_STAGES), evidence: str, updatedBy: id, updatedAt: str })),
   evidenceBriefs: array(shape({ id, subjectId: id, createdBy: id, createdAt: str, recommendation: one("keep", "refresh", "revise", "undecided"), notes: str, markdown: str,

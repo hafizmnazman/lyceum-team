@@ -36,9 +36,9 @@ export const SECTION_GUIDES: SectionGuide[] = [
   {
     screen: "watch", title: "Watch", audience: "Assigned lecturers and coordinators",
     purpose: "See what employers are asking for, right now and over time.", status: "Working locally",
-    steps: ["Run a research run against a permitted employer board (Greenhouse or Lever, through the local API) or the dated saved sample. Collection happens only when you ask.", "Keep the postings worth reading. Each keeps its link, publication date, retrieval time and fingerprint; a copy of a kept posting is flagged as a duplicate and not counted twice.", "Paste a document you are permitted to keep, such as an employer letter or an advisory board note, with its exact text.", "Freeze a snapshot of the reviewed evidence at each review and compare a later window with it. A skill is called rising or falling only when the two 95% intervals separate."],
+    steps: ["Run a research run against a permitted employer board (Greenhouse or Lever, through the local API), the dated saved sample, or Agent web search, where a model you choose in Settings searches the web and reads pages for your brief. Collection happens only when you ask.", "Keep the postings worth reading. Each keeps its link, publication date, retrieval time and fingerprint; a copy of a kept posting is flagged as a duplicate and not counted twice.", "Paste a document you are permitted to keep, such as an employer letter or an advisory board note, with its exact text.", "Freeze a snapshot of the reviewed evidence at each review and compare a later window with it. A skill is called rising or falling only when the two 95% intervals separate."],
     output: "Dated sources with their receipts, and frozen snapshots to compare.",
-    limitation: "Two documented board APIs and a dated saved sample only; no other sites, no scheduled refresh and no employer-balanced view. A convenience sample describes the postings kept, not the labour market.",
+    limitation: "Two documented board APIs, a dated saved sample, and agent web search when a model and search key are set; no scheduled refresh and no employer-balanced view. Many job sites block or forbid automated reading. A convenience sample describes the postings kept, not the labour market.",
   },
   {
     screen: "report", title: "Report", audience: "Assigned lecturers and coordinators",
@@ -152,6 +152,13 @@ export const SECTION_GUIDES: SectionGuide[] = [
     steps: ["Browse the catalogue and open a course.", "Inspect its outcome, example evidence and disagreement warning.", "Read the prototype-data notice before citing any figure."],
     output: "An illustrative course-level relevance view.",
     limitation: "Source agreement describes direction only, not reliability or truth. All shipped market records are synthetic; this is not a live labour-market ranking.",
+  },
+  {
+    screen: "settings", title: "Settings", audience: "Whoever runs this copy of Lyceum",
+    purpose: "See which model and web search provider agent web search will use, as set in .env, and test both.", status: "Partial",
+    steps: ["In .env, set LYCEUM_AGENT_PROVIDER (openai, openrouter, gemini, groq, ollama, or custom with LYCEUM_AGENT_BASE_URL), LYCEUM_AGENT_MODEL and LYCEUM_AGENT_API_KEY. The model must support tool calling.", "Set LYCEUM_SEARCH_PROVIDER (tavily, brave, serper, google or searxng) and its key, search engine id or address, and the per-run limits if the defaults do not suit.", "Open Settings to check what the local API read, and test the model (it must call a tool) and the search. Edits to .env apply on the next request."],
+    output: "A read-only view of the agent's settings, with keys shown only as their last four characters.",
+    limitation: "Keys sit unencrypted in .env on this computer. One run at a time. The agent's choices vary by model; every kept posting still needs the lecturer's review, and its text is the page as fetched.",
   },
   {
     screen: "guide", title: "Institution settings", audience: "Everyone reads; a coordinator edits",

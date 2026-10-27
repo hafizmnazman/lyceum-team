@@ -17,6 +17,9 @@ import { parseDocx, parsePptx } from "./parse/office.ts";
 import { hasKey, MODEL, runIntakeLLM, streamAgentLLM } from "./llm.ts";
 import { CollectError, collectBoard } from "./collect.ts";
 import { filterPostings } from "../src/lib/collect.ts";
+import { missingSettings, publicSettings } from "../src/lib/agentSettings.ts";
+import { ENV_PATH, liveDeps, loadAgentSettings, openAiChat, runAgentSearch, TOOLS } from "./agentSearch.ts";
+import { searchWeb } from "./webTools.ts";
 import { createHash } from "node:crypto";
 import { networkInterfaces } from "node:os";
 
@@ -81,6 +84,69 @@ app.get("/api/collect/:provider/:board", async (c) => {
     console.error("collect failed:", err);
     return c.json({ error: "The board could not be collected." }, 502);
   }
+});
+
+// Agent web search (server/agentSearch.ts). Its settings come from .env; the browser only ever sees key hints.
+app.get("/api/agent-settings", async (c) => {
+  const s = await loadAgentSettings();
+  return c.json({ settings: publicSettings(s), missing: missingSettings(s), path: ENV_PATH });
+});
+app.post("/api/agent-settings/test/:target", async (c) => {
+  const s = await loadAgentSettings(), target = c.req.param("target");
+  try {
+    if (target === "model") {
+      if (!s.model.baseUrl || !s.model.model) return c.json({ ok: false, error: "Set LYCEUM_AGENT_MODEL (and LYCEUM_AGENT_BASE_URL for a custom endpoint) in .env first." });
+      const reply = await openAiChat(s)([{ role: "user", content: "Call the web_search tool with the query \"connection test\". Do nothing else." }], TOOLS);
+      const called = reply.tool_calls?.some((t) => t.function.name === "web_search");
+      return c.json({ ok: true, detail: called ? "The model answered and called a tool, so tool calling works." : "The model answered but did not call the tool. It may not support tool calling well; try another model.", toolCalling: Boolean(called) });
+    }
+    if (target === "search") {
+      const hits = await searchWeb(s.search, "software engineer job posting", 5);
+      return c.json({ ok: true, detail: hits.length + " results, the first: " + (hits[0] ? hits[0].title + " (" + hits[0].url + ")" : "none") });
+    }
+    return c.json({ error: "unknown test" }, 404);
+  } catch (err) {
+    return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+// One agent run, streamed as lines of JSON: {type:"log"} as it works, then {type:"done"} with the postings or {type:"error"}.
+const AGENT_RUN_MS = 6 * 60 * 1000;
+let agentRunning = false;
+app.post("/api/agent-search", async (c) => {
+  let body: { brief?: unknown; q?: unknown; scope?: unknown };
+  try { body = await c.req.json(); } catch { return c.json({ error: "send the brief as JSON" }, 400); }
+  const brief = typeof body.brief === "string" ? body.brief.trim().slice(0, 300) : "";
+  if (brief.length < 3) return c.json({ error: "Describe what the agent should look for." }, 400);
+  const s = await loadAgentSettings(), missing = missingSettings(s);
+  if (missing.length) return c.json({ error: "Agent search is not set up yet. Add " + missing.join(", ") + " to .env (see .env.example and Settings)." }, 400);
+  if (agentRunning) return c.json({ error: "An agent search is already running. Wait for it to finish." }, 429);
+  agentRunning = true;
+  const started = Date.now(), enc = new TextEncoder();
+  c.header("content-type", "application/x-ndjson");
+  c.header("cache-control", "no-cache");
+  return c.body(new ReadableStream({
+    async start(controller) {
+      let open = true;
+      const send = (event: Record<string, unknown>) => { if (open) controller.enqueue(enc.encode(JSON.stringify(event) + "\n")); };
+      const stop = new AbortController();
+      const timer = setTimeout(() => stop.abort(new Error("The agent did not finish within " + AGENT_RUN_MS / 60000 + " minutes.")), AGENT_RUN_MS);
+      try {
+        const result = await runAgentSearch(brief, liveDeps(s), s, (line) => send({ type: "log", line }), stop.signal);
+        const query = typeof body.q === "string" ? body.q : "";
+        send({ type: "done", postings: filterPostings(result.postings, query, body.scope === "text"), total: result.postings.length, retrievedAt: new Date(started).toISOString(),
+          durationMs: Date.now() - started, summary: result.summary, pagesRead: result.pagesRead, searches: result.searches,
+          endpoint: "/api/agent-search (" + s.model.model + ", " + s.search.provider + ")" });
+      } catch (err) {
+        console.error("agent search failed:", err);
+        send({ type: "error", error: err instanceof Error ? err.message : "The agent search failed." });
+      } finally {
+        clearTimeout(timer);
+        agentRunning = false;
+        open = false;
+        controller.close();
+      }
+    },
+  }));
 });
 
 // The booth's survey collector (depth plan Section 7.2): append-only, in memory, one response per device, and nothing that

@@ -50,6 +50,7 @@
     "prove:surveys": "node --test src/prove-surveys.ts",
     "prove:attainment": "node --test src/prove-attainment.ts",
     "prove:items": "node --test src/prove-items.ts",
+    "prove:agent-search": "node --test src/prove-agent-search.ts",
     "mcp": "node mcp/server.ts",
     "mcp:sample": "node mcp/sample.ts",
     "mcp:try": "node mcp/try.ts",

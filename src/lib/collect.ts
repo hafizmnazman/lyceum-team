@@ -30,6 +30,13 @@ export const SOURCE_POLICIES: Record<CollectionProvider, SourcePolicy> = {
     refresh: "On request; the local API caches a site for one hour and refuses rapid repeat fetches", policyReviewedOn: "2026-10-09", enabled: true,
     note: "Lever publishes this API for employers' own job pages. The employer name is the site token because the API does not state it. Confirm intended use before any scheduled or bulk collection.",
   },
+  agent: {
+    name: "Agent web search", owner: "The model and search provider chosen in Settings, through the local API",
+    method: "A tool-calling model searches the web, reads pages and lists Greenhouse or Lever boards, then keeps postings; each kept posting's text is the page as fetched, never the model's words",
+    retention: "Posting text, link, publication date when the page states it, and retrieval time are kept in this browser for your review",
+    refresh: "On request only; each run spends from the keys in Settings", policyReviewedOn: "2026-10-27", enabled: true,
+    note: "Pages are read only from public addresses and only when the agent asks. Many job sites forbid automated reading in their terms or block it; check a site's terms before relying on it, and prefer employers' own pages and boards.",
+  },
 };
 export const BOARD_TOKEN = /^[a-z0-9][a-z0-9_-]{0,79}$/i;
 export const MAX_POSTING_CHARS = 20000;

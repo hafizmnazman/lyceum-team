@@ -184,8 +184,42 @@ export interface CollectionRequest { provider: CollectionProvider; board: string
 export type CollectionOutcome =
   | { ok: true; postings: CollectedPosting[]; retrievedAt: string; cached: boolean; total: number; label: string; endpoint?: string; bytes?: number | null; durationMs?: number | null }
   | { ok: false; error: string };
-export async function fetchCollection(request: CollectionRequest): Promise<CollectionOutcome> {
+const AGENT_TIMEOUT_MS_TOTAL = 7 * 60 * 1000;
+/** Agent web search: the local API streams one JSON object per line, log lines as the agent works and then the result. */
+async function fetchAgentCollection(request: CollectionRequest, onLog: (line: string) => void): Promise<CollectionOutcome> {
+  const res = await withTimeout(fetch("/api/agent-search", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ brief: request.board, q: request.query, scope: request.inText ? "text" : "title" }) }), AGENT_TIMEOUT_MS_TOTAL);
+  if (!res.ok || !res.body) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    return { ok: false, error: body?.error ?? (res.status === 404 ? "The local API is not running. Start it with npm run dev to use agent search." : "Agent search failed (HTTP " + res.status + ").") };
+  }
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  const deadline = Date.now() + AGENT_TIMEOUT_MS_TOTAL;
+  while (Date.now() < deadline) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += value;
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as { type: string; line?: string; error?: string; postings?: CollectedPosting[]; total?: number; retrievedAt?: string; durationMs?: number; endpoint?: string; summary?: string };
+      if (event.type === "log" && event.line) onLog(event.line);
+      else if (event.type === "error") return { ok: false, error: event.error ?? "Agent search failed." };
+      else if (event.type === "done" && Array.isArray(event.postings)) {
+        return { ok: true, postings: event.postings, retrievedAt: event.retrievedAt ?? new Date().toISOString(), cached: false, total: event.total ?? event.postings.length,
+          label: SOURCE_POLICIES.agent.name + " \"" + request.board + "\"", endpoint: event.endpoint ?? "/api/agent-search", bytes: null, durationMs: event.durationMs ?? null };
+      }
+    }
+  }
+  await reader.cancel().catch(() => undefined);
+  return { ok: false, error: "The agent search ended without a result." };
+}
+
+export async function fetchCollection(request: CollectionRequest, onLog: (line: string) => void = () => undefined): Promise<CollectionOutcome> {
   try {
+    if (request.provider === "agent") return await fetchAgentCollection(request, onLog);
     if (request.provider === "sample") {
       const started = Date.now();
       const res = await withTimeout(fetch("/demo/collected-sample.json"), COLLECT_TIMEOUT_MS);

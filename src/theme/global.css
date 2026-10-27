@@ -1021,14 +1021,11 @@ input[type="radio"] {
 
 /* ---------- page furniture ---------- */
 
+/* App pages fill the main column at every window size; only the public landing page keeps a reading width (--content-max). */
 .page-content {
   width: 100%;
-  max-width: var(--content-max);
   padding: 32px 32px 64px;
   margin: 0;
-}
-.page-content.page-wide {
-  max-width: var(--content-wide);
 }
 .page-heading {
   display: flex;
@@ -1140,7 +1137,7 @@ dt { font-weight: 600; }
 .save-status { color: var(--emerald-text); }
 .limitation { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-left: 3px solid var(--warn); background: var(--warn-soft); border-radius: 0 var(--radius-input) var(--radius-input) 0; font-size: 13px; color: var(--ink); }
 .limitation::before { color: var(--warn); }
-.section-help { margin: 12px 32px 0; max-width: 1256px; color: var(--ink-2); font-size: 13px; }
+.section-help { margin: 12px 32px 0; color: var(--ink-2); font-size: 13px; }
 summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .section-help > summary { width: fit-content; }
 .section-help-body { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 20px; }

@@ -625,7 +625,7 @@ export interface SkillMapping {
 }
 
 // ---------- the lecturer's research run ----------
-export type CollectionProvider = "sample" | "greenhouse" | "lever";
+export type CollectionProvider = "sample" | "greenhouse" | "lever" | "agent";
 /** Where a collected source came from. The retrieval time is never the publication date. */
 export interface EvidenceCollection { provider: CollectionProvider; board: string; postingId: string; retrievedAt: string; label: string }
 /** One posting fetched from a permitted board, before the lecturer decides to keep it. Transient. */

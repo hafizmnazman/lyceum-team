@@ -2369,31 +2369,39 @@ export interface CollectRun {
   endpoint: string | null; bytes: number | null; durationMs: number | null;
 }
 const clock = () => new Date().toTimeString().slice(0, 8);
-type CollectionLoader = (request: CollectionRequest) => Promise<CollectionOutcome>;
+type CollectionLoader = (request: CollectionRequest, onLog?: (line: string) => void) => Promise<CollectionOutcome>;
 /** Fetch postings from a permitted board or the saved sample. Only on request; nothing is imported until the lecturer chooses. */
 export async function runCollection(subjectId: SubjectId, input: { provider: CollectionProvider; board: string; query: string; inText: boolean }, loader: CollectionLoader = fetchCollection): Promise<SaveResult> {
   if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can collect evidence for this course." };
   if (!SOURCE_POLICIES[input.provider]?.enabled) return { ok: false, error: "Choose a supported source." };
-  const board = input.provider === "sample" ? "sample" : input.board.trim().toLowerCase();
-  if (input.provider !== "sample" && !BOARD_TOKEN.test(board)) return { ok: false, error: "Enter the employer's board token: letters, digits, hyphens or underscores, for example the NAME in jobs.lever.co/NAME or boards.greenhouse.io/NAME." };
+  const agent = input.provider === "agent";
+  const board = input.provider === "sample" ? "sample" : agent ? input.board.trim().replace(/\s+/g, " ").slice(0, 300) : input.board.trim().toLowerCase();
+  if (agent && board.length < 3) return { ok: false, error: "Describe what the agent should look for, for example: data analyst internships in Malaysia." };
+  if (input.provider !== "sample" && !agent && !BOARD_TOKEN.test(board)) return { ok: false, error: "Enter the employer's board token: letters, digits, hyphens or underscores, for example the NAME in jobs.lever.co/NAME or boards.greenhouse.io/NAME." };
   const run = { subjectId, provider: input.provider, board, query: input.query.trim(), inText: Boolean(input.inText) };
   const opening = clock() + (input.provider === "sample"
     ? " Loading the saved sample shipped with the app. No network request."
+    : agent ? " Asking the agent, through the local API (/api/agent-search), to find postings for \"" + board + "\". It searches and reads the web with the model and search provider in Settings."
     : " Requesting " + SOURCE_POLICIES[input.provider].name + " \"" + board + "\" through the local API (/api/collect/" + input.provider + "/" + board + "). Only this host is permitted.");
   set({ collectRun: { ...run, status: "running", postings: [], retrievedAt: null, cached: false, total: 0, error: null, label: "", log: [opening], endpoint: null, bytes: null, durationMs: null } });
-  const result = await trackRequest("collect", subjectId, () => loader(run));
+  // The agent's steps arrive while it works; each joins the log of the run that asked for them.
+  const onLog = (line: string) => {
+    const live = state.collectRun;
+    if (live && live.status === "running" && live.subjectId === subjectId && live.board === board && live.provider === input.provider) set({ collectRun: { ...live, log: [...live.log, clock() + " " + line] } });
+  };
+  const result = await trackRequest("collect", subjectId, () => loader(run, onLog));
   const current = state.collectRun;
   if (!current || current.status !== "running" || current.subjectId !== subjectId || current.board !== board || current.provider !== input.provider) return { ok: true };
   if (result.ok) {
     const size = typeof result.bytes === "number" ? " (" + (result.bytes >= 1048576 ? (result.bytes / 1048576).toFixed(1) + " MB" : Math.round(result.bytes / 1024) + " kB") + ")" : "";
     const took = typeof result.durationMs === "number" ? " in " + (result.durationMs / 1000).toFixed(1) + " s" : "";
-    const received = clock() + " Received " + result.total + " postings" + size + " from " + (result.endpoint ?? "the source") + took + (input.provider === "sample" ? ". Sample retrieved " + result.retrievedAt + "." : result.cached ? ". Served from the local cache; fetched live at " + result.retrievedAt + "." : ". Fetched live at " + result.retrievedAt + ".");
+    const received = clock() + (agent ? " The agent kept " : " Received ") + result.total + " postings" + size + " from " + (result.endpoint ?? "the source") + took + (agent ? ". Retrieved from the web on request, starting " + result.retrievedAt + "." : input.provider === "sample" ? ". Sample retrieved " + result.retrievedAt + "." : result.cached ? ". Served from the local cache; fetched live at " + result.retrievedAt + "." : ". Fetched live at " + result.retrievedAt + ".");
     const matched = clock() + " Kept " + result.postings.length + " of " + result.total + (run.query ? " whose " + (run.inText ? "title or text" : "title") + " matches \"" + run.query + "\"." : " (no keywords).") + " Nothing is imported until you choose.";
     set({ collectRun: { ...run, status: "done", postings: result.postings, retrievedAt: result.retrievedAt, cached: result.cached, total: result.total, error: null, label: result.label,
-      log: [opening, received, matched], endpoint: result.endpoint ?? null, bytes: result.bytes ?? null, durationMs: result.durationMs ?? null } });
+      log: [...(state.collectRun?.log ?? [opening]), received, matched], endpoint: result.endpoint ?? null, bytes: result.bytes ?? null, durationMs: result.durationMs ?? null } });
     return { ok: true };
   }
-  set({ collectRun: { ...run, status: "failed", postings: [], retrievedAt: null, cached: false, total: 0, error: result.error, label: "", log: [opening, clock() + " Failed: " + result.error], endpoint: null, bytes: null, durationMs: null } });
+  set({ collectRun: { ...run, status: "failed", postings: [], retrievedAt: null, cached: false, total: 0, error: result.error, label: "", log: [...(state.collectRun?.log ?? [opening]), clock() + " Failed: " + result.error], endpoint: null, bytes: null, durationMs: null } });
   return { ok: false, error: result.error };
 }
 export function clearCollection() { set({ collectRun: null }); }
