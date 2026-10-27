@@ -114,7 +114,7 @@ import { DEMO_LINE } from "../data/sample-course/index.ts";
 import { listedStudents, obeReport } from "../lib/attainment.ts";
 import { templateItems } from "../lib/items.ts";
 import { PRIOR_SURVEYS, PRIOR_SURVEY_RESPONSES } from "../data/sample-course/surveys.ts";
-import { loadWorkspace, saveWorkspace, signOut, updateProfile, whoAmI, type AccountUser } from "./account.ts";
+import { loadWorkspace, markOnboarded, saveWorkspace, signOut, updateProfile, whoAmI, type AccountUser } from "./account.ts";
 import {
   CANONICAL_PROPOSAL,
   CLOS,
@@ -729,7 +729,7 @@ export function openAccountWorkspace(user: AccountUser, saved: { backup: string;
   resetAgents();
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
-  const onboarded = Boolean(saved) && (data.subjects?.length ?? 0) > 0;
+  const onboarded = user.onboarded;
   state = { ...seedState(), ...data, people: [me], account: { user, version: saved?.version ?? 0 }, currentPersonId: me.id,
     screen: onboarded ? "inbox" : "onboarding", selectedSubjectId: null, selectedProposalId: null, persistenceStatus: "saved", toast: null };
   for (const l of listeners) l();
@@ -787,6 +787,15 @@ function syncAccountWorkspace() {
 function shortNameOf(institution: string): string {
   return institution.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).map((w) => w[0]).join("").toUpperCase().slice(0, 10) || institution.slice(0, 10);
 }
+/** Onboarding's last step, after the first course is made: the account now counts (server/auth.ts, pending accounts). */
+export async function completeOnboarding(): Promise<SaveResult> {
+  const account = state.account;
+  if (!account) return { ok: false, error: "Sign in first." };
+  const done = await markOnboarded();
+  if (!done.ok) return done;
+  setQuiet({ account: { ...state.account!, user: done.user } });
+  return { ok: true };
+}
 /** Onboarding's first step: the person's name, role and institution (kept on the account) and their programme. */
 export async function saveOnboardingProfile(input: { name: string; institution: string; programme: string; jobRole?: string }): Promise<SaveResult> {
   const account = state.account;
@@ -822,6 +831,7 @@ export function switchUser(personId: PersonId) {
 }
 /** Go to a screen, or, with a course route, to one step of that course's loop (#/course/:id/<step>). */
 export function navigate(screen: Screen, course?: CourseRoute) {
+  if (screen === "login" && state.account) return; // an account leaves by signing out (logout), not by opening sign in
   const target = course ? stepDef(course.step).screen : screen;
   const leaving = target !== state.screen || (course !== undefined && course.subjectId !== state.selectedSubjectId);
   if (leaving && !confirmLeaveEditor()) {

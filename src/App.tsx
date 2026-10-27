@@ -65,7 +65,8 @@ export default function App() {
         if (window.location.hash !== hashFor(s)) navigate(stepDef(route.course.step).screen, route.course);
         return;
       }
-      if (navAllows(person, s.assignments, route.screen) && route.screen !== s.screen) navigate(route.screen);
+      if (!navAllows(person, s.assignments, route.screen)) { window.history.replaceState(null, "", hashFor(s)); return; } // keep the URL honest
+      if (route.screen !== s.screen) navigate(route.screen);
     }
     // On first load, honour a deep link.
     onHashChange();
@@ -101,8 +102,8 @@ export default function App() {
   } else if (state.screen === "login") {
     const Login = SCREENS.login;
     content = <Login />;
-  } else if (state.screen === "onboarding") {
-    // A new account's first steps render bare, like sign in.
+  } else if (state.screen === "onboarding" || (state.account && !state.account.user.onboarded)) {
+    // A new account's first steps render bare, like sign in, and nothing else opens until they are done.
     content = <SCREENS.onboarding />;
   } else if (state.screen === "judge") {
     // The judge's page is the same bare page signed in or out (depth plan Section 9.1).

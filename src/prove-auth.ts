@@ -7,14 +7,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Hono } from "hono";
 import { AuthStore, authRoutes, hashPassword, pkceChallenge, signupError, verifyPassword } from "../server/auth.ts";
+import { memoryDb, migrate } from "../server/db.ts";
 import { DEMO_INSTITUTION } from "./data/institution.ts";
 import { BACKUP_SCHEMA_VERSION, WORKSPACE_DATA_KEYS } from "./lib/workspaceBackup.ts";
 
 let clock = Date.parse("2026-10-27T08:00:00Z");
-function setup() {
-  const store = new AuthStore(":memory:", () => clock);
+/** A fresh in-process Postgres (PGlite) with the migrations applied, and the routes on it. */
+async function setup() {
+  const store = await AuthStore.open(await memoryDb(), () => clock);
   const app = new Hono();
-  authRoutes(app, store);
+  authRoutes(app, async () => store);
   let cookie = "";
   const call = async (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
     const res = await app.request(path, { method, headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -50,7 +52,7 @@ test("passwords are scrypt hashes that verify only the right password", async ()
 });
 
 test("sign up starts a session in an HttpOnly, SameSite cookie; me, sign out and sign in follow it", async () => {
-  const { call, dropCookie } = setup();
+  const { call, dropCookie } = await setup();
   const up = await call("POST", "/api/auth/signup", ME);
   assert.equal(up.status, 200);
   assert.equal(up.body.user.email, "aina@example.edu", "emails are kept in lower case");
@@ -58,7 +60,8 @@ test("sign up starts a session in an HttpOnly, SameSite cookie; me, sign out and
   assert.match(up.setCookie!, /lyceum_session=[\w-]{40,}/);
   assert.match(up.setCookie!, /HttpOnly/i); assert.match(up.setCookie!, /SameSite=Lax/i); assert.match(up.setCookie!, /Path=\//);
   assert.equal((await call("GET", "/api/auth/me")).body.user.name, "Dr Aina");
-  assert.equal((await call("POST", "/api/auth/signup", ME)).status, 409, "one account per email");
+  assert.equal((await call("POST", "/api/auth/onboarded")).body.user.onboarded, true);
+  assert.equal((await call("POST", "/api/auth/signup", ME)).status, 409, "one finished account per email");
   await call("POST", "/api/auth/logout");
   assert.equal((await call("GET", "/api/auth/me")).body.user, null, "signed out");
   dropCookie();
@@ -68,8 +71,9 @@ test("sign up starts a session in an HttpOnly, SameSite cookie; me, sign out and
 });
 
 test("a wrong password says nothing about the account, and five lock the email for fifteen minutes", async () => {
-  const { call } = setup();
+  const { call } = await setup();
   await call("POST", "/api/auth/signup", ME);
+  await call("POST", "/api/auth/onboarded");
   const wrong = await call("POST", "/api/auth/login", { email: ME.email, password: "nope nope nope" });
   const nobody = await call("POST", "/api/auth/login", { email: "ghost@example.edu", password: "nope nope nope" });
   assert.equal(wrong.status, 401); assert.equal(nobody.status, 401);
@@ -82,24 +86,26 @@ test("a wrong password says nothing about the account, and five lock the email f
 });
 
 test("a session ends after thirty days, and only a hash of its token is stored", async () => {
-  const { store, call } = setup();
+  const { store, call } = await setup();
   const up = await call("POST", "/api/auth/signup", ME);
   const token = up.setCookie!.split(";")[0].split("=")[1];
-  assert.ok(store.userForSession(token));
-  assert.equal((store as unknown as { db: { prepare: (q: string) => { all: () => unknown[] } } }).db.prepare("SELECT * FROM sessions").all().some((r) => JSON.stringify(r).includes(token)), false);
+  assert.ok(await store.userForSession(token));
+  const sessions = (await (store as unknown as { db: { query: (q: string) => Promise<{ rows: unknown[] }> } }).db.query("SELECT * FROM sessions")).rows;
+  assert.equal(sessions.length, 1);
+  assert.equal(sessions.some((r) => JSON.stringify(r).includes(token)), false);
   clock += 30 * 86400000 + 1;
   assert.equal((await call("GET", "/api/auth/me")).body.user, null);
 });
 
 test("pages on another site cannot sign in or save; this computer's pages can", async () => {
-  const { call } = setup();
+  const { call } = await setup();
   assert.equal((await call("POST", "/api/auth/signup", ME, { origin: "https://evil.example" })).status, 403);
   assert.equal((await call("POST", "/api/auth/signup", ME, { origin: "http://localhost:5173" })).status, 200);
   assert.equal((await call("PUT", "/api/workspace", { backup: "{}", version: 0 }, { origin: "https://evil.example" })).status, 403);
 });
 
 test("the workspace: signed in only, validated, and saved only over the version it was based on", async () => {
-  const { call, dropCookie } = setup();
+  const { call, dropCookie } = await setup();
   assert.equal((await call("GET", "/api/workspace")).status, 401);
   const me = (await call("POST", "/api/auth/signup", ME)).body.user;
   assert.equal((await call("GET", "/api/workspace")).body.workspace, null, "a new account has no workspace yet");
@@ -122,7 +128,7 @@ test("a new account's workspace, as the store builds it, passes the server's val
   const { openAccountWorkspace, createCourseWorkspace, getState, saveOnboardingProfile } = await import("./app/store.ts");
   const { parseWorkspaceBackup, serializeWorkspaceBackup } = await import("./lib/workspaceBackup.ts");
   const { navFor, navAllows } = await import("./app/roles.ts");
-  const user = { id: "0f3c9a1e-0000-4000-8000-000000000000", email: "aina@example.edu", name: "Dr Aina", personId: "U-0f3c9a1e", institution: "Universiti Teknologi PETRONAS", jobRole: "lecturer" as const };
+  const user = { id: "0f3c9a1e-0000-4000-8000-000000000000", email: "aina@example.edu", name: "Dr Aina", personId: "U-0f3c9a1e", institution: "Universiti Teknologi PETRONAS", jobRole: "lecturer" as const, onboarded: false };
   assert.deepEqual(openAccountWorkspace(user, null), { ok: true });
   let s = getState();
   assert.equal(s.screen, "onboarding", "a new account starts at onboarding");
@@ -140,7 +146,7 @@ test("a new account's workspace, as the store builds it, passes the server's val
   const me = s.people[0];
   assert.ok(!navFor(me, s.assignments).includes("acceptance"), "the illustrative sandbox is not in an account's nav");
   assert.ok(navAllows(me, s.assignments, "onboarding") && !navAllows({ ...me, account: false }, s.assignments, "onboarding"));
-  const reopened = openAccountWorkspace(user, { backup: serializeWorkspaceBackup(s, "2026-10-27T08:00:00.000Z"), version: 3 });
+  const reopened = openAccountWorkspace({ ...user, onboarded: true }, { backup: serializeWorkspaceBackup(s, "2026-10-27T08:00:00.000Z"), version: 3 });
   assert.deepEqual(reopened, { ok: true });
   assert.equal(getState().screen, "inbox", "an account with a course opens at Home");
   assert.equal(getState().account?.version, 3);
@@ -149,8 +155,8 @@ test("a new account's workspace, as the store builds it, passes the server's val
 // ---------- Google sign-in (docs/GOOGLE_AUTH_PORTABLE.md): the flow against a fake token endpoint ----------
 const CLIENT = { clientId: "client-123.apps.googleusercontent.com", clientSecret: "secret-xyz" };
 const idToken = (claims: Record<string, unknown>) => "h." + Buffer.from(JSON.stringify(claims)).toString("base64url") + ".sig";
-function googleSetup(claimsFor: (nonce: string) => Record<string, unknown>, tokenStatus = 200) {
-  const store = new AuthStore(":memory:", () => clock);
+async function googleSetup(claimsFor: (nonce: string) => Record<string, unknown>, tokenStatus = 200) {
+  const store = await AuthStore.open(await memoryDb(), () => clock);
   const app = new Hono();
   const exchanges: URLSearchParams[] = [];
   let nonceSent = "";
@@ -158,7 +164,7 @@ function googleSetup(claimsFor: (nonce: string) => Record<string, unknown>, toke
     exchanges.push(new URLSearchParams(String(init.body)));
     return new Response(JSON.stringify({ id_token: idToken(claimsFor(nonceSent)) }), { status: tokenStatus });
   }) as unknown as typeof fetch;
-  authRoutes(app, store, { google: CLIENT, appUrl: "http://localhost:5173", fetcher });
+  authRoutes(app, async () => store, { google: CLIENT, appUrl: "http://localhost:5173", fetcher });
   const jar = new Map<string, string>();
   const go = async (path: string) => {
     const res = await app.request(path, { headers: { cookie: [...jar].map(([k, v]) => k + "=" + v).join("; ") } });
@@ -182,7 +188,7 @@ const goodClaims = (nonce: string) => ({ iss: "https://accounts.google.com", aud
   sub: "google-sub-1", email: "Aina@gmail.com", email_verified: true, name: "Aina Rahim" });
 
 test("Google: the start sends state, a PKCE S256 challenge and a nonce, with the flow in a ten-minute cookie on its own path", async () => {
-  const { go, jar } = googleSetup(goodClaims);
+  const { go, jar } = await googleSetup(goodClaims);
   const start = await go("/api/auth/google");
   assert.equal(start.status, 302);
   const url = new URL(start.location), q = url.searchParams;
@@ -201,7 +207,7 @@ test("Google: the start sends state, a PKCE S256 challenge and a nonce, with the
 });
 
 test("Google: a good sign in exchanges the code server to server, keys the account on sub, and audits signup then login", async () => {
-  const { store, signIn, exchanges, go, jar } = googleSetup(goodClaims);
+  const { store, signIn, exchanges, go, jar } = await googleSetup(goodClaims);
   const first = await signIn();
   assert.equal(first.back.status, 302);
   assert.equal(first.back.location, "http://localhost:5173/");
@@ -212,24 +218,24 @@ test("Google: a good sign in exchanges the code server to server, keys the accou
   assert.equal(sent.get("code"), "abc");
   assert.equal(sent.get("grant_type"), "authorization_code");
   assert.equal(pkceChallenge(sent.get("code_verifier")!), first.sent.get("code_challenge"), "the verifier matches the challenge sent");
-  const me = store.userForSession(jar.get("lyceum_session"));
+  const me = await store.userForSession(jar.get("lyceum_session"));
   assert.equal(me?.email, "aina@gmail.com"); assert.equal(me?.name, "Aina Rahim");
   jar.delete("lyceum_session");
   await signIn();
-  assert.equal(store.userForSession(jar.get("lyceum_session"))?.id, me?.id, "signing in again finds the same account, no second one");
-  assert.deepEqual(store.auditTrail().map((e) => e.event + ":" + e.method), ["signup:google", "login:google", "login:google"]);
+  assert.equal((await store.userForSession(jar.get("lyceum_session")))?.id, me?.id, "signing in again finds the same account, no second one");
+  assert.deepEqual((await store.auditTrail()).map((e) => e.event + ":" + e.method), ["signup:google", "login:google", "login:google"]);
   await (async () => { const r = await go("/api/auth/google/callback?code=abc&state=x"); assert.match(r.location, /auth_error=state/); })();
 });
 
 test("Google: cancelled, a wrong state and a failed exchange go back to sign in with their reason, each audited", async () => {
-  const cancelled = await googleSetup(goodClaims).signIn(undefined, "&error=access_denied");
+  const cancelled = await (await googleSetup(goodClaims)).signIn(undefined, "&error=access_denied");
   assert.equal(cancelled.back.location, "http://localhost:5173/?auth_error=cancelled#/login");
-  const forged = googleSetup(goodClaims);
+  const forged = await googleSetup(goodClaims);
   const r = await forged.signIn("not-the-state");
   assert.match(r.back.location, /auth_error=state/);
   assert.equal(forged.exchanges.length, 0, "a wrong state never reaches the token endpoint");
-  assert.deepEqual(forged.store.auditTrail().map((e) => e.event + ":" + e.reason), ["login_failed:state"]);
-  const broken = googleSetup(goodClaims, 400);
+  assert.deepEqual((await forged.store.auditTrail()).map((e) => e.event + ":" + e.reason), ["login_failed:state"]);
+  const broken = await googleSetup(goodClaims, 400);
   assert.match((await broken.signIn()).back.location, /auth_error=exchange/);
   assert.ok(!broken.jar.has("lyceum_session"));
 });
@@ -243,7 +249,7 @@ test("Google: an ID token with a wrong issuer, audience or nonce, expired, or wi
     ["unverified email", (n) => ({ ...goodClaims(n), email_verified: false })],
   ];
   for (const [why, claims] of cases) {
-    const s = googleSetup(claims);
+    const s = await googleSetup(claims);
     const r = await s.signIn();
     assert.match(r.back.location, /auth_error=token/, why);
     assert.ok(!s.jar.has("lyceum_session"), why + ": no session");
@@ -251,8 +257,8 @@ test("Google: an ID token with a wrong issuer, audience or nonce, expired, or wi
 });
 
 test("Google: an email that already has a password account is refused, not linked", async () => {
-  const s = googleSetup(goodClaims);
-  await s.store.signup({ name: "Squatter", email: "aina@gmail.com", password: "registered first", institution: "Somewhere", jobRole: "other" });
+  const s = await googleSetup(goodClaims);
+  await s.store.markOnboarded((await s.store.signup({ name: "Squatter", email: "aina@gmail.com", password: "registered first", institution: "Somewhere", jobRole: "other" })).id);
   const r = await s.signIn();
   assert.match(r.back.location, /auth_error=email-taken/);
   assert.ok(!s.jar.has("lyceum_session"));
@@ -260,15 +266,15 @@ test("Google: an email that already has a password account is refused, not linke
 });
 
 test("Google: hidden and refused when no client is configured", async () => {
-  const store = new AuthStore(":memory:", () => clock), app = new Hono();
-  authRoutes(app, store, { google: { clientId: "", clientSecret: "" } });
+  const store = await AuthStore.open(await memoryDb(), () => clock), app = new Hono();
+  authRoutes(app, async () => store, { google: { clientId: "", clientSecret: "" } });
   assert.deepEqual(await (await app.request("/api/auth/providers")).json(), { password: true, google: false });
   const res = await app.request("/api/auth/google");
   assert.match(res.headers.get("location") ?? "", /auth_error=unavailable/);
 });
 
 test("sign up keeps where and as what the person teaches; the profile can change later, within the listed roles", async () => {
-  const { call } = setup();
+  const { call } = await setup();
   const up = await call("POST", "/api/auth/signup", ME);
   assert.equal(up.body.user.institution, "Universiti Teknologi PETRONAS");
   assert.equal(up.body.user.jobRole, "lecturer");
@@ -280,29 +286,49 @@ test("sign up keeps where and as what the person teaches; the profile can change
   assert.equal((await call("PATCH", "/api/auth/me", { jobRole: "dean" })).status, 400);
 });
 
-test("migrations: a fresh database gets every one once; a database from before migrations is adopted, its data kept", async () => {
-  const { DatabaseSync } = await import("node:sqlite");
-  const { migrate, openDatabase } = await import("../server/db.ts");
-  const { mkdtempSync, readdirSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const files = readdirSync(new URL("../server/migrations/", import.meta.url)).map((f) => f.replace(/\.sql$/, "")).sort();
-  const fresh = openDatabase(":memory:");
-  assert.deepEqual((fresh.prepare("SELECT id FROM schema_migrations ORDER BY id").all() as Array<{ id: string }>).map((r) => r.id), files);
-  assert.deepEqual(migrate(fresh), [], "a second run applies nothing");
-  // The schema as it was created inline, before migrations: users with the Google columns, and one account in it.
-  const path = join(mkdtempSync(join(tmpdir(), "lyceum-db-")), "old.db");
-  const old = new DatabaseSync(path);
-  old.exec(`CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password TEXT NOT NULL, created_at TEXT NOT NULL, google_sub TEXT, last_login_at TEXT);
-    CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL);
-    CREATE TABLE workspaces (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, backup TEXT NOT NULL, version INTEGER NOT NULL, updated_at TEXT NOT NULL);
-    CREATE TABLE auth_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, user_id TEXT, email TEXT, reason TEXT, method TEXT, ip TEXT, user_agent TEXT, created_at TEXT NOT NULL);
-    INSERT INTO users VALUES ('u1', 'kept@example.edu', 'Kept', '', '2026-10-27', 'sub-1', NULL);`);
-  old.close();
-  const adopted = openDatabase(path);
-  assert.deepEqual((adopted.prepare("SELECT id FROM schema_migrations ORDER BY id").all() as Array<{ id: string }>).map((r) => r.id), files, "001 and 002 recorded as already there, 003 applied");
-  const columns = (adopted.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>).map((c) => c.name);
-  assert.ok(columns.includes("institution") && columns.includes("job_role"));
-  assert.equal((adopted.prepare("SELECT name FROM users WHERE id = 'u1'").get() as { name: string }).name, "Kept", "the account survives");
-  adopted.close();
+test("migrations: a fresh database gets every one once, in order; a second run applies none; the database stays usable", async () => {
+  const { readdirSync } = await import("node:fs");
+  const files = readdirSync(new URL("../server/migrations/", import.meta.url)).filter((f) => f.endsWith(".sql")).map((f) => f.replace(/\.sql$/, "")).sort();
+  const db = await memoryDb();
+  assert.deepEqual(await migrate(db), files);
+  assert.deepEqual((await db.query<{ id: string }>("SELECT id FROM schema_migrations ORDER BY id")).rows.map((r) => r.id), files);
+  assert.deepEqual(await migrate(db), [], "a second run applies nothing");
+  const tables = (await db.query<{ t: string }>("SELECT table_name AS t FROM information_schema.tables WHERE table_schema = 'public' ORDER BY 1")).rows.map((r) => r.t);
+  assert.deepEqual(tables, ["auth_events", "schema_migrations", "sessions", "users", "workspaces"]);
+  await assert.rejects(db.query("INSERT INTO users (id, email, name, job_role, created_at) VALUES (gen_random_uuid(), 'x@y.z', 'X', 'dean', now())"), /job_role/, "the role list is enforced by the database too");
+  await db.close();
+});
+
+test("an account counts only once onboarding is finished: a pending one cannot sign in, is replaced, and goes on sign out or after a day", async () => {
+  const { store, call, dropCookie } = await setup();
+  const up = await call("POST", "/api/auth/signup", ME);
+  assert.equal(up.body.user.onboarded, false, "a new account starts pending");
+  await call("PUT", "/api/workspace", { backup: backup(up.body.user.personId), version: 0 });
+  assert.ok((await call("GET", "/api/workspace")).body.workspace, "a pending account can save, so a refresh resumes onboarding");
+  dropCookie();
+  assert.equal((await call("POST", "/api/auth/login", { email: ME.email, password: ME.password })).status, 401, "a pending account does not sign in by password");
+  const again = await call("POST", "/api/auth/signup", { ...ME, name: "Dr Aina Again" });
+  assert.equal(again.status, 200, "signing up again with the email of an unfinished sign up replaces it");
+  assert.notEqual(again.body.user.id, up.body.user.id);
+  assert.equal(await store.userForSession(undefined), null);
+  await call("POST", "/api/auth/logout");
+  assert.equal((await call("POST", "/api/auth/signup", ME)).status, 200, "signing out of a pending account deleted it, so the email is free");
+  assert.ok((await store.auditTrail()).some((e) => e.event === "logout" && String(e.reason).includes("account deleted")));
+  // left pending for a day: gone when the server next starts or anyone signs up
+  clock += 24 * 60 * 60 * 1000 + 1;
+  await store.purgePending();
+  assert.equal((await call("GET", "/api/auth/me")).body.user, null, "a day-old pending account is deleted with its sessions");
+  // finished: it stays through a sign out and signs in again
+  const done = await call("POST", "/api/auth/signup", { ...ME, email: "done@example.edu" });
+  assert.equal((await call("POST", "/api/auth/onboarded")).body.user.onboarded, true);
+  await call("POST", "/api/auth/logout");
+  assert.equal((await call("POST", "/api/auth/login", { email: "done@example.edu", password: ME.password })).body.user.id, done.body.user.id);
+});
+
+test("Google: an unfinished password sign up does not hold the email against a Google sign in", async () => {
+  const s = await googleSetup(goodClaims);
+  await s.store.signup({ name: "Never finished", email: "aina@gmail.com", password: "registered first", institution: "Somewhere", jobRole: "other" });
+  const r = await s.signIn();
+  assert.equal(r.back.location, "http://localhost:5173/", "signed in with Google; the pending password account was dropped");
+  assert.equal((await s.store.userForSession(s.jar.get("lyceum_session")))?.onboarded, false, "the Google account starts pending too, at onboarding");
 });

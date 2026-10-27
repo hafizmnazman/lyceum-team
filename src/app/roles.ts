@@ -172,5 +172,7 @@ export function landingScreen(person: Person, assignments: RoleAssignment[]): Sc
 /** Does this person's nav include the screen? */
 export function navAllows(person: Person, assignments: RoleAssignment[], screen: Screen): boolean {
   if (screen === "onboarding") return Boolean(person.account);
+  // A signed-in account leaves by signing out, never by opening the sign in page inside its own workspace.
+  if (screen === "login" && person.account) return false;
   return screen === "login" || screen === "index" || screen === "judge" || screen === "kiosk" || navFor(person, assignments).includes(screen);
 }

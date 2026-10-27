@@ -21,6 +21,7 @@ import { missingSettings, publicSettings } from "../src/lib/agentSettings.ts";
 import { ENV_PATH, liveDeps, loadAgentSettings, openAiChat, runAgentSearch, TOOLS } from "./agentSearch.ts";
 import { searchWeb } from "./webTools.ts";
 import { AuthStore, authRoutes } from "./auth.ts";
+import { DATABASE_URL, postgresDb } from "./db.ts";
 import { createHash } from "node:crypto";
 import { networkInterfaces } from "node:os";
 
@@ -47,8 +48,12 @@ app.use("/api/*", async (c, next) => {
 app.use("/api/*", cors());
 
 // Accounts (email and password, and Google when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set), sessions and each
-// account's workspace (server/auth.ts), in SQLite at data/lyceum.db.
-authRoutes(app, new AuthStore(), {
+// account's workspace (server/auth.ts), in PostgreSQL at DATABASE_URL (server/db.ts; npm run db:up starts one). The store
+// opens on first use; while the database is down the account routes answer 503 and everything else still works.
+const database = postgresDb(DATABASE_URL); // one pool; it connects when first asked and again after Postgres restarts
+let opening: Promise<AuthStore> | null = null;
+const getStore = () => (opening ??= AuthStore.open(database).catch((err) => { opening = null; throw err; }));
+authRoutes(app, getStore, {
   appUrl: process.env.APP_URL || "http://localhost:5173",
   google: { clientId: process.env.GOOGLE_CLIENT_ID ?? "", clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "" },
 });

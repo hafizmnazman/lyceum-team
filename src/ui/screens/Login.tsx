@@ -8,7 +8,8 @@ import { authProviders, googleErrorText, JOB_ROLE_LABEL, JOB_ROLES, signIn, sign
 import { hatsOn, subjectsForPerson } from "../../app/roles.ts";
 import { enterAccount, login, navigate, useStore } from "../../app/store.ts";
 import { HOST_NAME, MascotChat } from "../mascots/index.tsx";
-import { Button, Field, Input, Select } from "../primitives/index.tsx";
+import { Button, Field, Input } from "../primitives/index.tsx";
+import { Dropdown } from "../primitives/Dropdown.tsx";
 import { Tooltip } from "../primitives/Tooltip.tsx";
 import { Segmented } from "../primitives/Segmented.tsx";
 import type { Person } from "../../types.ts";
@@ -57,7 +58,7 @@ export function LoginScreen() {
           {mode === "signin" ? <>
           <div className="signin-divider"><span>or try the demo, no account needed</span></div>
           <ul className="people-list" aria-label="Demo people">
-            {state.people.map((p) => (
+            {state.people.filter((p) => !p.account).map((p) => (
               <li key={p.id}>
                 <Tooltip content={scopeLine(p)}>
                   <button type="button" className="person-row" data-demo-id={`login-${p.id}`} onClick={() => login(p.id)}>
@@ -104,6 +105,7 @@ function AccountPanel({ mode, onMode }: { mode: "signin" | "signup"; onMode: (mo
   }, []);
   async function submit() {
     setError("");
+    if (mode === "signup" && !jobRole) { setError("Choose your role."); return; }
     if (mode === "signup" && password !== confirm) { setError("The two passwords do not match."); return; }
     setBusy(true);
     const result = mode === "signup" ? await signUp({ name, email, password, institution, jobRole }) : await signIn(email, password);
@@ -121,10 +123,7 @@ function AccountPanel({ mode, onMode }: { mode: "signin" | "signup"; onMode: (mo
         <Field label={mode === "signup" ? "Work email" : "Email"}><Input type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={254} /></Field>
         {mode === "signup" ? <div className="signin-pair">
           <Field label="Institution"><Input autoComplete="organization" value={institution} onChange={(e) => setInstitution(e.target.value)} required maxLength={200} placeholder="e.g. Universiti Teknologi PETRONAS" /></Field>
-          <Field label="Your role"><Select value={jobRole} onChange={(e) => setJobRole(e.target.value)} required>
-            <option value="" disabled>Choose one</option>
-            {JOB_ROLES.map((r) => <option key={r} value={r}>{JOB_ROLE_LABEL[r]}</option>)}
-          </Select></Field>
+          <Field label="Your role"><Dropdown value={jobRole} onChange={setJobRole} options={JOB_ROLES.map((r) => ({ value: r, label: JOB_ROLE_LABEL[r] }))} /></Field>
         </div> : null}
         {/* written out rather than through Field, so the label and hint point at the input, not at its wrapper */}
         <div className="form-field">

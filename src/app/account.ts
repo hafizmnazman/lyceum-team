@@ -7,7 +7,7 @@ export type JobRole = (typeof JOB_ROLES)[number];
 export const JOB_ROLE_LABEL: Record<JobRole, string> = {
   lecturer: "Lecturer", coordinator: "Course coordinator", "programme-leader": "Programme leader", "head-of-department": "Head of department", other: "Other",
 };
-export interface AccountUser { id: string; email: string; name: string; personId: string; institution: string; jobRole: JobRole | null }
+export interface AccountUser { id: string; email: string; name: string; personId: string; institution: string; jobRole: JobRole | null; onboarded: boolean }
 type Result<T> = ({ ok: true } & T) | { ok: false; error: string; status?: number };
 
 async function call<T>(method: string, path: string, body?: unknown, keepalive = false): Promise<Result<T>> {
@@ -36,6 +36,8 @@ export const signIn = (email: string, password: string) => call<{ user: AccountU
 export const signOut = () => call<{ ok: true }>("POST", "/api/auth/logout", {});
 export const whoAmI = () => call<{ user: AccountUser | null }>("GET", "/api/auth/me");
 export const updateProfile = (input: { name?: string; institution?: string; jobRole?: string }) => call<{ user: AccountUser }>("PATCH", "/api/auth/me", input);
+/** Onboarding is finished: from now on the account counts, and signs in by password. */
+export const markOnboarded = () => call<{ user: AccountUser }>("POST", "/api/auth/onboarded", {});
 export const loadWorkspace = () => call<{ workspace: { backup: string; version: number; updatedAt: string } | null }>("GET", "/api/workspace");
 /** A save keeps going while the page closes when it is small enough for the browser to allow (keepalive caps a body at 64 kB). */
 export const saveWorkspace = (backup: string, version: number) =>

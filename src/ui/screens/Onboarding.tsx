@@ -1,13 +1,14 @@
 // A new account's first steps (server/auth.ts gives the account; this gives it a workspace): who you are and where you
-// teach, then your first course. Creating the course opens its outline, where the loop starts. Tualang says what each
-// step is for. Skipping leaves an empty workspace; the next sign in comes back here until a course exists.
+// teach, then your first course. Creating the course finishes onboarding (only then does the account count) and opens its
+// outline, where the loop starts. Tualang says what each step is for. Cancelling, or signing out first, deletes the account.
 
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { JOB_ROLE_LABEL, JOB_ROLES } from "../../app/account.ts";
-import { createCourseWorkspace, navigate, saveOnboardingProfile, useStore } from "../../app/store.ts";
+import { completeOnboarding, createCourseWorkspace, saveOnboardingProfile, signOutAccount, useStore } from "../../app/store.ts";
 import { HOST_NAME, MascotChat } from "../mascots/index.tsx";
-import { Button, Field, Input, Select } from "../primitives/index.tsx";
+import { Button, Field, Input } from "../primitives/index.tsx";
+import { Dropdown } from "../primitives/Dropdown.tsx";
 
 const STEPS = ["About you", "Your first course"] as const;
 
@@ -33,10 +34,19 @@ export function OnboardingScreen() {
     setBusy(false);
     if (result.ok) setStep(1); else setError(result.error);
   }
-  function createCourse() {
+  async function createCourse() {
     setError("");
     const result = createCourseWorkspace({ code, title, programmeTitle: state.programme.title, year: Number(year), semester: Number(semester) });
-    if (!result.ok) setError(result.error);
+    if (!result.ok) { setError(result.error); return; }
+    setBusy(true);
+    const done = await completeOnboarding();
+    setBusy(false);
+    if (!done.ok) setError(done.error);
+  }
+  /** Leave without an account: a sign up that is not finished is not kept (server/auth.ts deletes it on sign out). */
+  async function cancel() {
+    if (!window.confirm("Cancel signing up? Your account and anything entered here will not be kept.")) return;
+    await signOutAccount();
   }
   const lines = step === 0
     ? ["Welcome, " + (name.split(" ").slice(-1)[0] || "there") + ". I'm " + HOST_NAME + ". Two short steps and your workspace is ready.", "Your institution and programme name the records you make, such as briefs, decks and course files."]
@@ -54,28 +64,25 @@ export function OnboardingScreen() {
             <h1 id="onboarding-title" className="onboarding-title">Set up your workspace</h1>
             <p className="muted">Signed in as {me.email}. Everything you make is saved to your account on this Lyceum server.</p>
             <Field label="Your name" hint="As colleagues know you, e.g. Dr Aina Rahim."><Input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></Field>
-            <Field label="Your role"><Select value={jobRole} onChange={(e) => setJobRole(e.target.value)} required>
-              <option value="" disabled>Choose one</option>
-              {JOB_ROLES.map((r) => <option key={r} value={r}>{JOB_ROLE_LABEL[r]}</option>)}
-            </Select></Field>
+            <Field label="Your role"><Dropdown value={jobRole} onChange={setJobRole} options={JOB_ROLES.map((r) => ({ value: r, label: JOB_ROLE_LABEL[r] }))} /></Field>
             <Field label="Institution"><Input autoComplete="organization" value={institution} onChange={(e) => setInstitution(e.target.value)} required maxLength={200} placeholder="e.g. Universiti Teknologi PETRONAS" /></Field>
             <Field label="Programme" hint="The degree your courses belong to."><Input value={programme} onChange={(e) => setProgramme(e.target.value)} required maxLength={200} placeholder="e.g. Bachelor of Computer Science" /></Field>
             {error ? <p role="alert" className="form-error">{error}</p> : null}
-            <div className="button-row"><Button type="submit" variant="primary" loading={busy}>Continue <ArrowRight size={15} /></Button></div>
-          </form> : <form onSubmit={(e) => { e.preventDefault(); createCourse(); }}>
+            <div className="button-row"><Button type="submit" variant="primary" loading={busy}>Continue <ArrowRight size={15} /></Button><Button variant="quiet" onClick={() => void cancel()}>Cancel sign-up</Button></div>
+          </form> : <form onSubmit={(e) => { e.preventDefault(); void createCourse(); }}>
             <h1 id="onboarding-title" className="onboarding-title">Your first course</h1>
             <p className="muted">A personal course workspace in {state.programme.title}. It is yours to prepare; it is not an official approval.</p>
             <div className="form-grid onboarding-grid">
               <Field label="Course code"><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} required maxLength={40} placeholder="CS101" /></Field>
-              <Field label="Year"><Select value={year} onChange={(e) => setYear(e.target.value)}>{[1, 2, 3, 4, 5].map((y) => <option key={y} value={y}>Year {y}</option>)}</Select></Field>
-              <Field label="Semester"><Select value={semester} onChange={(e) => setSemester(e.target.value)}>{[1, 2, 3].map((s) => <option key={s} value={s}>Semester {s}</option>)}</Select></Field>
+              <Field label="Year"><Dropdown value={year} onChange={setYear} options={["1", "2", "3", "4", "5"].map((y) => ({ value: y, label: "Year " + y }))} /></Field>
+              <Field label="Semester"><Dropdown value={semester} onChange={setSemester} options={["1", "2", "3"].map((n) => ({ value: n, label: "Semester " + n }))} /></Field>
             </div>
             <Field label="Course title"><Input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} placeholder="e.g. Introduction to Programming" /></Field>
             {error ? <p role="alert" className="form-error">{error}</p> : null}
             <div className="button-row">
-              <Button type="submit" variant="primary">Create the course <ArrowRight size={15} /></Button>
+              <Button type="submit" variant="primary" loading={busy}>Create the course <ArrowRight size={15} /></Button>
               <Button onClick={() => { setError(""); setStep(0); }}>Back</Button>
-              <Button variant="quiet" onClick={() => navigate("courses")}>Skip for now</Button>
+              <Button variant="quiet" onClick={() => void cancel()}>Cancel sign-up</Button>
             </div>
           </form>}
         </section>

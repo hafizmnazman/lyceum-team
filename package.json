@@ -8,6 +8,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "concurrently -n web,api -c blue,green \"vite\" \"node --watch server/index.ts\"",
+    "start": "docker compose up -d --wait && npm run dev",
     "booth": "vite build && concurrently -n web,api -c blue,green \"vite preview --host\" \"node server/index.ts\"",
     "dev:web": "vite",
     "dev:api": "node --watch server/index.ts",
@@ -54,7 +55,8 @@
     "prove:auth": "node --test src/prove-auth.ts",
     "search:up": "docker compose up -d searxng",
     "db:migrate": "node server/db-migrate.ts",
-    "search:down": "docker compose down",
+    "services:down": "docker compose down",
+    "db:up": "docker compose up -d --wait postgres",
     "mcp": "node mcp/server.ts",
     "mcp:sample": "node mcp/sample.ts",
     "mcp:try": "node mcp/try.ts",
@@ -75,6 +77,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.469.0",
     "lz-string": "^1.5.0",
+    "pg": "^8.23.1",
     "pptxgenjs": "^4.0.1",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
@@ -84,10 +87,12 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.12",
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
