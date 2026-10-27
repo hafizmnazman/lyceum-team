@@ -20,6 +20,7 @@ import { filterPostings } from "../src/lib/collect.ts";
 import { missingSettings, publicSettings } from "../src/lib/agentSettings.ts";
 import { ENV_PATH, liveDeps, loadAgentSettings, openAiChat, runAgentSearch, TOOLS } from "./agentSearch.ts";
 import { searchWeb } from "./webTools.ts";
+import { readOutline, MAX_OUTLINE_CHARS } from "./outline.ts";
 import { AuthStore, authRoutes } from "./auth.ts";
 import { DATABASE_URL, postgresDb } from "./db.ts";
 import { createHash } from "node:crypto";
@@ -124,6 +125,24 @@ app.post("/api/agent-settings/test/:target", async (c) => {
     return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
   }
 });
+// Onboarding's outline import (server/outline.ts): a parsed document's text in, the model's proposal out, checked against
+// the text. Uses the model in .env; without one it says so, and the lecturer types the outline instead.
+app.post("/api/agent/outline", async (c) => {
+  let body: { text?: unknown; fileName?: unknown };
+  try { body = await c.req.json(); } catch { return c.json({ error: "Send the outline's text as JSON." }, 400); }
+  const text = typeof body.text === "string" ? body.text : "", fileName = typeof body.fileName === "string" ? body.fileName.slice(0, 200) : "outline";
+  if (text.trim().length < 40) return c.json({ error: "That file has too little text to read an outline from. Is it a scanned image?" }, 400);
+  const s = await loadAgentSettings();
+  const needs = missingSettings(s).filter((k) => k.startsWith("LYCEUM_AGENT"));
+  if (needs.length) return c.json({ error: "Reading an outline needs the model set up: add " + needs.join(", ") + " to .env (see Settings). You can type the outcomes below instead." }, 400);
+  try {
+    return c.json({ outline: await readOutline(text, fileName, s), truncated: text.length > MAX_OUTLINE_CHARS });
+  } catch (err) {
+    console.error("outline read failed:", err);
+    return c.json({ error: "The model could not read this outline: " + (err instanceof Error ? err.message : String(err)).slice(0, 300) + " You can type the outcomes below instead." }, 502);
+  }
+});
+
 // One agent run, streamed as lines of JSON: {type:"log"} as it works, then {type:"done"} with the postings or {type:"error"}.
 const AGENT_RUN_MS = 6 * 60 * 1000;
 let agentRunning = false;

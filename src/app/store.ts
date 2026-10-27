@@ -114,6 +114,7 @@ import { DEMO_LINE } from "../data/sample-course/index.ts";
 import { listedStudents, obeReport } from "../lib/attainment.ts";
 import { templateItems } from "../lib/items.ts";
 import { PRIOR_SURVEYS, PRIOR_SURVEY_RESPONSES } from "../data/sample-course/surveys.ts";
+import { outlineDefinition } from "../lib/outline.ts";
 import { loadWorkspace, markOnboarded, saveWorkspace, signOut, updateProfile, whoAmI, type AccountUser } from "./account.ts";
 import {
   CANONICAL_PROPOSAL,
@@ -786,6 +787,31 @@ function syncAccountWorkspace() {
 /** An institution's initials for its short name: Universiti Teknologi PETRONAS, UTP. */
 function shortNameOf(institution: string): string {
   return institution.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).map((w) => w[0]).join("").toUpperCase().slice(0, 10) || institution.slice(0, 10);
+}
+/** Onboarding's course step, after createCourseWorkspace: the outline the lecturer accepted (imported or typed) becomes the
+ *  course's first version through the same save, check and adopt as any revision, and the term is set on its teaching plan.
+ *  If the check finds a problem the course is kept with the revision open, and the message says what to fix in Update. */
+export function applyOnboardingOutline(subjectId: SubjectId, rows: Parameters<typeof outlineDefinition>[2], term: string, source: string): SaveResult {
+  const draft = state.curriculumDrafts.find((d) => d.subjectId === subjectId && d.status === "drafting");
+  const base = definitionForCourse(subjectId);
+  if (!draft || !base) return { ok: false, error: "The course was not found." };
+  if (term.trim()) {
+    const planned = saveTeachingPlanDetails(subjectId, { term, notes: "" });
+    if (!planned.ok) return planned;
+  }
+  if (!rows.outcomes.length) return { ok: true }; // nothing to adopt: the lecturer adds outcomes in Update
+  const reason = "The first outline, " + (source ? "imported from " + source + " and reviewed" : "entered") + " at onboarding.";
+  const saved = saveCurriculumRevision(draft.id, draft.revision, { definition: outlineDefinition(base, subjectId, rows), reason, effectiveTerm: term.trim() || "Not set" });
+  if (!saved.ok) return saved;
+  const checked = checkCurriculumRevision(draft.id, draft.revision + 1);
+  const adopted = checked.ok ? adoptCurriculumRevision(draft.id, draft.revision + 1, true) : checked;
+  if (!adopted.ok) {
+    const error = "Your course is made, and its outline is saved as a revision, but it needs a fix before it becomes the course version: " + adopted.error + " Open Update to correct it.";
+    set({ toast: error });
+    return { ok: false, error };
+  }
+  set({ toast: "Your course is ready, with its outline as the first version. Watch is next." });
+  return adopted;
 }
 /** Onboarding's last step, after the first course is made: the account now counts (server/auth.ts, pending accounts). */
 export async function completeOnboarding(): Promise<SaveResult> {

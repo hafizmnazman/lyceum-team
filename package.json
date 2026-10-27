@@ -53,6 +53,7 @@
     "prove:items": "node --test src/prove-items.ts",
     "prove:agent-search": "node --test src/prove-agent-search.ts",
     "prove:auth": "node --test src/prove-auth.ts",
+    "prove:outline": "node --test src/prove-outline.ts",
     "search:up": "docker compose up -d searxng",
     "db:migrate": "node server/db-migrate.ts",
     "services:down": "docker compose down",

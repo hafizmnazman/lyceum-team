@@ -2483,3 +2483,32 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
 .dropdown-option.is-active { background: var(--tint-1); }
 .dropdown-option.is-chosen { font-weight: 700; }
 .dropdown-option svg { flex: none; color: var(--emerald); }
+
+/* ---------- Onboarding's outline import and review ---------- */
+.onboarding.is-wide { max-width: 1100px; grid-template-columns: 240px minmax(0, 760px); }
+.outline-drop { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px; border: 2px dashed var(--border); border-radius: 12px; background: var(--tint-1); }
+.outline-drop > div { display: grid; gap: 2px; min-width: 0; flex: 1 1 260px; }
+.outline-drop .muted { font-size: 13px; }
+.outline-section { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
+.outline-section legend { font-family: var(--font-display); font-weight: 700; font-size: 17px; margin-bottom: 8px; }
+.outline-section > .btn { justify-self: start; }
+.outline-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.outline-row { display: grid; grid-template-columns: 24px 52px minmax(0, 1fr) 190px; gap: 10px; align-items: start; transition: opacity 160ms var(--ease-out); }
+.outline-row.is-topic { grid-template-columns: 24px minmax(0, 1fr) 90px auto 32px; align-items: center; }
+.outline-row.is-off { opacity: 0.5; }
+.outline-keep { display: grid; place-items: center; min-height: 44px; }
+.outline-keep input { width: 18px; height: 18px; accent-color: var(--emerald); }
+.outline-label { font-weight: 800; padding-top: 12px; font-variant-numeric: tabular-nums; }
+.outline-meta { display: grid; gap: 6px; justify-items: start; }
+.outline-hours { text-align: right; }
+.outline-serves { font-size: 13px; white-space: nowrap; }
+.outline-remove { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--ink-2); cursor: pointer; }
+.outline-remove:hover { background: var(--tint-1); color: var(--ink); }
+@media (max-width: 760px) {
+  .onboarding.is-wide { grid-template-columns: minmax(0, 1fr); }
+  .outline-row { grid-template-columns: 24px minmax(0, 1fr); }
+  .outline-row .outline-label { padding-top: 10px; }
+  .outline-row textarea, .outline-row .outline-meta { grid-column: 2; }
+  .outline-row.is-topic { grid-template-columns: 24px minmax(0, 1fr) 80px 32px; }
+  .outline-row.is-topic .outline-serves { display: none; }
+}

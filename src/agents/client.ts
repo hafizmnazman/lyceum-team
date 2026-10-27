@@ -14,6 +14,7 @@
 import type { CLO, CollectedPosting, CollectionProvider, IntakeInterpretation, ParsedDoc, Subject, UploadedFileKind } from "../types.ts";
 import { SOURCE_POLICIES, filterPostings } from "../lib/collect.ts";
 import { interpretLocally } from "./intakeLocal.ts";
+import type { OutlineProposal } from "../lib/outline.ts";
 
 const PARSE_TIMEOUT_MS = 20000;
 const AGENT_TIMEOUT_MS = 30000;
@@ -241,5 +242,22 @@ export async function fetchCollection(request: CollectionRequest, onLog: (line: 
       bytes: typeof body.bytes === "number" ? body.bytes : null, durationMs: typeof body.durationMs === "number" ? body.durationMs : Date.now() - started };
   } catch (err) {
     return { ok: false, error: err instanceof Error && err.message === "timeout" ? "The collection timed out. Try again, or narrow the keywords." : "The local API is not reachable. Start it with npm run dev to collect from a live board." };
+  }
+}
+
+// ---------- onboarding: read a course outline (server/outline.ts) ----------
+const OUTLINE_TIMEOUT_MS = 180000;
+/** Parse the lecturer's outline on the local API, then ask the model in .env what it states. The proposal is reviewed before anything saves. */
+export async function readOutlineFile(file: File): Promise<{ ok: true; outline: OutlineProposal; truncated: boolean } | { ok: false; error: string }> {
+  const parsed = await parseFile(file);
+  if (!parsed.doc) return { ok: false, error: parsed.error ?? "The file could not be read." };
+  const text = [...parsed.doc.pages.map((p) => p.text), ...parsed.doc.tables.map((t) => t.rows.map((r) => r.join("  |  ")).join("\n"))].join("\n\n");
+  try {
+    const res = await withTimeout(fetch("/api/agent/outline", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, fileName: file.name }) }), OUTLINE_TIMEOUT_MS);
+    const body = (await res.json().catch(() => null)) as { outline?: OutlineProposal; truncated?: boolean; error?: string } | null;
+    if (!res.ok || !body?.outline) return { ok: false, error: body?.error ?? "The outline could not be read (HTTP " + res.status + ")." };
+    return { ok: true, outline: body.outline, truncated: Boolean(body.truncated) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error && err.message === "timeout" ? "Reading the outline took too long. Try again, or type the outcomes." : "The local API is not reachable. Start it with npm run dev." };
   }
 }

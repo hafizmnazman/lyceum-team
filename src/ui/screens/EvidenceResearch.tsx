@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  clearCollection, clearProposals, navigate, confirmProposals, dismissProposal, downloadPack, evidenceTrendNote, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
+  clearCollection, clearProposals, definitionForCourse, navigate, confirmProposals, dismissProposal, downloadPack, evidenceTrendNote, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
   scanForRequirements, selectBrief, sendEvidenceBrief, setSkillLexicon, setSourcesReviewed, type AppState,
 } from "../../app/store.ts";
 import { briefDeck } from "../../lib/slides.ts";
@@ -23,7 +23,8 @@ const PROVIDERS = Object.keys(SOURCE_POLICIES) as CollectionProvider[];
 export function ResearchRun({ state, subject, mayEdit }: Props) {
   const [provider, setProvider] = useState<CollectionProvider>("agent");
   const [board, setBoard] = useState("");
-  const [brief, setBrief] = useState("");
+  // The agent's brief starts from where the course's graduates go, as onboarding or the course brief recorded it.
+  const [brief, setBrief] = useState(() => definitionForCourse(subject.id)?.brief.targetRoles ?? "");
   // Agent web search is the default source; when .env does not set it up yet, the panel says what is missing.
   const [agentMissing, setAgentMissing] = useState<string[] | null>(null);
   useEffect(() => {
