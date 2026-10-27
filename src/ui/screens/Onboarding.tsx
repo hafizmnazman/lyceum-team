@@ -6,7 +6,7 @@
 // the account count) and opens the course. Cancelling, or signing out first, deletes the account.
 
 import { useRef, useState } from "react";
-import { ArrowRight, FileUp, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FileUp, Plus, X } from "lucide-react";
 import { JOB_ROLE_LABEL, JOB_ROLES } from "../../app/account.ts";
 import { readOutlineFile } from "../../agents/client.ts";
 import { applyOnboardingOutline, completeOnboarding, createCourseWorkspace, saveOnboardingProfile, signOutAccount, useStore } from "../../app/store.ts";
@@ -26,6 +26,7 @@ export function OnboardingScreen() {
   const state = useStore();
   const me = state.people.find((p) => p.id === state.currentPersonId);
   const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // about you
@@ -53,11 +54,17 @@ export function OnboardingScreen() {
   const [plos, setPlos] = useState<string[]>([]);
   if (!me) return null;
 
+  function moveTo(next: number) {
+    setDirection(next > step ? "forward" : "back");
+    setError("");
+    setStep(next);
+  }
+
   async function saveProfile() {
     setBusy(true); setError("");
     const result = await saveOnboardingProfile({ name, institution, programme, jobRole });
     setBusy(false);
-    if (result.ok) setStep(1); else setError(result.error);
+    if (result.ok) moveTo(1); else setError(result.error);
   }
   /** The lecturer's outline, read by the model: every proposal fills a field or a row that stays editable. */
   async function importOutline(file: File) {
@@ -83,7 +90,7 @@ export function OnboardingScreen() {
     if (!code.trim() || !title.trim()) { setError("Give the course its code and title."); return; }
     if (!term.trim()) { setError("Enter the term this course runs in, e.g. 2026/2027 Semester 1."); return; }
     if (!outcomes.length) setOutcomes([{ key: ++rowKey, text: "", bloom: "Understand", keep: true, inDocument: null }]);
-    setStep(2);
+    moveTo(2);
   }
   async function createCourse() {
     setError("");
@@ -122,14 +129,22 @@ export function OnboardingScreen() {
 
   return (
     <div className="signin forest-backdrop">
-      <div className={"onboarding" + (step === 2 ? " is-wide" : "")}>
+      <div className={"onboarding is-step-" + step + (step === 2 ? " is-wide" : "")}>
         <aside className="onboarding-host"><MascotChat key={step} who="host" mood="greeting" size={120} name={HOST_NAME} lines={lines} /></aside>
         <section className="onboarding-card card card-focal" aria-labelledby="onboarding-title">
-          <div className="onboarding-progress" aria-label={"Step " + (step + 1) + " of " + STEPS.length}>
-            {STEPS.map((label, i) => <span key={label} className={i < step ? "is-done" : i === step ? "is-current" : ""}>{label}</span>)}
+          <div className="onboarding-progress" role="list" aria-label={"Step " + (step + 1) + " of " + STEPS.length}>
+            {STEPS.map((label, i) => <div key={label} className={"onboarding-step-marker" + (i < step ? " is-done" : i === step ? " is-current" : "")} role="listitem" aria-current={i === step ? "step" : undefined}>
+              {i < step ? <button type="button" className="onboarding-step-button" onClick={() => moveTo(i)} aria-label={"Back to step " + (i + 1) + ": " + label}><span className="onboarding-step-node"><Check size={14} strokeWidth={3} /></span><span>{label}</span></button>
+                : <span className="onboarding-step-button"><span className="onboarding-step-node">{i + 1}</span><span>{label}</span></span>}
+              {i < STEPS.length - 1 ? <span className="onboarding-step-connector" aria-hidden /> : null}
+            </div>)}
           </div>
+          <p className="onboarding-next" aria-live="polite">
+            <span className="eyebrow">Step {step + 1} of {STEPS.length}</span>
+            <strong>{step === STEPS.length - 1 ? "Final check" : "Next: " + STEPS[step + 1]}</strong>
+          </p>
 
-          {step === 0 ? <form onSubmit={(e) => { e.preventDefault(); void saveProfile(); }}>
+          {step === 0 ? <form className={"onboarding-step-form " + direction} onSubmit={(e) => { e.preventDefault(); void saveProfile(); }}>
             <h1 id="onboarding-title" className="onboarding-title">Set up your workspace</h1>
             <p className="muted">Signed in as {me.email}. Everything you make is saved to your account on this Lyceum server.</p>
             <Field label="Your name" hint="As colleagues know you, e.g. Dr Aina Rahim."><Input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></Field>
@@ -140,7 +155,7 @@ export function OnboardingScreen() {
             <div className="button-row"><Button type="submit" variant="primary" loading={busy}>Continue <ArrowRight size={15} /></Button><Button variant="quiet" onClick={() => void cancel()}>Cancel sign-up</Button></div>
           </form> : null}
 
-          {step === 1 ? <form onSubmit={(e) => { e.preventDefault(); toOutline(); }}>
+          {step === 1 ? <form className={"onboarding-step-form " + direction} onSubmit={(e) => { e.preventDefault(); toOutline(); }}>
             <h1 id="onboarding-title" className="onboarding-title">Your first course</h1>
             <p className="muted">A personal course workspace in {state.programme.title}. It is yours to prepare; it is not an official approval.</p>
             <div className="outline-drop">
@@ -163,12 +178,12 @@ export function OnboardingScreen() {
             {error ? <p role="alert" className="form-error">{error}</p> : null}
             <div className="button-row">
               <Button type="submit" variant="primary">Continue to the outline <ArrowRight size={15} /></Button>
-              <Button onClick={() => { setError(""); setStep(0); }}>Back</Button>
+              <Button onClick={() => moveTo(0)}><ArrowLeft size={15} /> Back</Button>
               <Button variant="quiet" onClick={() => void cancel()}>Cancel sign-up</Button>
             </div>
           </form> : null}
 
-          {step === 2 ? <form onSubmit={(e) => { e.preventDefault(); void createCourse(); }}>
+          {step === 2 ? <form className={"onboarding-step-form " + direction} onSubmit={(e) => { e.preventDefault(); void createCourse(); }}>
             <h1 id="onboarding-title" className="onboarding-title">{code} outline</h1>
             <p className="muted">{source ? "Proposed from " + source + ". Untick what you don't want and edit the rest." : "Write the course's learning outcomes; topics are optional and can wait for Update."}</p>
 
@@ -211,7 +226,7 @@ export function OnboardingScreen() {
             {error ? <p role="alert" className="form-error">{error}</p> : null}
             <div className="button-row">
               <Button type="submit" variant="primary" loading={busy}>Create the course <ArrowRight size={15} /></Button>
-              <Button onClick={() => { setError(""); setStep(1); }}>Back</Button>
+              <Button onClick={() => moveTo(1)}><ArrowLeft size={15} /> Back</Button>
               <Button variant="quiet" onClick={() => void cancel()}>Cancel sign-up</Button>
             </div>
           </form> : null}

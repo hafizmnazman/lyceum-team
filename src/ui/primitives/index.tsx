@@ -21,7 +21,7 @@ const cx = (...names: Array<string | false | null | undefined>) => names.filter(
 
 /** The content column: left-aligned, capped width, generous padding. */
 export function Page(props: { children: ReactNode; wide?: boolean }) {
-  return <div className={cx("page-content", props.wide && "page-wide")}>{props.children}</div>;
+  return <div className={cx("page-content", "route-enter", props.wide && "page-wide")}>{props.children}</div>;
 }
 
 /** Page header: the display title, the question the screen answers, a quiet

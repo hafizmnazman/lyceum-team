@@ -277,6 +277,17 @@ select {
   animation: fadeIn var(--motion-state) var(--ease-out) both;
 }
 
+/* Route-level entrances use the same small lift and settled landing as Home.
+   The direct-child boundary keeps nested controls from replaying the entrance. */
+.route-enter > * {
+  animation: popIn 420ms var(--ease-out) both;
+}
+.route-enter > :nth-child(2) { animation-delay: 60ms; }
+.route-enter > :nth-child(3) { animation-delay: 110ms; }
+.route-enter > :nth-child(4) { animation-delay: 160ms; }
+.route-enter > :nth-child(5) { animation-delay: 210ms; }
+.route-enter > :nth-child(6) { animation-delay: 260ms; }
+
 /* The working shimmer, shown only while a real request runs. */
 .agent-shimmer {
   background: linear-gradient(90deg, var(--tint-1) 0%, var(--tint-2) 50%, var(--tint-1) 100%);
@@ -995,6 +1006,20 @@ input[type="radio"] {
   color: var(--ink-2);
 }
 
+/* The rail arrives as a readable sequence, including its compact course
+   controls. Tooltip bubbles use the same timing when they leave the rail. */
+.app-sidebar .nav-item,
+.app-sidebar .course-chips,
+.app-sidebar .nav-fold {
+  animation: popIn 360ms var(--ease-out) both;
+}
+.app-sidebar .nav-item:nth-of-type(2) { animation-delay: 45ms; }
+.app-sidebar .nav-item:nth-of-type(3) { animation-delay: 90ms; }
+.app-sidebar .nav-item:nth-of-type(4) { animation-delay: 135ms; }
+.app-sidebar .nav-item:nth-of-type(5) { animation-delay: 180ms; }
+.app-sidebar .course-chips { animation-delay: 90ms; }
+.app-sidebar .nav-fold { animation-delay: 180ms; }
+
 .app-main {
   flex: 1;
   overflow-y: auto;
@@ -1304,6 +1329,14 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .stat-label { font-size: 14px; color: var(--ink-2); line-height: 1.45; }
 .stat-source { font-size: 13px; }
 .landing { min-height: 100%; overflow-y: auto; }
+.landing > * {
+  animation: popIn 420ms var(--ease-out) both;
+}
+.landing > :nth-child(2) { animation-delay: 70ms; }
+.landing > :nth-child(3) { animation-delay: 130ms; }
+.landing > :nth-child(4) { animation-delay: 190ms; }
+.landing > :nth-child(5) { animation-delay: 250ms; }
+.landing > :nth-child(6) { animation-delay: 310ms; }
 .landing-bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px; background: var(--forest); }
 .landing-bar .wordmark { font-size: 28px; }
 .landing-hero { max-width: var(--content-max); margin: 32px auto 0; padding: 0 24px; }
@@ -2369,9 +2402,9 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
 
 /* ---------- The custom tooltip (primitives/Tooltip.tsx): a forest bubble with an arrow and the brand's flat lip, above
    its anchor or below when there is no room. A forest surface, so it carries on-forest. Never takes the pointer. */
-@keyframes tooltipIn { from { opacity: 0; scale: 0.96; } to { opacity: 1; scale: 1; } }
+@keyframes tooltipIn { from { opacity: 0; scale: 0.94; translate: 0 6px; } 65% { opacity: 1; scale: 1.015; translate: 0 0; } to { opacity: 1; scale: 1; translate: 0 0; } }
 .tooltip { position: fixed; z-index: 1000; max-width: 280px; padding: 8px 12px; display: grid; gap: 2px; background: var(--forest); color: var(--white); border-radius: 10px; font-size: 13px; line-height: 1.4; pointer-events: none; box-shadow: 0 4px 0 var(--forest-deep); transform-origin: var(--arrow-x, 50%) 100%; }
-.tooltip.is-placed { animation: tooltipIn 140ms var(--ease-out) both; }
+.tooltip.is-placed { animation: tooltipIn 220ms var(--ease-out) both; }
 .tooltip.is-below { transform-origin: var(--arrow-x, 50%) 0; }
 .tooltip::after { content: ""; position: absolute; left: var(--arrow-x, 50%); bottom: -5px; width: 10px; height: 10px; margin-left: -5px; background: var(--forest); transform: rotate(45deg); }
 .tooltip.is-below::after { bottom: auto; top: -5px; }
@@ -2421,22 +2454,60 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
   .signin-brand { padding: 28px; gap: 20px; }
   .signin-brand .mascot-chat { display: none; }
 }
-.onboarding { display: grid; grid-template-columns: 260px minmax(0, 560px); gap: 32px; align-items: center; width: 100%; max-width: 900px; animation: popIn 480ms var(--ease-out) both; }
+.onboarding { display: grid; grid-template-columns: 300px minmax(0, 720px); gap: 40px; align-items: center; width: 100%; max-width: 1120px; animation: popIn 480ms var(--ease-out) both; }
 .onboarding-card { padding: 28px; }
+.onboarding.is-step-1 .onboarding-card { padding: 24px 28px; }
+.onboarding.is-step-1 .onboarding-card form { gap: 12px; }
+.onboarding.is-step-1 .onboarding-card .form-field { margin-bottom: 4px; }
+.onboarding.is-step-1 .onboarding-card .field-label { margin-bottom: 4px; }
+.onboarding.is-step-1 .onboarding-card .field-hint { margin-top: 4px; }
+.onboarding.is-step-1 .onboarding-card .control { min-height: 44px; }
+.onboarding.is-step-1 .outline-drop { padding: 12px 14px; }
 .onboarding-card form { display: grid; gap: 16px; }
 .onboarding-title { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
 .onboarding-card form > p { margin: -8px 0 0; }
 .onboarding-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
-.onboarding-progress { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 20px; }
-.onboarding-progress span { padding-top: 10px; border-top: 4px solid var(--tint-2); font-size: 13px; font-weight: 700; color: var(--ink-2); transition: border-color 240ms var(--ease-out); }
-.onboarding-progress span.is-current { border-color: var(--emerald); color: var(--ink); }
-.onboarding-progress span.is-done { border-color: var(--emerald); }
+.onboarding-progress { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
+.onboarding-step-marker { position: relative; min-width: 0; }
+.onboarding-step-button { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 0 6px 8px 0; border: 0; border-radius: 6px; background: var(--white); color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 700; text-align: left; }
+button.onboarding-step-button { cursor: pointer; }
+button.onboarding-step-button:hover { color: var(--ink); }
+.onboarding-step-node { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; width: 28px; height: 28px; border: 2px solid var(--border); border-radius: 50%; background: var(--white); color: var(--ink-2); font-family: var(--font-mono); font-size: 12px; transition: background-color 240ms var(--ease-out), border-color 240ms var(--ease-out), color 240ms var(--ease-out), scale 240ms var(--ease-out); }
+.onboarding-step-marker.is-current .onboarding-step-node { border-color: var(--emerald); background: var(--emerald); color: var(--white); scale: 1.12; }
+.onboarding-step-marker.is-current .onboarding-step-button,
+.onboarding-step-marker.is-done .onboarding-step-button { color: var(--ink); }
+.onboarding-step-marker.is-done .onboarding-step-node { border-color: var(--emerald); background: var(--tint-2); color: var(--emerald-text); }
+.onboarding-step-connector { position: absolute; z-index: 0; top: 13px; left: 32px; right: 0; height: 2px; background: var(--border); transition: background-color 300ms var(--ease-out); }
+.onboarding-step-marker.is-done .onboarding-step-connector { background: var(--emerald); }
+.onboarding-next { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 20px; padding: 10px 12px; border-left: 3px solid var(--emerald); background: var(--tint-1); color: var(--ink-2); }
+.onboarding-next .eyebrow { margin: 0; font-size: 11px; }
+.onboarding-next strong { color: var(--ink); font-size: 13px; }
+.onboarding-step-form { animation: onboardingStepForward 360ms var(--ease-out) both; }
+.onboarding-step-form.back { animation-name: onboardingStepBack; }
+@keyframes onboardingStepForward { from { opacity: 0; translate: 18px 0; } to { opacity: 1; translate: 0 0; } }
+@keyframes onboardingStepBack { from { opacity: 0; translate: -18px 0; } to { opacity: 1; translate: 0 0; } }
 .onboarding-host .mascot-chat-bubble { background: var(--white); }
 @media (max-width: 760px) {
   .onboarding { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .onboarding-host .mascot-chat { flex-direction: row; }
   .onboarding-host .mascot-chat-bubble::before { left: -9px; top: 50%; margin: -7px 0 0; border-top: 0; border-bottom: 2px solid var(--forest); }
   .onboarding-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 761px) and (max-height: 850px) {
+  .forest-backdrop.signin { padding: 16px 24px; }
+  .onboarding { gap: 28px; }
+  .onboarding.is-step-1 .onboarding-host .mascot-chat { scale: 0.9; transform-origin: center; }
+  .onboarding.is-step-1 .onboarding-card { padding-top: 20px; padding-bottom: 20px; }
+  .onboarding.is-step-1 .onboarding-progress { margin-bottom: 8px; }
+  .onboarding.is-step-1 .onboarding-next { margin-bottom: 12px; padding: 8px 10px; }
+  .onboarding.is-step-1 .onboarding-card form { gap: 8px; }
+  .onboarding.is-step-1 .onboarding-card .form-field { margin-bottom: 0; }
+}
+@media (max-width: 480px) {
+  .onboarding-step-button { gap: 5px; font-size: 11px; }
+  .onboarding-step-node { flex-basis: 24px; width: 24px; height: 24px; }
+  .onboarding-step-connector { top: 11px; left: 28px; }
+  .onboarding-next { align-items: flex-start; flex-direction: column; gap: 2px; }
 }
 /* Settings: the search chain, in the order it is tried */
 .search-chain { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
