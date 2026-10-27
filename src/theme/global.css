@@ -1390,7 +1390,7 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .ring-steps li.is-next .ring-step-status { color: var(--ink); }
 .ring-step-count { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .start-here { display: flex; gap: 20px; align-items: flex-start; }
-.start-here-host { flex-shrink: 0; }
+.start-here-host { flex-shrink: 0; align-self: center; }
 .start-here-body { flex: 1; min-width: 0; }
 
 /* the denominator meter and the waffle */
@@ -1630,6 +1630,58 @@ button.loop-station-button:hover { background: var(--tint-1); }
    a just-saved record gets one spring, and a slow float belongs to the landing page and the film ---------- */
 .mascot { display: inline-flex; line-height: 0; flex-shrink: 0; }
 .mascot-svg { display: block; overflow: visible; }
+/* Idle life, every character at rest: a float and a blink, each on its own clock so two side by side never move in step,
+   and one move of its own prop. All of it sits under :where() at the lowest weight and before the mood rules, so a
+   working prop, a done spring and a celebration still win. A hop under the pointer. */
+.mascot-idle .mascot-svg { animation: mascotFloat var(--float-dur, 3.2s) ease-in-out infinite alternate; }
+.mascot-idle:hover .mascot-svg { animation: mascotSpring 720ms linear both; }
+.mascot-idle :where([data-part="eyes"]) { animation: mascotBlink var(--blink-dur, 5.4s) ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 60%; }
+.mascot-idle :where(.mascot-svg[data-character="host"]) { --float-dur: 3.2s; --blink-dur: 5.4s; }
+.mascot-idle :where(.mascot-svg[data-character="scout"]) { --float-dur: 2.8s; --blink-dur: 4.6s; }
+.mascot-idle :where(.mascot-svg[data-character="folio"]) { --float-dur: 3.6s; --blink-dur: 6.2s; }
+.mascot-idle :where(.mascot-svg[data-character="atlas"]) { --float-dur: 3.4s; --blink-dur: 5.8s; }
+.mascot-idle :where(.mascot-svg[data-character="lens"]) { --float-dur: 3s; --blink-dur: 4.9s; }
+.mascot-idle :where(.mascot-svg[data-character="quill"]) { --float-dur: 3.8s; --blink-dur: 6.6s; }
+.mascot-idle :where(.mascot-svg[data-character="prism"]) { --float-dur: 2.6s; --blink-dur: 5.1s; }
+.mascot-idle :where(.mascot-svg[data-character="steward"]) { --float-dur: 4s; --blink-dur: 7s; }
+/* the host: its leaf in a breeze and a wave now and then */
+.mascot-idle :where([data-character="host"] [data-part="leaf"]) { animation: mascotLeaf 3.8s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 15% 100%; }
+.mascot-idle :where([data-character="host"] [data-arm="right"]) { animation: mascotWave 8s ease-in-out infinite 1.5s; transform-box: view-box; transform-origin: 108px 156px; }
+/* the helpers: Scout sweeps its telescope, Atlas's thread sways, Lens's bracket breathes, Quill tilts its ruler,
+   Prism's rays shimmer, Steward's receipt flutters, Folio rocks its arms */
+.mascot-idle :where([data-character="scout"] [data-part="prop"]) { animation: mascotSweep 4.4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 20% 80%; }
+.mascot-idle :where([data-character="atlas"] [data-part="prop"]) { animation: mascotSway 3.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 0%; }
+.mascot-idle :where([data-character="lens"] [data-part="prop"]) { animation: mascotBreathe 3.2s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 50%; }
+.mascot-idle :where([data-character="quill"] [data-part="prop"]) { animation: mascotTilt 5s ease-in-out infinite; transform-box: fill-box; transform-origin: 30% 70%; }
+.mascot-idle :where([data-character="prism"] [data-part="prop"]) { animation: mascotShimmer 2.8s ease-in-out infinite alternate; }
+.mascot-idle :where([data-character="steward"] [data-part="receipt"]) { animation: mascotFlutter 4.2s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 0%; }
+.mascot-idle :where([data-character="folio"] [data-part="arms"]) { animation: mascotSway 4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 0%; }
+@keyframes mascotBlink { 0%, 88%, 100% { scale: 1 1; } 91% { scale: 1 0.12; } 94% { scale: 1 1; } }
+@keyframes mascotLeaf { from { rotate: -6deg; } to { rotate: 9deg; } }
+@keyframes mascotWave { 0%, 72%, 100% { rotate: 0deg; } 77% { rotate: -16deg; } 82% { rotate: 7deg; } 87% { rotate: -12deg; } 93% { rotate: 3deg; } }
+@keyframes mascotSweep { from { rotate: -5deg; } to { rotate: 6deg; } }
+@keyframes mascotSway { from { rotate: -3deg; } to { rotate: 3deg; } }
+@keyframes mascotBreathe { from { scale: 1 1; } to { scale: 1.08 1; } }
+@keyframes mascotTilt { 0%, 60%, 100% { rotate: 0deg; } 70% { rotate: -6deg; } 85% { rotate: 4deg; } }
+@keyframes mascotShimmer { from { opacity: 1; } to { opacity: 0.7; } }
+@keyframes mascotFlutter { 0%, 70%, 100% { skew: 0deg 0deg; } 78% { skew: 0deg 3deg; } 88% { skew: 0deg -2deg; } }
+
+/* A character with a chat bubble (MascotChat): it types for a moment, then speaks; pressing it moves to its next line. */
+.mascot-chat { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+.mascot-chat.is-side { flex-direction: row; align-items: center; }
+.mascot-chat-figure { border: 0; background: none; padding: 0; line-height: 0; border-radius: 50%; }
+button.mascot-chat-figure { cursor: pointer; }
+.mascot-chat-bubble { position: relative; width: 100%; min-width: 0; padding: 12px 14px; background: var(--white); border: 2px solid var(--forest); border-radius: var(--radius-card); box-shadow: 3px 3px 0 var(--forest); }
+.mascot-chat-bubble::before { content: ""; position: absolute; left: 50%; top: -9px; width: 14px; height: 14px; margin-left: -7px; background: var(--white); border-left: 2px solid var(--forest); border-top: 2px solid var(--forest); transform: rotate(45deg); }
+.mascot-chat.is-side .mascot-chat-bubble::before { left: -9px; top: 50%; margin: -7px 0 0; border-top: 0; border-bottom: 2px solid var(--forest); }
+.mascot-chat-name { display: block; font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--emerald-text); }
+.mascot-chat-bubble p { margin: 2px 0 0; font-size: 14px; line-height: 1.45; color: var(--ink); min-height: 20px; }
+.mascot-chat-next { margin-top: 6px; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.mascot-chat-typing { display: inline-flex; gap: 4px; padding: 6px 0; }
+.mascot-chat-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-2); animation: chatDot 900ms ease-in-out infinite; }
+.mascot-chat-typing i:nth-child(2) { animation-delay: 150ms; }
+.mascot-chat-typing i:nth-child(3) { animation-delay: 300ms; }
+@keyframes chatDot { 0%, 60%, 100% { translate: 0 0; opacity: 0.45; } 30% { translate: 0 -3px; opacity: 1; } }
 .mascot-working [data-part="prop"] { animation: mascotProp 1.4s var(--ease-out) infinite alternate; transform-box: fill-box; transform-origin: 30% 70%; }
 .mascot-done .mascot-svg, .mascot-celebrating .mascot-svg { animation: mascotSpring 720ms linear both; }
 .mascot-float .mascot-svg { animation: mascotFloat 4s ease-in-out infinite alternate; }
@@ -2229,3 +2281,104 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
   .obe-report h4 { break-after: avoid; }
   .obe-report tr { break-inside: avoid; }
 }
+
+/* ---------- Home: the course's next step beside the work queue ----------
+   One question: what do I do next on my course? Start here answers it, largest and first; the queues (briefs,
+   notifications, courses) sit in a right column on a wide screen and under it otherwise, each keeping its own height. */
+.home-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: stretch; margin-bottom: 32px; }
+@media (min-width: 1280px) { .home-grid { grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); } }
+.home-grid > .workspace-panel, .home-grid > .home-queues { margin: 0; }
+/* Your work: three short queues that are always open, each with one sentence when empty; the link to the course's
+   history is pinned to the foot, so a panel stretched to Start here's height ends on an action, not a hole. */
+.home-queues { display: flex; flex-direction: column; padding: 20px 24px; }
+.home-queues-title { margin: 0 0 4px; }
+.home-queue { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.home-queue:last-of-type { border-bottom: 0; }
+.home-queue h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 15px; }
+.home-queue > p { margin: 0; font-size: 14px; }
+.home-queue .work-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.home-note-top p { margin: 8px 0 10px; font-size: 14px; }
+.home-rows { list-style: none; margin: 0; padding: 0; }
+.home-rows button { display: flex; justify-content: space-between; gap: 12px; width: 100%; min-height: 36px; padding: 6px 8px; margin: 0 -8px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 14px; color: var(--ink); text-align: left; cursor: pointer; }
+.home-rows button:hover, .home-rows button:focus-visible { background: var(--tint-1); }
+.home-rows button > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-rows button > span:last-child { flex: none; }
+.home-queues-foot { margin-top: auto; align-self: flex-start; }
+/* Your courses: one card per course with its own ring, as many across as fit, never an empty slot. */
+.home-courses .section-heading { justify-content: space-between; align-items: center; }
+.home-courses h2 { margin: 0; }
+.home-course-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; }
+.home-course { display: flex; gap: 20px; align-items: center; margin: 0; }
+.home-course-body { min-width: 0; }
+.home-course-body h3 { margin: 0 0 4px; }
+.home-course-body p { margin: 0 0 8px; font-size: 14px; }
+.home-course-body .btn { margin-top: 4px; }
+.start-here { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; align-items: center; }
+.start-here-host { align-self: center; min-width: 0; }
+.ring-panel { gap: 28px; flex-wrap: nowrap; align-items: center; }
+/* the seven steps read down two columns: Course to Decide, then Update to Learn; counts on one right edge */
+.ring-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); grid-auto-flow: column; gap: 2px 32px; }
+.ring-steps li { grid-template-columns: 24px auto auto minmax(0, 1fr); min-height: 36px; }
+.ring-step-status .tag { padding: 1px 8px; font-size: 12px; }
+.ring-step-count { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) {
+  .start-here { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .start-here-host .mascot-chat { flex-direction: row; }
+  .start-here-host .mascot-chat-bubble::before { left: -9px; top: 50%; margin: -7px 0 0; border-top: 0; border-bottom: 2px solid var(--forest); }
+}
+@media (max-width: 640px) {
+  .ring-panel { flex-wrap: wrap; justify-content: center; }
+  .ring-steps { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-auto-flow: row; }
+  .start-here-host .mascot-svg { width: 72px; height: 72px; }
+}
+
+/* The landing page's host speaks its line in a bubble inside the loop. */
+.loop-graphic-host-line { position: relative; margin-top: 8px; padding: 6px 10px; background: var(--white); border: 2px solid var(--forest); border-radius: 12px; color: var(--ink); }
+.loop-graphic-host-line::before { content: ""; position: absolute; left: 50%; top: -7px; width: 10px; height: 10px; margin-left: -5px; background: var(--white); border-left: 2px solid var(--forest); border-top: 2px solid var(--forest); transform: rotate(45deg); }
+
+/* ---------- Pop and wait: entrances on Home, and the ring waiting on its next step ----------
+   Transform and opacity only; prefers-reduced-motion (above) ends every one of them at its final frame at once. */
+@keyframes popIn { from { opacity: 0; scale: 0.94; translate: 0 8px; } 60% { opacity: 1; scale: 1.015; translate: 0 0; } to { opacity: 1; scale: 1; translate: 0 0; } }
+.pop-in { display: inline-block; animation: popIn 420ms var(--ease-out) both; transform-origin: 0 50%; }
+/* Home's blocks pop in once, one after another: Start here, Your work, then each course */
+.home-grid > *, .home-course { animation: popIn 480ms var(--ease-out) both; }
+.home-grid > :nth-child(2) { animation-delay: 90ms; }
+.home-course { animation-delay: calc(180ms + var(--n, 0) * 90ms); }
+.home-course:nth-child(2) { --n: 1; } .home-course:nth-child(3) { --n: 2; } .home-course:nth-child(4) { --n: 3; }
+.mascot-chat-bubble { animation: popIn 380ms var(--ease-out) 240ms both; transform-origin: 50% 0; }
+/* the seven steps arrive in reading order */
+.ring-steps li { animation: popIn 360ms var(--ease-out) both; animation-delay: calc(160ms + var(--k, 0) * 45ms); }
+.ring-steps li:nth-child(2) { --k: 1; } .ring-steps li:nth-child(3) { --k: 2; } .ring-steps li:nth-child(4) { --k: 3; }
+.ring-steps li:nth-child(5) { --k: 4; } .ring-steps li:nth-child(6) { --k: 5; } .ring-steps li:nth-child(7) { --k: 6; }
+
+/* The ring: each done segment draws itself in turn; the next segment breathes and its dashes march forward into it. */
+@keyframes ringDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes ringBreathe { from { opacity: 0.55; } to { opacity: 1; } }
+@keyframes ringMarch { to { stroke-dashoffset: -12; } }
+.ring-seg-done { stroke-dasharray: 1; animation: ringDraw 520ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 110ms); }
+.ring-seg-next { animation: ringBreathe 1.4s ease-in-out infinite alternate; }
+.ring-seg-march { animation: ringMarch 900ms linear infinite; }
+.ring-count { animation: popIn 420ms var(--ease-out) 200ms both; transform-box: fill-box; transform-origin: 50% 50%; }
+/* The next step's mark: its dashed circle turns slowly, and its Next tag gives a soft pulse, waiting to be taken. */
+@keyframes nextPulse { 0%, 100% { scale: 1; } 50% { scale: 1.08; } }
+.ring-steps li.is-next .ring-mark { position: relative; border-color: transparent; }
+.ring-steps li.is-next .ring-mark::before { content: ""; position: absolute; inset: -1.5px; border: 1.5px dashed var(--emerald); border-radius: 50%; animation: spin 8s linear infinite; }
+.ring-steps li.is-next .ring-step-status .tag { animation: nextPulse 1.8s ease-in-out infinite; }
+.settings-loading { display: flex; align-items: center; gap: 8px; }
+/* Each line of a research run pops in as it arrives, so a streaming agent search reads as live work. */
+.collect-log li { animation: popIn 320ms var(--ease-out) both; transform-origin: 0 50%; }
+
+/* ---------- The custom tooltip (primitives/Tooltip.tsx): a forest bubble with an arrow and the brand's flat lip, above
+   its anchor or below when there is no room. A forest surface, so it carries on-forest. Never takes the pointer. */
+@keyframes tooltipIn { from { opacity: 0; scale: 0.96; } to { opacity: 1; scale: 1; } }
+.tooltip { position: fixed; z-index: 1000; max-width: 280px; padding: 8px 12px; display: grid; gap: 2px; background: var(--forest); color: var(--white); border-radius: 10px; font-size: 13px; line-height: 1.4; pointer-events: none; box-shadow: 0 4px 0 var(--forest-deep); transform-origin: var(--arrow-x, 50%) 100%; }
+.tooltip.is-placed { animation: tooltipIn 140ms var(--ease-out) both; }
+.tooltip.is-below { transform-origin: var(--arrow-x, 50%) 0; }
+.tooltip::after { content: ""; position: absolute; left: var(--arrow-x, 50%); bottom: -5px; width: 10px; height: 10px; margin-left: -5px; background: var(--forest); transform: rotate(45deg); }
+.tooltip.is-below::after { bottom: auto; top: -5px; }
+.tooltip-title { font-family: var(--font-display); font-weight: 700; font-size: 14px; }
+.tooltip.on-forest .tooltip-state { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--lime); color: var(--forest); font-size: 11px; font-weight: 800; }
+.tooltip-note { color: var(--tint-2); }
+/* the ring under the pointer: the segment pointed at stays full, the others step back */
+.ring g { transition: opacity 160ms var(--ease-out); }
+.ring.is-pointing g:not(.is-hover) { opacity: 0.4; }

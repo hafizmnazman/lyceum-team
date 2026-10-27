@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { ENV, MODEL_PROVIDERS, SEARCH_PROVIDERS, type PublicAgentSettings } from "../../lib/agentSettings.ts";
-import { Button, Page, PageHead, Tag } from "../primitives/index.tsx";
+import { Button, Page, PageHead, Spinner, Tag } from "../primitives/index.tsx";
 
 type Loaded = { settings: PublicAgentSettings; missing: string[]; path: string };
 type TestResult = { ok: boolean; detail?: string; error?: string } | null;
@@ -18,24 +18,24 @@ async function api(path: string, init?: RequestInit): Promise<unknown> {
 export function SettingsScreen() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"" | "model" | "search">("");
   const [tests, setTests] = useState<{ model: TestResult; search: TestResult }>({ model: null, search: null });
   const reload = () => api("/api/agent-settings").then((d) => { setLoaded(d as Loaded); setError(""); }).catch((e: Error) => setError(e.message));
   useEffect(() => { void reload(); }, []);
 
   async function test(target: "model" | "search") {
-    setBusy(true); setTests((t) => ({ ...t, [target]: null }));
+    setBusy(target); setTests((t) => ({ ...t, [target]: null }));
     try { await reload(); const r = await api("/api/agent-settings/test/" + target, { method: "POST" }) as TestResult; setTests((t) => ({ ...t, [target]: r })); }
-    catch (e) { setTests((t) => ({ ...t, [target]: { ok: false, error: (e as Error).message } })); } finally { setBusy(false); }
+    catch (e) { setTests((t) => ({ ...t, [target]: { ok: false, error: (e as Error).message } })); } finally { setBusy(""); }
   }
-  const testLine = (r: TestResult) => (r ? <p role="status" className={r.ok ? "save-status" : "form-error"}>{r.ok ? r.detail : r.error}</p> : null);
+  const testLine = (r: TestResult) => (r ? <p role="status" className={(r.ok ? "save-status" : "form-error") + " pop-in"}>{r.ok ? r.detail : r.error}</p> : null);
   const row = (label: string, env: string, value: string) => <div><dt>{label} <code>{env}</code></dt><dd>{value || <span className="muted">Not set</span>}</dd></div>;
   const s = loaded?.settings;
 
   return (
     <Page>
       <PageHead title="Settings" context="The model and search provider behind agent web search, on Watch's research run. Any provider with an OpenAI-compatible API and tool calling can drive the agent."
-        actions={<Button disabled={busy} onClick={() => void reload()}>Reload from .env</Button>} />
+        actions={<Button disabled={Boolean(busy)} onClick={() => void reload()}>Reload from .env</Button>} />
       {error ? <p role="alert" className="form-error">{error}</p> : null}
       {s && loaded ? <>
         <p className="muted">
@@ -51,7 +51,7 @@ export function SettingsScreen() {
             {row("Model id", ENV.model, s.model.model)}
             {row("API key", ENV.modelKey, s.model.keyHint ? "Set, " + s.model.keyHint : MODEL_PROVIDERS[s.model.provider].needsKey ? "" : "Not needed")}
           </dl>
-          <div className="button-row"><Button disabled={busy} onClick={() => void test("model")}>Test the model</Button></div>
+          <div className="button-row"><Button loading={busy === "model"} disabled={Boolean(busy)} onClick={() => void test("model")}>{busy === "model" ? "Testing the model..." : "Test the model"}</Button></div>
           {testLine(tests.model)}
         </section>
 
@@ -63,7 +63,7 @@ export function SettingsScreen() {
             {SEARCH_PROVIDERS[s.search.provider].needs.includes("cx") ? row("Search engine id", ENV.searchCx, s.search.cx) : null}
             {SEARCH_PROVIDERS[s.search.provider].needs.includes("url") ? row("Address", ENV.searchUrl, s.search.url) : null}
           </dl>
-          <div className="button-row"><Button disabled={busy} onClick={() => void test("search")}>Test the search</Button></div>
+          <div className="button-row"><Button loading={busy === "search"} disabled={Boolean(busy)} onClick={() => void test("search")}>{busy === "search" ? "Testing the search..." : "Test the search"}</Button></div>
           {testLine(tests.search)}
         </section>
 
@@ -74,7 +74,7 @@ export function SettingsScreen() {
             {row("Postings kept", ENV.maxPostings, String(s.maxPostings))}
           </dl>
         </section>
-      </> : error ? null : <p className="muted">Loading settings from the local API...</p>}
+      </> : error ? null : <p className="muted settings-loading"><Spinner size={14} decorative /> Loading settings from the local API...</p>}
     </Page>
   );
 }

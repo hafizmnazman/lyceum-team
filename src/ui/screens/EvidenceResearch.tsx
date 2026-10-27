@@ -3,7 +3,7 @@
 // confirm each exact quotation, vouch for the extraction, then turn the result
 // into a meeting brief that can be downloaded or sent to a colleague.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   clearCollection, clearProposals, navigate, confirmProposals, dismissProposal, downloadPack, evidenceTrendNote, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
   scanForRequirements, selectBrief, sendEvidenceBrief, setSkillLexicon, setSourcesReviewed, type AppState,
@@ -21,15 +21,14 @@ type Props = { state: AppState; person: Person; subject: Subject; mayEdit: boole
 const PROVIDERS = Object.keys(SOURCE_POLICIES) as CollectionProvider[];
 
 export function ResearchRun({ state, subject, mayEdit }: Props) {
-  const [provider, setProvider] = useState<CollectionProvider>("sample");
+  const [provider, setProvider] = useState<CollectionProvider>("agent");
   const [board, setBoard] = useState("");
   const [brief, setBrief] = useState("");
-  // Agent web search is the default source once .env sets it up; until then, the saved sample. A choice made here wins.
-  const chosen = useRef(false);
+  // Agent web search is the default source; when .env does not set it up yet, the panel says what is missing.
+  const [agentMissing, setAgentMissing] = useState<string[] | null>(null);
   useEffect(() => {
-    fetch("/api/agent-settings").then((r) => (r.ok ? r.json() : null)).then((d: { missing?: string[] } | null) => {
-      if (d && Array.isArray(d.missing) && !d.missing.length && !chosen.current) setProvider("agent");
-    }).catch(() => undefined);
+    fetch("/api/agent-settings").then((r) => (r.ok ? r.json() : null)).then((d: { missing?: string[] } | null) => setAgentMissing(d && Array.isArray(d.missing) ? d.missing : null))
+      .catch(() => setAgentMissing(null));
   }, []);
   const [query, setQuery] = useState("");
   const [inText, setInText] = useState(false);
@@ -51,7 +50,7 @@ export function ResearchRun({ state, subject, mayEdit }: Props) {
     <div className="section-heading"><div><h3 id="research-run">Research run</h3><p className="muted">Fetch postings from a permitted employer board or the dated saved sample, then keep the ones worth reading.</p></div></div>
     {mayEdit ? <>
       <div className="form-grid form-grid-wide-first">
-        <Field label="Source"><Select data-demo-id="collect-provider" value={provider} onChange={(e) => { chosen.current = true; setProvider(e.target.value as CollectionProvider); setMessage(""); }}>{PROVIDERS.map((p) => <option key={p} value={p}>{SOURCE_POLICIES[p].name}</option>)}</Select></Field>
+        <Field label="Source"><Select data-demo-id="collect-provider" value={provider} onChange={(e) => { setProvider(e.target.value as CollectionProvider); setMessage(""); }}>{PROVIDERS.map((p) => <option key={p} value={p}>{SOURCE_POLICIES[p].name}</option>)}</Select></Field>
         {agent ? <Field label="What should the agent look for?" hint="Roles, place and anything else that matters. The model and search provider are chosen in Settings."><Input data-demo-id="collect-brief" maxLength={300} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="e.g. data analyst internships in Malaysia posted this year" /></Field> : null}
         {provider !== "sample" && !agent ? <Field label="Employer board token" hint={provider === "greenhouse" ? "The name in boards.greenhouse.io/NAME, or in an employer's careers link." : "The name in jobs.lever.co/NAME."}><Input data-demo-id="collect-board" maxLength={80} value={board} onChange={(e) => setBoard(e.target.value)} placeholder={provider === "greenhouse" ? "e.g. stripe" : "e.g. palantir"} /></Field> : null}
         <Field label="Role keywords" hint="Comma-separated, matched against posting titles."><Input data-demo-id="collect-query" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. data analyst, analytics" /></Field>
@@ -60,10 +59,11 @@ export function ResearchRun({ state, subject, mayEdit }: Props) {
       <details className="guide-entry"><summary><span>Source policy: {policy.name}</span><Tag tone={policy.enabled ? "ok" : "warn"}>{policy.enabled ? "Permitted on request" : "Disabled"}</Tag></summary>
         <div className="guide-entry-body"><dl className="context-list"><div><dt>Owner</dt><dd>{policy.owner}</dd></div><div><dt>Method</dt><dd>{policy.method}</dd></div><div><dt>Retention</dt><dd>{policy.retention}</dd></div><div><dt>Refresh</dt><dd>{policy.refresh}</dd></div><div><dt>Policy reviewed</dt><dd>{policy.policyReviewedOn}</dd></div></dl><p className="muted">{policy.note}</p></div></details>
       <div className="button-row">
-        <Button variant="primary" data-demo-id="collect-run" disabled={run?.status === "running" || !boardOk} onClick={() => void fetchNow()}>{run?.status === "running" ? (agent ? "Agent searching..." : "Fetching...") : agent ? "Run agent search" : "Fetch postings"}</Button>
+        <Button variant="primary" data-demo-id="collect-run" loading={run?.status === "running"} disabled={!boardOk} onClick={() => void fetchNow()}>{run?.status === "running" ? (agent ? "Agent searching..." : "Fetching...") : agent ? "Run agent search" : "Fetch postings"}</Button>
         {agent ? <Button onClick={() => navigate("settings")}>Agent settings</Button> : null}
         {run ? <Button onClick={() => { clearCollection(); setSelected([]); setMessage(""); }}>Clear results</Button> : null}
       </div>
+      {agent && agentMissing?.length ? <p className="form-error">Agent search is not set up yet. Add {agentMissing.join(", ")} to .env (see Settings), or choose another source.</p> : null}
       {message ? <p role="alert" className="form-error">{message}</p> : null}
       {run ? <div data-demo-id="collect-log"><div className="button-row"><h4>Collection log</h4>{run.status === "running" ? <Tag tone="warn">Fetching now</Tag> : run.status === "failed" ? <Tag tone="danger">Failed</Tag> : run.provider === "sample" ? <Tag>Saved sample, no network</Tag> : run.provider === "agent" ? <Tag tone="accent">Found by the agent, read live</Tag> : run.cached ? <Tag tone="accent">Local cache of a live fetch</Tag> : <Tag tone="ok">Fetched live</Tag>}</div>
         <ol className="collect-log" aria-live="polite">{run.log.map((line, i) => <li key={i}>{line}</li>)}</ol></div> : null}

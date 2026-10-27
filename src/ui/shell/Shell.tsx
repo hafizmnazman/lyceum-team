@@ -28,6 +28,7 @@ import { CommandPalette } from "./CommandPalette.tsx";
 import { AgentPanel } from "./AgentPanel.tsx";
 import { Mark } from "../mascots/mark.tsx";
 import { Kbd } from "../primitives/index.tsx";
+import { Tooltip } from "../primitives/Tooltip.tsx";
 import { PrototypeNotice } from "../primitives/PrototypeNotice.tsx";
 import { SectionHelp } from "../primitives/SectionHelp.tsx";
 
@@ -124,7 +125,7 @@ export function Shell(props: { children: ReactNode }) {
 
       {/* ---------- header: the one forest band ---------- */}
       <header className="app-header on-forest">
-        <button ref={navTrigger} type="button" className="header-icon-btn nav-toggle" aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="primary-sidebar" onClick={() => setNavOpen((open) => !open)}><Menu size={20} /></button>
+        <Tooltip content={navOpen ? "Close the menu" : "Open the menu"}><button ref={navTrigger} type="button" className="header-icon-btn nav-toggle" aria-label="Toggle navigation" aria-expanded={navOpen} aria-controls="primary-sidebar" onClick={() => setNavOpen((open) => !open)}><Menu size={20} /></button></Tooltip>
         <button type="button" className="wordmark" onClick={() => navigate("inbox")} aria-label="Lyceum, go to Home"><Mark size={30} tone="white" leaf />Lyceum</button>
         <span className="header-crumb" aria-hidden>{crumb}</span>
         <div className="header-spacer" />
@@ -135,10 +136,10 @@ export function Shell(props: { children: ReactNode }) {
           <Kbd>Ctrl K</Kbd>
         </button>
 
-        <button type="button" data-demo-id="topbar-bell" className="header-icon-btn" onClick={() => navigate("inbox")} aria-label={`Notifications, ${unread} unread`}>
+        <Tooltip content={unread ? unread + " unread, open Home to read them" : "No unread notifications"}><button type="button" data-demo-id="topbar-bell" className="header-icon-btn" onClick={() => navigate("inbox")} aria-label={`Notifications, ${unread} unread`}>
           <Bell size={18} />
           {unread > 0 ? <span className="header-badge num">{unread}</span> : null}
-        </button>
+        </button></Tooltip>
 
         {/* account menu */}
         <div ref={menuRef} className="account">
@@ -213,19 +214,20 @@ export function Shell(props: { children: ReactNode }) {
                   {mySubjects.map((sid) => {
                     const hats = hatsOn(person.id, sid, state.assignments);
                     const role = hats.includes("coordinator") && hats.includes("lecturer") ? "coordinator and lecturer" : hats.includes("coordinator") ? "coordinator" : "lecturer";
+                    const title = state.subjects.find((x) => x.id === sid)?.title;
                     return (
+                      <Tooltip key={sid} content={<><span className="tooltip-title">{sid}{title ? " " + title : ""}</span><span>You are {role}.</span></>}>
                       <button
-                        key={sid}
                         type="button"
                         data-demo-id={`subject-${sid}`}
                         className="course-chip tabular"
                         aria-pressed={sid === railCourse}
                         aria-label={sid + ", you are " + role}
-                        title={"You are " + role}
                         onClick={() => openStep(sid, "course")}
                       >
                         {sid}
                       </button>
+                      </Tooltip>
                     );
                   })}
                 </div>

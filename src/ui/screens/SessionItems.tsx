@@ -10,6 +10,7 @@ import { downloadBytes, downloadText } from "../../lib/download.ts";
 import { KIND_LABEL, LEVEL_NOTE, LINT_LIMIT, MOODLE_LABEL, QTI_LABEL, lintItem, lintSet, moodleXml, passes, qtiPackage, reviewLine, type ItemContext, type LintCheck } from "../../lib/items.ts";
 import type { DraftItem, Person, Subject, TeachingSession } from "../../types.ts";
 import { Button, Disclosure, Field, Input, Tag, Textarea } from "../primitives/index.tsx";
+import { Tooltip } from "../primitives/Tooltip.tsx";
 
 export function SessionItems({ subject, session, labels, misconceptions, mayEdit, people, demoLine }: {
   subject: Subject; session: TeachingSession; labels: (cloId: string) => string; misconceptions: string[]; mayEdit: boolean; people: Person[]; demoLine: string | null;
@@ -87,7 +88,7 @@ function ItemEditor({ item, onSave, onCancel, onRemove }: { item: DraftItem; onS
       {options.map((o, i) => <div key={i} className="item-option-row">
         <input type="radio" name={"key-" + item.id} checked={o.correct} onChange={() => setOption(i, { correct: true })} aria-label={"Option " + (i + 1) + " is the key"} />
         <Input value={o.text} maxLength={500} onChange={(e) => setOption(i, { text: e.target.value })} aria-label={"Option " + (i + 1)} placeholder={o.correct ? "The keyed answer, in your words" : ""} />
-        <Button variant="quiet" className="item-option-remove" disabled={options.length <= 2} aria-label={"Remove option " + (i + 1)} title="Remove this option" onClick={() => setDraft({ ...draft, options: options.filter((_, k) => k !== i) })}><X size={16} aria-hidden="true" /></Button>
+        <Tooltip content={options.length <= 2 ? "A question keeps at least two options" : "Remove option " + (i + 1)}><Button variant="quiet" className="item-option-remove" disabled={options.length <= 2} aria-label={"Remove option " + (i + 1)} onClick={() => setDraft({ ...draft, options: options.filter((_, k) => k !== i) })}><X size={16} aria-hidden="true" /></Button></Tooltip>
       </div>)}
       {options.length < 4 ? <Button variant="quiet" onClick={() => setDraft({ ...draft, options: [...options, { text: "", correct: false }] })}>Add an option</Button> : null}
     </fieldset> : null}

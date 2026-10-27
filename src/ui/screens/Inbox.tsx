@@ -25,9 +25,10 @@ import {
   selectProposal,
   useStore,
 } from "../../app/store.ts";
-import { Button, Card, Disclosure, Page, PageHead, Row, Tag } from "../primitives/index.tsx";
-import { RingPanel } from "../primitives/loop.tsx";
-import { Mascot, useCourseMoods } from "../mascots/index.tsx";
+import { Button, Page, PageHead, Tag } from "../primitives/index.tsx";
+import { Ring, RingPanel } from "../primitives/loop.tsx";
+import { runTimeline } from "../../app/runs.ts";
+import { HOST_NAME, MascotChat, useCourseMoods } from "../mascots/index.tsx";
 import { BriefDecisionPanel } from "./Decide.tsx";
 
 const KIND_LABEL: Record<Notification["kind"], string> = {
@@ -82,6 +83,7 @@ export function InboxScreen() {
     if (b.recipients.includes(person.id)) return mayDecide(b.subjectId, person) && !mine;
     return b.createdBy === person.id && Boolean(b.sentAt) && !state.briefDecisions.some((d) => d.briefId === b.id && d.byPersonId !== person.id);
   });
+  const activity = recentCourse ? runTimeline(state, recentCourse.id).filter((e) => !e.derived || e.step).slice(-5).reverse() : [];
   const legacy = person.orgRole === "management" ? state.proposals.filter((p) => p.status === "management-approval") : [];
 
   return (
@@ -97,6 +99,7 @@ export function InboxScreen() {
         <BriefDecisionPanel brief={brief} subjectId={brief.subjectId} compact />
       </section> : null}
 
+      <div className="home-grid">
       {person.orgRole === "academic" && recentCourse ? <StartHere subjectId={recentCourse.id}
         resume={<Button onClick={() => openStep(recentCourse.id, recentPlan ? "teach" : "course")} data-demo-id="home-resume">{recentPlan ? "Continue teaching plan" : "Open course workspace"}</Button>}
         resumeNote={nextSession ? "Next class: week " + nextSession.week + ", " + nextSession.topic + "." : recentPlan ? recentPlan.sessions.filter((s) => !s.sample).length + " saved sessions · " + (recentPlan.term || "teaching term not set") : undefined} />
@@ -107,56 +110,50 @@ export function InboxScreen() {
           <div className="button-row"><Button variant="primary" onClick={() => navigate(person.orgRole === "management" ? "approval" : person.orgRole === "department" ? "programme" : "guide")}>{person.orgRole === "management" ? "Open the approvals sandbox" : person.orgRole === "department" ? "Open programme" : "Read the guide"}</Button></div>
         </section>}
 
-      <section className="home-queues" aria-label="Your work">
-        <Disclosure summary="Briefs waiting for a decision" count={waiting.length + (waiting.length === 1 ? " brief" : " briefs")} defaultOpen={waiting.length > 0} data-demo-id="home-briefs">
-          {waiting.length ? <ul className="work-list">{waiting.map((b) => <li key={b.id}><div><strong>{b.subjectId}</strong><span>{b.recipients.includes(person.id) ? "From " + (state.people.find((p) => p.id === b.createdBy)?.name ?? b.createdBy) + ": " + RECOMMENDATION_LABEL[b.recommendation] : "Your brief: waiting for a second person's decision"}</span></div><Button aria-label={"Open the brief for " + b.subjectId} data-demo-id={"waiting-" + b.id} onClick={() => { if (b.recipients.includes(person.id)) selectBrief(b.id); else openStep(b.subjectId, "decide"); }}>Open</Button></li>)}</ul>
+      <section className="home-queues" aria-labelledby="home-queues-title">
+        <h2 id="home-queues-title" className="home-queues-title">Your work</h2>
+        <div className="home-queue" data-demo-id="home-briefs">
+          <h3>Briefs waiting for a decision <Tag>{waiting.length}</Tag></h3>
+          {waiting.length ? <ul className="work-list">{waiting.slice(0, 4).map((b) => <li key={b.id}><div><strong>{b.subjectId}</strong><span>{b.recipients.includes(person.id) ? "From " + (state.people.find((p) => p.id === b.createdBy)?.name ?? b.createdBy) + ": " + RECOMMENDATION_LABEL[b.recommendation] : "Your brief: waiting for a second person's decision"}</span></div><Button aria-label={"Open the brief for " + b.subjectId} data-demo-id={"waiting-" + b.id} onClick={() => { if (b.recipients.includes(person.id)) selectBrief(b.id); else openStep(b.subjectId, "decide"); }}>Open</Button></li>)}</ul>
             : <p className="muted">No brief is waiting for you.</p>}
-          {legacy.length ? <><h3>Illustrative sandbox</h3><ul className="work-list">{legacy.map((p) => <li key={p.id}><div><strong>{p.subjectId}</strong><span>Proposal awaits the sandbox approval</span></div><Button aria-label={"Open proposal for " + p.subjectId} onClick={() => { selectProposal(p.id); navigate("approval"); }}>Open</Button></li>)}</ul></> : null}
-        </Disclosure>
-
-        <Disclosure summary="Notifications" count={unread.length + " unread"} defaultOpen={unread.length > 0} data-demo-id="home-notifications">
-          {top ? (
-            <Card focal data-demo-id="inbox-top">
-              <div className="button-row" style={{ marginBottom: 8 }}>
-                <Tag tone={KIND_TONE[top.kind]}>{KIND_LABEL[top.kind]}</Tag>
-                {top.subjectId ? <span className="num muted">{top.subjectId}</span> : null}
-              </div>
-              {top.agentFindings ? <p style={{ margin: "0 0 14px", maxWidth: 620 }}>{top.agentFindings}</p> : null}
-              <div className="button-row">
-                <Button variant="primary" data-demo-id="inbox-open-top" onClick={() => openNotification(top.id)}>
-                  {top.kind === "evidence-brief" ? "Read brief" : top.kind === "brief-decision" ? "Open Decide" : "Open " + (top.subjectId ?? "it")} <ArrowRight size={15} />
-                </Button>
-                {sender(top) ? <span className="muted">{sender(top)}</span> : null}
-              </div>
-            </Card>
-          ) : (
-            <p className="muted">No unread notifications.</p>
-          )}
-          {rest.length > 0 ? (
-            <div style={{ marginTop: 16 }}>
-              {rest.map((n) => (
-                <Row key={n.id} onClick={() => openNotification(n.id)} data-demo-id={`inbox-${n.id}`}>
-                  <Tag tone={KIND_TONE[n.kind]}>{KIND_LABEL[n.kind]}</Tag>
-                  <span className="num muted" style={{ width: 56 }}>{n.subjectId ?? ""}</span>
-                  <span style={{ flex: 1, fontSize: 13, color: n.read ? "var(--ink-2)" : "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {n.agentFindings ?? KIND_LABEL[n.kind]}
-                  </span>
-                  {!n.read ? <span className="tag tag-accent">Unread</span> : null}
-                </Row>
-              ))}
-            </div>
-          ) : null}
-        </Disclosure>
-
-        {ownCourses.length ? <Disclosure summary="Your courses at a glance" count={ownCourses.length} data-demo-id="home-courses">
-          <div className="course-grid">{ownCourses.map((course) => {
-            const summary = planSummary(state.teachingPlans.find((p) => p.subjectId === course.id), state.clos.filter((c) => c.subjectId === course.id));
-            const loop = loopState(state, course.id);
-            return <article className="workspace-panel" key={course.id}><span className="eyebrow">{course.id} · Year {course.year}, semester {course.semester}</span><h3>{course.title}</h3><p className="muted">{loop.summary}</p><p className="muted">{plural(summary.sessions.length, "teaching session", "teaching sessions")} · {summary.ready} ready · {summary.delivered} delivered</p><Button onClick={() => openStep(course.id, loop.next ?? "course")}>Open {course.id}</Button></article>;
-          })}</div>
-          <Button variant="quiet" onClick={() => navigate("courses")}>Browse courses <ArrowRight size={15} /></Button>
-        </Disclosure> : null}
+          {legacy.length ? <ul className="work-list">{legacy.map((p) => <li key={p.id}><div><strong>{p.subjectId}</strong><span>Illustrative sandbox: proposal awaits approval</span></div><Button aria-label={"Open proposal for " + p.subjectId} onClick={() => { selectProposal(p.id); navigate("approval"); }}>Open</Button></li>)}</ul> : null}
+        </div>
+        <div className="home-queue" data-demo-id="home-notifications">
+          <h3>Notifications <Tag>{unread.length} unread</Tag></h3>
+          {top ? <div className="home-note-top" data-demo-id="inbox-top">
+            <div className="button-row"><Tag tone={KIND_TONE[top.kind]}>{KIND_LABEL[top.kind]}</Tag>{top.subjectId ? <span className="num muted">{top.subjectId}</span> : null}</div>
+            {top.agentFindings ? <p>{top.agentFindings}</p> : null}
+            <div className="button-row"><Button variant="primary" data-demo-id="inbox-open-top" onClick={() => openNotification(top.id)}>{top.kind === "evidence-brief" ? "Read brief" : top.kind === "brief-decision" ? "Open Decide" : "Open " + (top.subjectId ?? "it")} <ArrowRight size={15} /></Button>{sender(top) ? <span className="muted">{sender(top)}</span> : null}</div>
+          </div> : <p className="muted">No unread notifications.</p>}
+          {rest.length ? <ul className="home-rows">{rest.slice(0, 3).map((n) => <li key={n.id}><button type="button" data-demo-id={`inbox-${n.id}`} onClick={() => openNotification(n.id)}>
+            <span className={n.read ? "muted" : ""}>{n.agentFindings ?? KIND_LABEL[n.kind]}</span><span className="num muted">{n.subjectId ?? ""}</span></button></li>)}</ul> : null}
+        </div>
+        {recentCourse ? <div className="home-queue">
+          <h3>Recent on {recentCourse.id}</h3>
+          {activity.length ? <ul className="home-rows">{activity.map((e, i) => <li key={i}><button type="button" onClick={() => openStep(recentCourse.id, e.step ?? "history")}>
+            <span>{e.title}</span><span className="num muted">{when(e.at)}</span></button></li>)}</ul>
+            : <p className="muted">Nothing recorded on {recentCourse.id} yet. Your first research run, brief or decision shows here.</p>}
+        </div> : null}
+        <Button variant="quiet" className="home-queues-foot" onClick={() => recentCourse ? openStep(recentCourse.id, "history") : navigate("courses")}>{recentCourse ? "Open " + recentCourse.id + "'s history" : "Browse courses"} <ArrowRight size={15} /></Button>
       </section>
+      </div>
+
+      {ownCourses.length ? <section className="home-courses" aria-labelledby="home-courses-title" data-demo-id="home-courses">
+        <div className="section-heading"><h2 id="home-courses-title">Your courses</h2><Button variant="quiet" onClick={() => navigate("courses")}>Browse courses <ArrowRight size={15} /></Button></div>
+        <div className="home-course-grid">{ownCourses.map((course) => {
+          const summary = planSummary(state.teachingPlans.find((p) => p.subjectId === course.id), state.clos.filter((c) => c.subjectId === course.id));
+          const loop = loopState(state, course.id);
+          return <article className="workspace-panel home-course" key={course.id}>
+            <Ring loop={loop} size={128} />
+            <div className="home-course-body">
+              <h3><span className="num">{course.id}</span> {course.title}</h3>
+              <p className="muted">Year {course.year}, semester {course.semester} · {plural(summary.sessions.length, "teaching session", "teaching sessions")}, {summary.delivered} delivered</p>
+              <p>{loop.closed ? "Loop closed this term." : loop.next ? stepDef(loop.next).label + " is next." : loop.summary}</p>
+              <Button onClick={() => openStep(course.id, loop.next ?? "course")}>Open {course.id} <ArrowRight size={15} /></Button>
+            </div>
+          </article>;
+        })}</div>
+      </section> : null}
     </Page>
   );
 
@@ -175,18 +172,33 @@ export function InboxScreen() {
   }
 }
 
+/** A record's time in words for the activity list: today's time, yesterday, or the date. */
+function when(at: string): string {
+  const d = new Date(at), now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toTimeString().slice(0, 5);
+  if (new Date(now.getTime() - 86400000).toDateString() === d.toDateString()) return "Yesterday";
+  return at.slice(0, 10);
+}
+
 /** Start here (plan Section 5.3): the host, the ring with the next step lit, and one action. */
 function StartHere({ subjectId, resume, resumeNote }: { subjectId: string; resume?: ReactNode; resumeNote?: string }) {
   const state = useStore();
   const loop = loopState(state, subjectId);
   const moods = useCourseMoods(subjectId);
+  // What the host says: the next step and its question first, then the term's progress, then one tip.
+  const done = loop.steps.filter((s) => s.done).length, next = loop.next ? stepDef(loop.next) : null;
+  const lines = [
+    loop.closed ? "The loop is closed on " + subjectId + " for this term. The recap has every receipt." : next ? next.label + " is next on " + subjectId + ". " + next.question : "Open the course to carry on.",
+    done + " of " + loop.steps.length + " steps done" + (loop.window.term ? " for " + loop.window.term + "." : ". Set the term at the Course step so the loop counts this term's records."),
+    "Every step saves in this browser. Guide & progress has the backup, and Settings sets up agent web search.",
+  ];
   return <section className="workspace-panel start-here" aria-labelledby="start-here-title" data-demo-id="journey-card">
-    <div className="start-here-host">{moods ? <Mascot who="host" mood={moods.host} size={88} /> : null}</div>
+    <div className="start-here-host">{moods ? <MascotChat key={subjectId} who="host" mood={moods.host} size={96} name={HOST_NAME} lines={lines} /> : null}</div>
     <div className="start-here-body">
       <div className="section-heading"><div><span className="eyebrow">Start here · {subjectId}</span><h2 id="start-here-title">{loop.closed ? "The loop is closed for this term" : "Continue the loop on " + subjectId}</h2></div>
         {loop.next ? <Button variant="primary" data-demo-id="journey-next" onClick={() => openStep(subjectId, loop.next!)}>Continue: {stepDef(loop.next).label} <ArrowRight size={15} /></Button>
           : loop.closed ? <Button data-demo-id="journey-recap" onClick={() => openRecap(subjectId)}>The term recap <ArrowRight size={15} /></Button> : null}</div>
-      <RingPanel loop={loop} onStep={(step) => openStep(subjectId, step)} />
+      <RingPanel loop={loop} onStep={(step) => openStep(subjectId, step)} size={148} />
       {resume ? <div className="start-here-resume button-row">{resume}{resumeNote ? <span className="muted">{resumeNote}</span> : null}</div> : null}
     </div>
   </section>;

@@ -55,7 +55,7 @@ export function Host({ pose = "resting", size = 96, surface = "light", detail, m
       <TwoTone id={trunkId} d={HOST_TRUNK} light={color.forestBorder} dark={color.forest2} shift={[-7, -4]} />
       {level !== "base" ? <g fill="none" stroke={color.forest2} strokeWidth={2.5} strokeLinecap="round"><path d="M96 150 q-2 8 0 16" /><path d="M104 146 q2 6 0 12" /></g> : null}
       <g data-part="arms">
-        {arms.map((d) => { const t = tip(d); return <g key={d}><Arm d={d} fill={color.forestBorder} /><circle cx={t.x} cy={t.y} r={7} fill={color.ray3} stroke={INK} strokeWidth={3.5} /></g>; })}
+        {arms.map((d, i) => { const t = tip(d); return <g key={d} data-arm={i ? "right" : "left"}><Arm d={d} fill={color.forestBorder} /><circle cx={t.x} cy={t.y} r={7} fill={color.ray3} stroke={INK} strokeWidth={3.5} /></g>; })}
       </g>
       {/* the crown, which carries the face */}
       <TwoTone id={crownId} d={HOST_CROWN} light={color.ray3} dark={color.ray2} shift={[-16, -14]} />

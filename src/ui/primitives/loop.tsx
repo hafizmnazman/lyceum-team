@@ -3,7 +3,7 @@
 // decision card and the handoff card. All colour comes from the token variables;
 // every state a colour shows is also said in words.
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { LOOP_STEPS, REPORT_TABS, REPORT_TAB_LABEL, RING_STEPS, ringTermLines, stepDef, type CourseStep, type LoopState, type ReportTab } from "../../app/loop.ts";
 import { OUTCOME_LABEL } from "../../lib/decisions.ts";
@@ -11,6 +11,7 @@ import { locateExcerpt, normaliseWhitespace, STAGE_LABEL, type SkillRow } from "
 import type { BriefDecision, EvidenceSource } from "../../types.ts";
 import { Button, Tag } from "./index.tsx";
 import { ShareBar } from "./ShareBar.tsx";
+import { TooltipBubble, useTooltipAnchor } from "./Tooltip.tsx";
 
 const pct = (x: number | null) => (x === null ? "Unknown" : Math.round(x * 1000) / 10 + "%");
 
@@ -30,27 +31,42 @@ export function Ring({ loop, size = 132, compact = false, leaf }: { loop: LoopSt
   };
   const done = loop.steps.filter((s) => RING_STEPS.includes(s.id) && s.done).length;
   const label = "The loop for this course, " + (loop.window.term || "term not set") + ": " + done + " of " + n + " done" + (loop.next ? "; next, " + stepDef(loop.next).label : "; closed") + ".";
-  return (
-    <svg className="ring" viewBox={"0 0 " + size + " " + size} width={size} height={size} role="img" aria-label={label}>
+  // Hovering a segment names its step: done, next or not yet, its count, and the question it answers. The ring's
+  // label and the step list beside it already say all of this in words, so the tooltip is for the pointer only.
+  const { tip, open, close } = useTooltipAnchor<CourseStep>();
+  const tipStep = tip ? loop.steps.find((s) => s.id === tip.key) : null;
+  return (<>
+    <svg className={"ring" + (tip ? " is-pointing" : "")} viewBox={"0 0 " + size + " " + size} width={size} height={size} role="img" aria-label={label}>
       <title>{label}</title>
       {RING_STEPS.map((id, i) => {
         const st = loop.steps.find((s) => s.id === id)!;
         const isNext = loop.next === id;
-        return <g key={id}>
-          <path d={arc(i)} fill="none" stroke={st.done ? "var(--emerald)" : isNext ? "var(--moods)" : "var(--tint-2)"} strokeWidth={w} strokeLinecap="butt" />
-          {isNext ? <path d={arc(i)} fill="none" stroke="var(--emerald-text)" strokeWidth={2} strokeDasharray="3 3" /> : null}
+        // Done segments draw themselves in, one after another; the next one breathes and its dashes march forward, waiting.
+        return <g key={id} style={{ "--i": i } as CSSProperties} className={tip?.key === id ? "is-hover" : undefined}
+          onPointerEnter={(e) => open(id, e.currentTarget)} onPointerLeave={close}>
+          <path d={arc(i)} fill="none" stroke="var(--tint-2)" strokeWidth={w} strokeLinecap="butt" />
+          {st.done ? <path className="ring-seg-done" d={arc(i)} pathLength={1} fill="none" stroke="var(--emerald)" strokeWidth={w} strokeLinecap="butt" /> : null}
+          {isNext ? <>
+            <path className="ring-seg-next" d={arc(i)} fill="none" stroke="var(--moods)" strokeWidth={w} strokeLinecap="butt" />
+            <path className="ring-seg-march" d={arc(i)} fill="none" stroke="var(--emerald-text)" strokeWidth={2} strokeDasharray="3 3" />
+          </> : null}
         </g>;
       })}
       {compact ? null : (() => {
         const lines = ringTermLines(loop.window.term || "Term not set", Math.floor((size - 2 * (w + 6)) / 7.4));
         return <>
-          <text x={c} y={lines.length > 1 ? c - 9 : c - 4} textAnchor="middle" className="ring-count">{done} of {n}</text>
+          <text x={c} y={lines.length > 1 ? c - 9 : c - 4} textAnchor="middle" className="ring-count" style={{ fontSize: Math.min(22, Math.round(size * 0.17)) }}>{done} of {n}</text>
           {lines.map((line, i) => <text key={i} x={c} y={(lines.length > 1 ? c + 8 : c + 14) + i * 14} textAnchor="middle" className="ring-term">{line}</text>)}
         </>;
       })()}
       {leaf}
     </svg>
-  );
+    {tip && tipStep ? <TooltipBubble anchor={tip.rect}>
+      <span className="tooltip-title">{stepDef(tip.key).label} <span className="tooltip-state">{tipStep.done ? "Done" : loop.next === tip.key ? "Next" : "Not yet"}</span></span>
+      <span>{tipStep.note ?? tipStep.count}</span>
+      <span className="tooltip-note">{stepDef(tip.key).question}</span>
+    </TooltipBubble> : null}
+  </>);
 }
 
 /** The ring with its words: each step, done or next, with its count, the ring's text equivalent. */
@@ -65,7 +81,7 @@ export function RingPanel({ loop, onStep, size = 132 }: { loop: LoopState; onSte
             return <li key={id} className={st.done ? "is-done" : isNext ? "is-next" : ""}>
               <span className="ring-mark" aria-hidden>{st.done ? <Check size={12} strokeWidth={3} /> : def.number ?? "S"}</span>
               {onStep ? <button type="button" className="ring-step-link" onClick={() => onStep(id)}>{def.label}</button> : <span>{def.label}</span>}
-              <span className="ring-step-status">{st.done ? "Done" : isNext ? "Next" : ""}</span>
+              <span className="ring-step-status">{st.done ? <span className="tag tag-ok">Done</span> : isNext ? <span className="tag tag-accent">Next</span> : null}</span>
               <span className="muted ring-step-count">{st.note ?? st.count}</span>
             </li>;
           })}

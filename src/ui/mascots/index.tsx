@@ -4,7 +4,9 @@
 // technology and its name sits in the adjacent label. It never appears for a
 // failed request ("stuck"): the error card speaks instead.
 
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useState } from "react";
+import { reducedMotion } from "../motion.ts";
+import { Tooltip } from "../primitives/Tooltip.tsx";
 import { moodsFor, DONE_WINDOW_MS, type CourseMoods, type HelperMood, type HelperRole, type HostMood } from "../../app/moods.ts";
 import { nowIso, useStore } from "../../app/store.ts";
 import { Atlas } from "./atlas.tsx";
@@ -40,15 +42,16 @@ const HELPERS = { folio: Folio, scout: Scout, atlas: Atlas, lens: Lens, quill: Q
 export const CHARACTERS = { host: Host, ...HELPERS } as const;
 
 type MascotProps =
-  | { who: "host"; mood: HostMood; size?: number; surface?: Surface; detail?: Detail; float?: boolean; className?: string }
-  | { who: HelperRole; mood: HelperMood; size?: number; surface?: Surface; detail?: Detail; interval?: number; className?: string; float?: never };
+  | { who: "host"; mood: HostMood; size?: number; surface?: Surface; detail?: Detail; float?: boolean; still?: boolean; className?: string }
+  | { who: HelperRole; mood: HelperMood; size?: number; surface?: Surface; detail?: Detail; interval?: number; still?: boolean; className?: string; float?: never };
 
-/** A character in a mood. Rest is static; the prop moves only while a request really runs, and a
- *  just-saved record gets one spring. prefers-reduced-motion stops both (global.css). */
+/** A character in a mood. At rest each one has a quiet idle life of its own (a float, a blink and a move of its prop,
+ *  global.css), unless it is still; the prop moves faster while a request really runs, and a just-saved record gets
+ *  one spring. prefers-reduced-motion stops all of it (global.css). */
 export function Mascot(props: MascotProps) {
   if (props.who !== "host" && props.mood === "stuck") return null;
   const size = props.size ?? 64;
-  const classes = ["mascot", "mascot-" + props.mood, props.who === "host" && props.float ? "mascot-float" : "", props.className ?? ""].filter(Boolean).join(" ");
+  const classes = ["mascot", "mascot-" + props.mood, props.who === "host" && props.float ? "mascot-float" : "", props.still ? "" : "mascot-idle", props.className ?? ""].filter(Boolean).join(" ");
   return (
     <span className={classes} aria-hidden="true">
       {props.who === "host"
@@ -57,6 +60,33 @@ export function Mascot(props: MascotProps) {
           ? <Lens pose={props.mood as HelperPose} size={size} surface={props.surface} detail={props.detail} interval={props.interval} />
           : (() => { const C = HELPERS[props.who]; return <C pose={props.mood as HelperPose} size={size} surface={props.surface} detail={props.detail} />; })()}
     </span>
+  );
+}
+
+/** A character with a chat bubble: it "types" for a moment, then says its line. With several lines, pressing the
+ *  character (or Next) moves to the next one; nothing rotates by itself, so a reader is never interrupted. */
+export function MascotChat(props: MascotProps & { name: string; lines: string[]; layout?: "stack" | "side" }) {
+  const { name, lines, layout = "stack", ...mascot } = props;
+  const [at, setAt] = useState(0);
+  const [typing, setTyping] = useState(true);
+  const line = lines[at % Math.max(1, lines.length)] ?? "";
+  useEffect(() => {
+    setTyping(true);
+    const t = setTimeout(() => setTyping(false), reducedMotion() ? 0 : 650);
+    return () => clearTimeout(t);
+  }, [line]);
+  const next = () => setAt((n) => (n + 1) % lines.length);
+  const many = lines.length > 1;
+  return (
+    <div className={"mascot-chat is-" + layout}>
+      {many ? <Tooltip content={"Press " + name + " for the next tip"}><button type="button" className="mascot-chat-figure" onClick={next} aria-label={"Next tip from " + name}><Mascot {...(mascot as MascotProps)} /></button></Tooltip>
+        : <span className="mascot-chat-figure"><Mascot {...(mascot as MascotProps)} /></span>}
+      <div className="mascot-chat-bubble">
+        <span className="mascot-chat-name">{name}</span>
+        <p aria-live="polite">{typing ? <span className="mascot-chat-typing" aria-hidden="true"><i /><i /><i /></span> : <span key={line} className="pop-in">{line}</span>}</p>
+        {many && !typing ? <button type="button" className="mascot-chat-next" onClick={next}>Next tip <span className="muted">{(at % lines.length) + 1} of {lines.length}</span></button> : null}
+      </div>
+    </div>
   );
 }
 
