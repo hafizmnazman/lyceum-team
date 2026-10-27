@@ -334,7 +334,7 @@ Explore the prototype's course relevance and source-agreement presentation.
 See which model and web search provider agent web search will use, as set in .env, and test both.
 
 1. In .env, set LYCEUM_AGENT_PROVIDER (openai, openrouter, gemini, groq, ollama, or custom with LYCEUM_AGENT_BASE_URL), LYCEUM_AGENT_MODEL and LYCEUM_AGENT_API_KEY. The model must support tool calling.
-2. Set LYCEUM_SEARCH_PROVIDER (tavily, brave, serper, google or searxng) and its key, search engine id or address, and the per-run limits if the defaults do not suit.
+2. Search needs nothing set: it tries SearXNG (npm run search:up starts one with Docker), then DuckDuckGo. To change the order, set LYCEUM_SEARCH_PROVIDER and LYCEUM_SEARCH_FALLBACK, and add a key such as TAVILY_API_KEY for a keyed provider; LYCEUM_SEARCH_TIME sets the default window.
 3. Open Settings to check what the local API read, and test the model (it must call a tool) and the search. Edits to .env apply on the next request.
 
 **Output:** A read-only view of the agent's settings, with keys shown only as their last four characters.

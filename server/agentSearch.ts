@@ -11,7 +11,8 @@ import { truncateText } from "../src/lib/collect.ts";
 import { settingsFromEnv, type AgentSettings } from "../src/lib/agentSettings.ts";
 import type { CollectedPosting } from "../src/types.ts";
 import { collectBoard } from "./collect.ts";
-import { ToolError, readPage, safeFetch, searchWeb, type ReadPage, type SearchHit } from "./webTools.ts";
+import { SEARCH_PROVIDERS, isTimeFilter, type TimeFilter } from "../src/lib/agentSettings.ts";
+import { ToolError, readPage, safeFetch, searchWeb, type ChainResult, type ReadPage } from "./webTools.ts";
 
 // ---------- settings, from .env, read again on every request so an edit takes effect without a restart ----------
 export const ENV_PATH = process.env.LYCEUM_ENV_FILE || ".env";
@@ -57,8 +58,9 @@ export function openAiChat(s: AgentSettings): Chat {
 
 // ---------- the tools ----------
 export const TOOLS: ToolSpec[] = [
-  { type: "function", function: { name: "web_search", description: "Search the web. Returns titles, URLs and snippets. Use it to find job postings, employers' career pages and their job boards.",
-    parameters: { type: "object", properties: { query: { type: "string", description: "The search query" } }, required: ["query"] } } },
+  { type: "function", function: { name: "web_search", description: "Search the web. Returns titles, URLs and snippets. Use it to find job postings, employers' career pages and their job boards. Results default to a recent window; pass time_filter to change it, or any for no limit.",
+    parameters: { type: "object", properties: { query: { type: "string", description: "The search query" },
+      time_filter: { type: "string", enum: ["day", "week", "month", "year", "any"], description: "Only results from the past day, week, month or year; any for no limit" } }, required: ["query"] } } },
   { type: "function", function: { name: "web_fetch", description: "Read one web page by URL and return its title and text, and whether it publishes structured job posting data. Read a posting before saving it.",
     parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } } },
   { type: "function", function: { name: "collect_board", description: "List every open posting on one employer's Greenhouse or Lever job board. The board token is the NAME in boards.greenhouse.io/NAME, job-boards.greenhouse.io/NAME or jobs.lever.co/NAME. Prefer this over reading those boards' pages.",
@@ -78,7 +80,8 @@ export const SYSTEM_PROMPT = [
 
 export interface AgentDeps {
   chat: Chat;
-  search: (query: string) => Promise<SearchHit[]>;
+  /** time: a window the model asked for, null for none, undefined for the default in .env. */
+  search: (query: string, time?: TimeFilter | null) => Promise<ChainResult>;
   fetchPage: (url: string) => Promise<ReadPage>;
   collect: (provider: "greenhouse" | "lever", board: string) => Promise<CollectedPosting[]>;
   now?: () => Date;
@@ -107,11 +110,13 @@ export async function runAgentSearch(brief: string, deps: AgentDeps, limits: { m
 
   async function run(name: string, args: Record<string, unknown>): Promise<string> {
     if (name === "web_search") {
-      const query = argStr(args, "query");
-      log("Searching the web for \"" + query + "\"");
+      const query = argStr(args, "query"), window = argStr(args, "time_filter", false);
+      const time = window === "any" ? null : isTimeFilter(window) ? window : undefined;
+      log("Searching the web for \"" + query + "\"" + (time ? ", past " + time : time === null ? ", any date" : ""));
       searches += 1;
-      const hits = await deps.search(query);
-      log("  " + hits.length + " results");
+      const { hits, provider, skipped } = await deps.search(query, time);
+      for (const s of skipped) log("  " + SEARCH_PROVIDERS[s.provider].label + " skipped: " + s.why);
+      log("  " + hits.length + " results" + (provider ? " from " + SEARCH_PROVIDERS[provider].label : ""));
       return hits.length ? hits.map((h, i) => (i + 1) + ". " + h.title + "\n   " + h.url + "\n   " + h.snippet).join("\n") : "No results.";
     }
     if (name === "web_fetch") {
@@ -181,7 +186,7 @@ export async function runAgentSearch(brief: string, deps: AgentDeps, limits: { m
 export function liveDeps(s: AgentSettings): AgentDeps {
   return {
     chat: openAiChat(s),
-    search: (q) => searchWeb(s.search, q),
+    search: (q, time) => searchWeb(s.search, q, time === undefined ? s.search.timeFilter : time),
     fetchPage: async (url) => readPage(await safeFetch(url)),
     collect: async (provider, board) => (await collectBoard(provider, board)).postings,
   };

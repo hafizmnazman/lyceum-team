@@ -7,6 +7,7 @@ import { currentPerson, navigate, useStore } from "../../app/store.ts";
 import { Footprints, Play } from "lucide-react";
 import { HOST_NAME } from "../mascots/index.tsx";
 import { Button, Field, Input, Page, PageHead, Tag } from "../primitives/index.tsx";
+import { Segmented } from "../primitives/Segmented.tsx";
 
 export function GuideScreen() {
   const state = useStore();
@@ -33,10 +34,7 @@ export function GuideScreen() {
       <div className="section-heading"><h2>Section-by-section guide</h2></div>
       <div className="filter-bar">
         <Field label="Find a section or function"><Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search outcomes, upload, review…" /></Field>
-        <div className="button-row" aria-label="Guide scope">
-          <Button aria-pressed={scope === "mine"} variant={scope === "mine" ? "primary" : "outline"} onClick={() => setScope("mine")}>My sections</Button>
-          <Button aria-pressed={scope === "all"} variant={scope === "all" ? "primary" : "outline"} onClick={() => setScope("all")}>All roles</Button>
-        </div>
+        <Segmented label="Guide scope" value={scope} onChange={setScope} options={[{ value: "mine", label: "My sections" }, { value: "all", label: "All roles" }]} />
       </div>
       <p className="muted" role="status">{sections.length} sections shown. “Working locally” means functional in this browser, not production ready.</p>
       {!sections.length ? <div className="workspace-panel"><h3>No matching sections</h3><p>Try a course task such as outcomes, upload or review, or show all roles.</p><Button onClick={() => { setQuery(""); setScope("all"); }}>Clear guide filters</Button></div> : null}

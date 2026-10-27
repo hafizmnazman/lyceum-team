@@ -109,8 +109,10 @@ app.post("/api/agent-settings/test/:target", async (c) => {
       return c.json({ ok: true, detail: called ? "The model answered and called a tool, so tool calling works." : "The model answered but did not call the tool. It may not support tool calling well; try another model.", toolCalling: Boolean(called) });
     }
     if (target === "search") {
-      const hits = await searchWeb(s.search, "software engineer job posting", 5);
-      return c.json({ ok: true, detail: hits.length + " results, the first: " + (hits[0] ? hits[0].title + " (" + hits[0].url + ")" : "none") });
+      const r = await searchWeb(s.search, "software engineer job posting", s.search.timeFilter, 5);
+      const skipped = r.skipped.map((x) => x.provider + " skipped (" + x.why + ")").join("; ");
+      return c.json({ ok: r.hits.length > 0, detail: r.hits.length + " results from " + (r.provider ?? "no provider") + (r.hits[0] ? ", the first: " + r.hits[0].title + " (" + r.hits[0].url + ")" : "") + (skipped ? ". " + skipped : ""),
+        error: r.hits.length ? undefined : "No provider found results. " + skipped });
     }
     return c.json({ error: "unknown test" }, 404);
   } catch (err) {

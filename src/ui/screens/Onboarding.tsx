@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
+import { JOB_ROLE_LABEL, JOB_ROLES } from "../../app/account.ts";
 import { createCourseWorkspace, navigate, saveOnboardingProfile, useStore } from "../../app/store.ts";
 import { HOST_NAME, MascotChat } from "../mascots/index.tsx";
 import { Button, Field, Input, Select } from "../primitives/index.tsx";
@@ -18,6 +19,7 @@ export function OnboardingScreen() {
   const [error, setError] = useState("");
   const [name, setName] = useState(me?.name ?? "");
   const [institution, setInstitution] = useState(state.institution.name === "My institution" ? "" : state.institution.name);
+  const [jobRole, setJobRole] = useState<string>(state.account?.user.jobRole ?? "");
   const [programme, setProgramme] = useState(state.programme.title === "My programme" ? "" : state.programme.title);
   const [code, setCode] = useState("");
   const [title, setTitle] = useState("");
@@ -27,7 +29,7 @@ export function OnboardingScreen() {
 
   async function saveProfile() {
     setBusy(true); setError("");
-    const result = await saveOnboardingProfile({ name, institution, programme });
+    const result = await saveOnboardingProfile({ name, institution, programme, jobRole });
     setBusy(false);
     if (result.ok) setStep(1); else setError(result.error);
   }
@@ -52,6 +54,10 @@ export function OnboardingScreen() {
             <h1 id="onboarding-title" className="onboarding-title">Set up your workspace</h1>
             <p className="muted">Signed in as {me.email}. Everything you make is saved to your account on this Lyceum server.</p>
             <Field label="Your name" hint="As colleagues know you, e.g. Dr Aina Rahim."><Input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></Field>
+            <Field label="Your role"><Select value={jobRole} onChange={(e) => setJobRole(e.target.value)} required>
+              <option value="" disabled>Choose one</option>
+              {JOB_ROLES.map((r) => <option key={r} value={r}>{JOB_ROLE_LABEL[r]}</option>)}
+            </Select></Field>
             <Field label="Institution"><Input autoComplete="organization" value={institution} onChange={(e) => setInstitution(e.target.value)} required maxLength={200} placeholder="e.g. Universiti Teknologi PETRONAS" /></Field>
             <Field label="Programme" hint="The degree your courses belong to."><Input value={programme} onChange={(e) => setProgramme(e.target.value)} required maxLength={200} placeholder="e.g. Bachelor of Computer Science" /></Field>
             {error ? <p role="alert" className="form-error">{error}</p> : null}

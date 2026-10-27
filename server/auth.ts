@@ -1,23 +1,21 @@
 // Real accounts on the local API: email and password, a session in an HttpOnly cookie, and each account's workspace kept
-// on the server so it follows the person to another browser. Stored in SQLite through node:sqlite (built into Node 24, no
-// dependency). Passwords are hashed with scrypt and a random salt; only a hash of each session token is stored; five wrong
+// on the server so it follows the person to another browser. Stored in SQLite (server/db.ts, schema in server/migrations/). Passwords are hashed with scrypt and a random salt; only a hash of each session token is stored; five wrong
 // passwords lock an email for fifteen minutes. A workspace is saved in the backup format and checked by the same
 // validator as a restored backup, with a version number so two windows cannot silently overwrite each other.
 
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { MAX_BACKUP_BYTES, parseWorkspaceBackup } from "../src/lib/workspaceBackup.ts";
+import { DB_PATH, openDatabase } from "./db.ts";
+import { JOB_ROLES, type JobRole } from "../src/app/account.ts";
 
-export const DB_PATH = process.env.LYCEUM_DB || "data/lyceum.db";
 export const SESSION_COOKIE = "lyceum_session";
 const SESSION_DAYS = 30, LOCK_AFTER = 5, LOCK_MS = 15 * 60 * 1000;
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 } as const;
 
-export interface User { id: string; email: string; name: string; personId: string; createdAt: string }
+export interface User { id: string; email: string; name: string; personId: string; createdAt: string; institution: string; jobRole: JobRole | null }
 export interface Client { ip: string | null; userAgent: string | null }
 export class AuthError extends Error {
   status: 400 | 401 | 403 | 409 | 413 | 429;
@@ -40,13 +38,19 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 export const normaliseEmail = (email: string) => email.trim().toLowerCase();
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export function signupError(input: { name: string; email: string; password: string }): string | null {
+/** Where and as what someone teaches: required at sign up, asked in onboarding of a Google account. */
+export function profileError(input: { institution?: string; jobRole?: string }): string | null {
+  if (input.institution !== undefined && (!input.institution.trim() || input.institution.trim().length > 200)) return "Enter your institution, up to 200 characters.";
+  if (input.jobRole !== undefined && !JOB_ROLES.includes(input.jobRole as JobRole)) return "Choose your role.";
+  return null;
+}
+export function signupError(input: { name: string; email: string; password: string; institution?: string; jobRole?: string }): string | null {
   if (!input.name.trim() || input.name.trim().length > 100) return "Enter your name, up to 100 characters.";
   if (!EMAIL.test(normaliseEmail(input.email)) || input.email.length > 254) return "Enter a valid email address.";
   if (input.password.length < 10) return "Use a password of at least 10 characters.";
   if (input.password.length > 200) return "Use a password of at most 200 characters.";
   if (input.password.toLowerCase() === normaliseEmail(input.email)) return "Choose a password that is not your email address.";
-  return null;
+  return profileError({ institution: input.institution ?? "", jobRole: input.jobRole ?? "" });
 }
 
 export class AuthStore {
@@ -55,23 +59,8 @@ export class AuthStore {
   private now: () => number;
   constructor(path = DB_PATH, now: () => number = Date.now) {
     this.now = now;
-    if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-    this.db = new DatabaseSync(path);
-    this.db.exec(`
-      PRAGMA foreign_keys = ON;
-      CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password TEXT NOT NULL, created_at TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS workspaces (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, backup TEXT NOT NULL, version INTEGER NOT NULL, updated_at TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS auth_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL CHECK (event IN ('signup', 'login', 'login_failed', 'logout')),
-        user_id TEXT REFERENCES users(id) ON DELETE SET NULL, email TEXT, reason TEXT, method TEXT, ip TEXT, user_agent TEXT, created_at TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS auth_events_created_at ON auth_events (created_at DESC);
-    `);
-    // Google sign-in (docs/GOOGLE_AUTH_PORTABLE.md) keys an account on Google's stable sub, never on its email. A database
-    // made before it gets the columns here; a Google account has no password, so its password is the empty string, which
-    // never verifies.
-    const columns = (this.db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>).map((c) => c.name);
-    if (!columns.includes("google_sub")) this.db.exec("ALTER TABLE users ADD COLUMN google_sub TEXT; ALTER TABLE users ADD COLUMN last_login_at TEXT;");
-    this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users (google_sub) WHERE google_sub IS NOT NULL;");
+    // The schema lives in server/migrations/ and is applied, once each, by openDatabase (server/db.ts).
+    this.db = openDatabase(path);
   }
   /** One row per sign up, sign in, failed sign in and sign out, kept when the account is deleted. */
   audit(event: "signup" | "login" | "login_failed" | "logout", details: { userId?: string; email?: string; reason?: string; method?: "password" | "google"; client?: Client } = {}) {
@@ -109,16 +98,18 @@ export class AuthStore {
     }
   }
   private toUser(row: Record<string, unknown> | undefined): User | null {
-    return row ? { id: String(row.id), email: String(row.email), name: String(row.name), personId: "U-" + String(row.id).slice(0, 8), createdAt: String(row.created_at) } : null;
+    return row ? { id: String(row.id), email: String(row.email), name: String(row.name), personId: "U-" + String(row.id).slice(0, 8), createdAt: String(row.created_at),
+      institution: typeof row.institution === "string" ? row.institution : "", jobRole: JOB_ROLES.includes(row.job_role as JobRole) ? (row.job_role as JobRole) : null } : null;
   }
-  async signup(input: { name: string; email: string; password: string }): Promise<User> {
+  async signup(input: { name: string; email: string; password: string; institution: string; jobRole: string }): Promise<User> {
     const error = signupError(input);
     if (error) throw new AuthError(400, error);
     const email = normaliseEmail(input.email);
     if (this.db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) throw new AuthError(409, "An account with this email already exists. Sign in instead.");
     const id = randomUUID(), createdAt = new Date(this.now()).toISOString();
-    this.db.prepare("INSERT INTO users (id, email, name, password, created_at) VALUES (?, ?, ?, ?, ?)").run(id, email, input.name.trim(), await hashPassword(input.password), createdAt);
-    return this.toUser({ id, email, name: input.name.trim(), created_at: createdAt })!;
+    this.db.prepare("INSERT INTO users (id, email, name, password, created_at, institution, job_role) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(id, email, input.name.trim(), await hashPassword(input.password), createdAt, input.institution.trim(), input.jobRole);
+    return this.toUser(this.db.prepare("SELECT * FROM users WHERE id = ?").get(id) as Record<string, unknown>)!;
   }
   async login(emailRaw: string, password: string): Promise<User> {
     const email = normaliseEmail(emailRaw), at = this.now();
@@ -154,9 +145,14 @@ export class AuthStore {
     this.db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashToken(token));
     return user;
   }
-  rename(userId: string, name: string): User {
-    if (!name.trim() || name.trim().length > 100) throw new AuthError(400, "Enter your name, up to 100 characters.");
-    this.db.prepare("UPDATE users SET name = ? WHERE id = ?").run(name.trim(), userId);
+  /** Change the name, institution or role; a field left out stays as it is. */
+  updateProfile(userId: string, input: { name?: string; institution?: string; jobRole?: string }): User {
+    if (input.name !== undefined && (!input.name.trim() || input.name.trim().length > 100)) throw new AuthError(400, "Enter your name, up to 100 characters.");
+    const error = profileError(input);
+    if (error) throw new AuthError(400, error);
+    if (input.name !== undefined) this.db.prepare("UPDATE users SET name = ? WHERE id = ?").run(input.name.trim(), userId);
+    if (input.institution !== undefined) this.db.prepare("UPDATE users SET institution = ? WHERE id = ?").run(input.institution.trim(), userId);
+    if (input.jobRole !== undefined) this.db.prepare("UPDATE users SET job_role = ? WHERE id = ?").run(input.jobRole, userId);
     return this.toUser(this.db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as Record<string, unknown>)!;
   }
   getWorkspace(userId: string): { backup: string; version: number; updatedAt: string } | null {
@@ -179,7 +175,7 @@ export class AuthStore {
 
 // ---------- the routes ----------
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-const publicUser = (u: User) => ({ id: u.id, email: u.email, name: u.name, personId: u.personId });
+const publicUser = (u: User) => ({ id: u.id, email: u.email, name: u.name, personId: u.personId, institution: u.institution, jobRole: u.jobRole });
 
 // Google sign-in, OpenID Connect's authorization code flow with PKCE (docs/GOOGLE_AUTH_PORTABLE.md, section 2's rules).
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -228,7 +224,7 @@ export function authRoutes(app: Hono, store: AuthStore, options: AuthOptions = {
   app.post("/api/auth/signup", async (c) => {
     try {
       const b = await body(c);
-      const user = await store.signup({ name: str(b.name), email: str(b.email), password: str(b.password) });
+      const user = await store.signup({ name: str(b.name), email: str(b.email), password: str(b.password), institution: str(b.institution), jobRole: str(b.jobRole) });
       setSession(c, store.createSession(user.id));
       store.audit("signup", { userId: user.id, email: user.email, method: "password", client: client(c) });
       store.audit("login", { userId: user.id, email: user.email, method: "password", client: client(c) });
@@ -263,7 +259,10 @@ export function authRoutes(app: Hono, store: AuthStore, options: AuthOptions = {
   app.patch("/api/auth/me", async (c) => {
     const user = current(c);
     if (!user) return c.json({ error: "Sign in first." }, 401);
-    try { const b = await body(c); return c.json({ user: publicUser(store.rename(user.id, str(b.name))) }); } catch (err) { return fail(c, err); }
+    try {
+      const b = await body(c), opt = (v: unknown) => (typeof v === "string" ? v : undefined);
+      return c.json({ user: publicUser(store.updateProfile(user.id, { name: opt(b.name), institution: opt(b.institution), jobRole: opt(b.jobRole) })) });
+    } catch (err) { return fail(c, err); }
   });
 
   // 1. Send the browser to Google with a fresh state (against forgery), PKCE verifier and nonce (against replay), all

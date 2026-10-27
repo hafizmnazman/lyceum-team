@@ -24,7 +24,7 @@ function setup() {
   };
   return { store, call, dropCookie: () => { cookie = ""; } };
 }
-const ME = { name: "Dr Aina", email: "Aina@Example.edu", password: "correct horse battery" };
+const ME = { name: "Dr Aina", email: "Aina@Example.edu", password: "correct horse battery", institution: "Universiti Teknologi PETRONAS", jobRole: "lecturer" };
 
 /** A minimal valid workspace in the backup format, owned by one person. */
 function backup(personId: string, title = "Data Mining") {
@@ -45,7 +45,8 @@ test("passwords are scrypt hashes that verify only the right password", async ()
   assert.notEqual(h, await hashPassword("correct horse battery"), "a fresh salt each time");
   assert.equal(signupError({ name: "A", email: "a@b.co", password: "short" }), "Use a password of at least 10 characters.");
   assert.equal(signupError({ name: "A", email: "not-an-email", password: "long enough pw" }), "Enter a valid email address.");
-  assert.equal(signupError({ name: "A", email: "a@b.co", password: "A@B.CO" + "" }), "Use a password of at least 10 characters.");
+  assert.equal(signupError({ name: "A", email: "a@b.co", password: "long enough pw", institution: "", jobRole: "lecturer" }), "Enter your institution, up to 200 characters.");
+  assert.equal(signupError({ name: "A", email: "a@b.co", password: "long enough pw", institution: "UTP", jobRole: "dean" }), "Choose your role.");
 });
 
 test("sign up starts a session in an HttpOnly, SameSite cookie; me, sign out and sign in follow it", async () => {
@@ -112,7 +113,7 @@ test("the workspace: signed in only, validated, and saved only over the version 
   assert.equal((await call("PUT", "/api/workspace", { backup: backup("U-someoneelse"), version: 2 })).status, 400, "a workspace naming another person fails validation");
   assert.equal((await call("PUT", "/api/workspace", { backup: "not json", version: 2 })).status, 400);
   dropCookie();
-  const other = (await call("POST", "/api/auth/signup", { name: "Mr Lee", email: "lee@example.edu", password: "another long password" })).body.user;
+  const other = (await call("POST", "/api/auth/signup", { name: "Mr Lee", email: "lee@example.edu", password: "another long password", institution: "UM", jobRole: "coordinator" })).body.user;
   assert.equal((await call("GET", "/api/workspace")).body.workspace, null, "one account never sees another's workspace");
   assert.ok(other.personId !== me.personId);
 });
@@ -121,7 +122,7 @@ test("a new account's workspace, as the store builds it, passes the server's val
   const { openAccountWorkspace, createCourseWorkspace, getState, saveOnboardingProfile } = await import("./app/store.ts");
   const { parseWorkspaceBackup, serializeWorkspaceBackup } = await import("./lib/workspaceBackup.ts");
   const { navFor, navAllows } = await import("./app/roles.ts");
-  const user = { id: "0f3c9a1e-0000-4000-8000-000000000000", email: "aina@example.edu", name: "Dr Aina", personId: "U-0f3c9a1e" };
+  const user = { id: "0f3c9a1e-0000-4000-8000-000000000000", email: "aina@example.edu", name: "Dr Aina", personId: "U-0f3c9a1e", institution: "Universiti Teknologi PETRONAS", jobRole: "lecturer" as const };
   assert.deepEqual(openAccountWorkspace(user, null), { ok: true });
   let s = getState();
   assert.equal(s.screen, "onboarding", "a new account starts at onboarding");
@@ -251,7 +252,7 @@ test("Google: an ID token with a wrong issuer, audience or nonce, expired, or wi
 
 test("Google: an email that already has a password account is refused, not linked", async () => {
   const s = googleSetup(goodClaims);
-  await s.store.signup({ name: "Squatter", email: "aina@gmail.com", password: "registered first" });
+  await s.store.signup({ name: "Squatter", email: "aina@gmail.com", password: "registered first", institution: "Somewhere", jobRole: "other" });
   const r = await s.signIn();
   assert.match(r.back.location, /auth_error=email-taken/);
   assert.ok(!s.jar.has("lyceum_session"));
@@ -264,4 +265,44 @@ test("Google: hidden and refused when no client is configured", async () => {
   assert.deepEqual(await (await app.request("/api/auth/providers")).json(), { password: true, google: false });
   const res = await app.request("/api/auth/google");
   assert.match(res.headers.get("location") ?? "", /auth_error=unavailable/);
+});
+
+test("sign up keeps where and as what the person teaches; the profile can change later, within the listed roles", async () => {
+  const { call } = setup();
+  const up = await call("POST", "/api/auth/signup", ME);
+  assert.equal(up.body.user.institution, "Universiti Teknologi PETRONAS");
+  assert.equal(up.body.user.jobRole, "lecturer");
+  assert.equal((await call("POST", "/api/auth/signup", { ...ME, email: "x@example.edu", institution: "" })).status, 400, "institution is required");
+  assert.equal((await call("POST", "/api/auth/signup", { ...ME, email: "y@example.edu", jobRole: "dean" })).status, 400, "only the listed roles");
+  const changed = await call("PATCH", "/api/auth/me", { jobRole: "coordinator" });
+  assert.equal(changed.body.user.jobRole, "coordinator");
+  assert.equal(changed.body.user.name, "Dr Aina", "a field left out stays as it was");
+  assert.equal((await call("PATCH", "/api/auth/me", { jobRole: "dean" })).status, 400);
+});
+
+test("migrations: a fresh database gets every one once; a database from before migrations is adopted, its data kept", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const { migrate, openDatabase } = await import("../server/db.ts");
+  const { mkdtempSync, readdirSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const files = readdirSync(new URL("../server/migrations/", import.meta.url)).map((f) => f.replace(/\.sql$/, "")).sort();
+  const fresh = openDatabase(":memory:");
+  assert.deepEqual((fresh.prepare("SELECT id FROM schema_migrations ORDER BY id").all() as Array<{ id: string }>).map((r) => r.id), files);
+  assert.deepEqual(migrate(fresh), [], "a second run applies nothing");
+  // The schema as it was created inline, before migrations: users with the Google columns, and one account in it.
+  const path = join(mkdtempSync(join(tmpdir(), "lyceum-db-")), "old.db");
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password TEXT NOT NULL, created_at TEXT NOT NULL, google_sub TEXT, last_login_at TEXT);
+    CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL);
+    CREATE TABLE workspaces (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, backup TEXT NOT NULL, version INTEGER NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE auth_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, user_id TEXT, email TEXT, reason TEXT, method TEXT, ip TEXT, user_agent TEXT, created_at TEXT NOT NULL);
+    INSERT INTO users VALUES ('u1', 'kept@example.edu', 'Kept', '', '2026-10-27', 'sub-1', NULL);`);
+  old.close();
+  const adopted = openDatabase(path);
+  assert.deepEqual((adopted.prepare("SELECT id FROM schema_migrations ORDER BY id").all() as Array<{ id: string }>).map((r) => r.id), files, "001 and 002 recorded as already there, 003 applied");
+  const columns = (adopted.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>).map((c) => c.name);
+  assert.ok(columns.includes("institution") && columns.includes("job_role"));
+  assert.equal((adopted.prepare("SELECT name FROM users WHERE id = 'u1'").get() as { name: string }).name, "Kept", "the account survives");
+  adopted.close();
 });

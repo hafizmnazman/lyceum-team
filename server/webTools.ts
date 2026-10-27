@@ -1,16 +1,17 @@
-// The agent's two web tools, run on the local API: a search through the provider chosen in Settings, and a guarded page
-// fetch. Everything either returns is untrusted text: the agent reads it, but only text fetched here can become a posting.
+// The agent's two web tools, run on the local API: a search through the provider chain set in .env (the primary, then
+// each fallback in turn when one fails or finds nothing, as Odysseus does), and a guarded page fetch. Everything either
+// returns is untrusted text: the agent reads it, but only text fetched here can become a posting.
 
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { htmlToText } from "../src/lib/collect.ts";
-import type { SearchProfile } from "../src/lib/agentSettings.ts";
+import { decodeEntities, htmlToText } from "../src/lib/collect.ts";
+import { SEARCH_PROVIDERS, searchChain, type SearchProviderId, type SearchSettings, type TimeFilter } from "../src/lib/agentSettings.ts";
 
 export interface SearchHit { title: string; url: string; snippet: string }
 export class ToolError extends Error {}
 
 const SEARCH_TIMEOUT_MS = 20_000, FETCH_TIMEOUT_MS = 20_000, MAX_PAGE_BYTES = 3 * 1024 * 1024, MAX_REDIRECTS = 5;
-const UA = "Lyceum local prototype (lecturer-initiated agent search, low volume)";
+const UA = "Mozilla/5.0 (compatible; Lyceum local prototype; lecturer-initiated agent search, low volume)";
 
 async function getJson(url: string, init: RequestInit, what: string): Promise<unknown> {
   let res: Response;
@@ -29,33 +30,92 @@ const rows = (v: unknown): Row[] => (Array.isArray(v) ? v.filter((x): x is Row =
 const hit = (title: unknown, url: unknown, snippet: unknown): SearchHit | null =>
   typeof url === "string" && /^https?:\/\//.test(url) ? { title: String(title ?? "").slice(0, 300), url, snippet: String(snippet ?? "").slice(0, 500) } : null;
 
-/** One web search through the chosen provider. */
-export async function searchWeb(p: SearchProfile, query: string, count = 8): Promise<SearchHit[]> {
-  const provider = p.provider;
+/** How each provider names a time window. */
+const WINDOW: Record<Exclude<SearchProviderId, "searxng" | "tavily">, Record<TimeFilter, string>> = {
+  duckduckgo: { day: "d", week: "w", month: "m", year: "y" },
+  brave: { day: "pd", week: "pw", month: "pm", year: "py" },
+  serper: { day: "qdr:d", week: "qdr:w", month: "qdr:m", year: "qdr:y" },
+  google: { day: "d1", week: "w1", month: "m1", year: "y1" },
+};
+
+/** DuckDuckGo's plain HTML results page: each result's link goes through its /l/?uddg= redirect, the real URL inside. */
+export function parseDuckDuckGo(html: string): Array<SearchHit | null> {
+  const hits: Array<SearchHit | null> = [];
+  // Split on each result's opening div, keeping its class (the capture) so an ad can be told apart and left out.
+  const parts = html.split(/<div[^>]+class="([^"]*\bresult\b[^"]*)"/);
+  for (let i = 1; i < parts.length; i += 2) {
+    const block = parts[i + 1] ?? "";
+    if (/\bresult--ad\b/.test(parts[i])) continue;
+    const link = /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(block);
+    if (!link) continue;
+    let url = decodeEntities(link[1]);
+    const wrapped = /[?&]uddg=([^&]+)/.exec(url);
+    if (wrapped) url = decodeURIComponent(wrapped[1]);
+    else if (url.startsWith("//")) url = "https:" + url;
+    const snippet = /class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/.exec(block)?.[1] ?? "";
+    // Titles and snippets hold inline tags only (<b> around the matched words), so they go without leaving a space.
+    const inline = (h: string) => decodeEntities(h.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+    hits.push(hit(inline(link[2]), url, inline(snippet)));
+  }
+  return hits;
+}
+
+/** One web search through one provider, within a time window when one is given. */
+export async function searchOne(provider: SearchProviderId, s: SearchSettings, query: string, time: TimeFilter | null, count = 8): Promise<SearchHit[]> {
+  const k = s.keys;
   let hits: Array<SearchHit | null>;
-  if (provider === "tavily") {
-    const body = await getJson("https://api.tavily.com/search", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + p.apiKey },
-      body: JSON.stringify({ api_key: p.apiKey, query, max_results: count }) }, "Tavily") as Row;
+  if (provider === "searxng") {
+    const base = k.searxngUrl.replace(/\/+$/, "");
+    if (!/^https?:\/\//.test(base)) throw new ToolError("SEARXNG_URL must start with http:// or https://.");
+    const body = await getJson(base + "/search?" + new URLSearchParams({ q: query, format: "json", ...(time ? { time_range: time } : {}) }), { headers: { accept: "application/json" } }, "SearXNG") as Row;
+    hits = rows(body.results).map((r) => hit(r.title, r.url, r.content));
+  } else if (provider === "duckduckgo") {
+    let res: Response;
+    try {
+      res = await fetch("https://html.duckduckgo.com/html/", { method: "POST", signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+        headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": UA }, body: new URLSearchParams({ q: query, ...(time ? { df: WINDOW.duckduckgo[time] } : {}) }) });
+    } catch { throw new ToolError("DuckDuckGo could not be reached."); }
+    if (!res.ok) throw new ToolError("DuckDuckGo answered HTTP " + res.status + (res.status === 202 || res.status === 403 ? " (it is limiting automated searches for now)." : "."));
+    hits = parseDuckDuckGo(await res.text());
+  } else if (provider === "tavily") {
+    const body = await getJson("https://api.tavily.com/search", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + k.tavily },
+      body: JSON.stringify({ api_key: k.tavily, query, max_results: count, ...(time ? { time_range: time } : {}) }) }, "Tavily") as Row;
     hits = rows(body.results).map((r) => hit(r.title, r.url, r.content));
   } else if (provider === "brave") {
-    const body = await getJson("https://api.search.brave.com/res/v1/web/search?" + new URLSearchParams({ q: query, count: String(count) }),
-      { headers: { accept: "application/json", "x-subscription-token": p.apiKey } }, "Brave Search") as Row;
+    const body = await getJson("https://api.search.brave.com/res/v1/web/search?" + new URLSearchParams({ q: query, count: String(count), ...(time ? { freshness: WINDOW.brave[time] } : {}) }),
+      { headers: { accept: "application/json", "x-subscription-token": k.brave } }, "Brave Search") as Row;
     hits = rows((body.web as Row | undefined)?.results).map((r) => hit(r.title, r.url, r.description));
   } else if (provider === "serper") {
-    const body = await getJson("https://google.serper.dev/search", { method: "POST", headers: { "content-type": "application/json", "x-api-key": p.apiKey },
-      body: JSON.stringify({ q: query, num: count }) }, "Serper") as Row;
+    const body = await getJson("https://google.serper.dev/search", { method: "POST", headers: { "content-type": "application/json", "x-api-key": k.serper },
+      body: JSON.stringify({ q: query, num: count, ...(time ? { tbs: WINDOW.serper[time] } : {}) }) }, "Serper") as Row;
     hits = rows(body.organic).map((r) => hit(r.title, r.link, r.snippet));
-  } else if (provider === "google") {
-    const body = await getJson("https://www.googleapis.com/customsearch/v1?" + new URLSearchParams({ key: p.apiKey, cx: p.cx, q: query, num: String(Math.min(count, 10)) }),
+  } else {
+    const body = await getJson("https://www.googleapis.com/customsearch/v1?" + new URLSearchParams({ key: k.google, cx: k.googleCx, q: query, num: String(Math.min(count, 10)), ...(time ? { dateRestrict: WINDOW.google[time] } : {}) }),
       {}, "Google Programmable Search") as Row;
     hits = rows(body.items).map((r) => hit(r.title, r.link, r.snippet));
-  } else {
-    const base = p.url.replace(/\/+$/, "");
-    if (!/^https?:\/\//.test(base)) throw new ToolError("The SearXNG address must start with http:// or https://.");
-    const body = await getJson(base + "/search?" + new URLSearchParams({ q: query, format: "json" }), { headers: { accept: "application/json" } }, "SearXNG") as Row;
-    hits = rows(body.results).map((r) => hit(r.title, r.url, r.content));
   }
   return hits.filter((h): h is SearchHit => h !== null).slice(0, count);
+}
+
+export interface ChainResult { hits: SearchHit[]; provider: SearchProviderId | null; skipped: Array<{ provider: SearchProviderId; why: string }> }
+/** The chain: the primary, then each fallback, skipping those missing a key and moving on when one fails or finds
+ *  nothing. Fails only when every usable provider failed. */
+export async function searchWeb(s: SearchSettings, query: string, time: TimeFilter | null, count = 8, one: typeof searchOne = searchOne): Promise<ChainResult> {
+  const skipped: ChainResult["skipped"] = [];
+  let answered = false; // a provider that worked but found nothing: the search ran, there is just nothing to show
+  for (const link of searchChain(s)) {
+    if (!link.usable) { skipped.push({ provider: link.id, why: "needs " + link.missing.join(", ") }); continue; }
+    try {
+      const hits = await one(link.id, s, query, time, count);
+      if (hits.length) return { hits, provider: link.id, skipped };
+      answered = true;
+      skipped.push({ provider: link.id, why: "no results" });
+    } catch (err) {
+      skipped.push({ provider: link.id, why: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  if (answered) return { hits: [], provider: null, skipped };
+  throw new ToolError("Every search provider failed. " + skipped.map((x) => SEARCH_PROVIDERS[x.provider].label + ": " + x.why).join("; "));
 }
 
 // ---------- the guarded fetch: public http(s) hosts only, every redirect re-checked, size and time capped ----------

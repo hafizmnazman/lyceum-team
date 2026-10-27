@@ -53,6 +53,7 @@
     "prove:agent-search": "node --test src/prove-agent-search.ts",
     "prove:auth": "node --test src/prove-auth.ts",
     "search:up": "docker compose up -d searxng",
+    "db:migrate": "node server/db-migrate.ts",
     "search:down": "docker compose down",
     "mcp": "node mcp/server.ts",
     "mcp:sample": "node mcp/sample.ts",

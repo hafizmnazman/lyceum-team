@@ -6,8 +6,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runAgentSearch, type AgentDeps, type Chat, type ToolCall } from "../server/agentSearch.ts";
-import { assertPublicUrl, extractJobPosting, isPublicAddress, readPage, ToolError, type ReadPage } from "../server/webTools.ts";
-import { missingSettings, publicSettings, settingsFromEnv } from "./lib/agentSettings.ts";
+import { assertPublicUrl, extractJobPosting, isPublicAddress, parseDuckDuckGo, readPage, searchWeb, ToolError, type ReadPage } from "../server/webTools.ts";
+import { missingSettings, publicSettings, settingsFromEnv, type TimeFilter } from "./lib/agentSettings.ts";
 import type { CollectedPosting } from "./types.ts";
 
 const call = (id: string, name: string, args: Record<string, unknown>): ToolCall => ({ id, type: "function", function: { name, arguments: JSON.stringify(args) } });
@@ -29,7 +29,7 @@ const page: ReadPage = { url: "https://careers.example.com/jobs/42", title: "Dat
 const boardPosting: CollectedPosting = { id: "greenhouse:acme:7", provider: "greenhouse", board: "acme", title: "Analytics Intern", organisation: "Acme", location: "Remote",
   url: "https://boards.greenhouse.io/acme/jobs/7", publishedAt: "2026-09-20T00:00:00.000Z", updatedAt: "", text: "Analytics intern. " + PAGE_TEXT, retrievedAt: "2026-10-27T00:00:00.000Z" };
 function deps(chat: Chat, overrides: Partial<AgentDeps> = {}): AgentDeps {
-  return { chat, search: async () => [{ title: "Data Analyst | Example", url: page.url, snippet: "Hiring a data analyst" }], fetchPage: async () => page,
+  return { chat, search: async () => ({ hits: [{ title: "Data Analyst | Example", url: page.url, snippet: "Hiring a data analyst" }], provider: "searxng", skipped: [] }), fetchPage: async () => page,
     collect: async () => [boardPosting], now: () => new Date("2026-10-27T08:00:00Z"), ...overrides };
 }
 const limits = { maxSteps: 10, maxPostings: 5 };
@@ -126,20 +126,57 @@ test("a page's schema.org JobPosting is read, inside @graph too, and the page ch
   assert.equal(extractJobPosting('<script type="application/ld+json">{broken</script>'), null);
 });
 
-test("settings come from .env: provider names fill the base URL, limits are clamped, keys are never shown", () => {
+test("settings come from .env: provider names fill the base URL, the search chain defaults to SearXNG then DuckDuckGo, keys never shown", () => {
   const s = settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "Groq", LYCEUM_AGENT_MODEL: "some-model", LYCEUM_AGENT_API_KEY: "gsk_secret_1234",
-    LYCEUM_SEARCH_PROVIDER: "brave", LYCEUM_SEARCH_API_KEY: "brave-secret-9876", LYCEUM_AGENT_MAX_STEPS: "999" });
+    LYCEUM_SEARCH_PROVIDER: "brave", LYCEUM_SEARCH_FALLBACK: "tavily, duckduckgo, nope, brave", BRAVE_API_KEY: "brave-secret-9876", LYCEUM_AGENT_MAX_STEPS: "999" });
   assert.equal(s.model.baseUrl, "https://api.groq.com/openai/v1");
   assert.equal(s.maxSteps, 40, "limits are clamped");
-  assert.equal(s.maxPostings, 20, "an unset limit takes its default");
-  assert.deepEqual(missingSettings(s), []);
+  assert.deepEqual(s.search.fallback, ["tavily", "duckduckgo"], "unknown names and the primary itself are dropped from the fallback");
+  assert.equal(s.search.timeFilter, "month", "searches default to the past month");
+  assert.deepEqual(missingSettings(s), [], "Tavily has no key, but Brave and DuckDuckGo can search");
   const shown = JSON.stringify(publicSettings(s));
   assert.ok(!shown.includes("secret"), "no key in what the browser sees");
-  assert.match(shown, /ends in 1234/);
-  assert.deepEqual(missingSettings(settingsFromEnv({})), ["LYCEUM_AGENT_MODEL", "LYCEUM_AGENT_API_KEY", "LYCEUM_SEARCH_API_KEY"], "nothing set: OpenRouter and Tavily by default, each line named");
-  assert.deepEqual(missingSettings(settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "llama", LYCEUM_SEARCH_PROVIDER: "searxng" })), ["LYCEUM_SEARCH_URL"], "Ollama needs no key; SearXNG needs its address");
-  const custom = settingsFromEnv({ LYCEUM_AGENT_BASE_URL: "http://localhost:1234/v1", LYCEUM_AGENT_MODEL: "m", LYCEUM_SEARCH_PROVIDER: "nope", LYCEUM_SEARCH_API_KEY: "k" });
-  assert.equal(custom.model.provider, "custom", "a base URL without a known provider is a custom endpoint");
-  assert.equal(custom.search.provider, "tavily", "an unknown search provider falls back to Tavily");
-  assert.deepEqual(missingSettings(custom), []);
+  assert.match(shown, /ends in 1234/); assert.match(shown, /ends in 9876/);
+  assert.deepEqual(publicSettings(s).search.chain.map((c) => c.id + ":" + c.usable), ["brave:true", "tavily:false", "duckduckgo:true"]);
+  const bare = settingsFromEnv({});
+  assert.deepEqual([bare.search.provider, ...bare.search.fallback], ["searxng", "duckduckgo"], "with nothing set: SearXNG, then DuckDuckGo");
+  assert.equal(bare.search.keys.searxngUrl, "http://localhost:8080", "where npm run search:up puts it");
+  assert.deepEqual(missingSettings(bare), ["LYCEUM_AGENT_MODEL", "LYCEUM_AGENT_API_KEY"], "only the model is left to set up");
+  assert.deepEqual(missingSettings(settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "llama", LYCEUM_SEARCH_PROVIDER: "tavily", LYCEUM_SEARCH_FALLBACK: "" })),
+    ["TAVILY_API_KEY"], "Ollama needs no key; a chain with no usable provider names what its first one needs");
+  assert.equal(settingsFromEnv({ LYCEUM_SEARCH_TIME: "any" }).search.timeFilter, null);
+});
+
+test("the chain: a failing or empty provider falls through to the next, one missing its key is skipped, all failing is an error", async () => {
+  const s = settingsFromEnv({ LYCEUM_SEARCH_PROVIDER: "searxng", LYCEUM_SEARCH_FALLBACK: "tavily,duckduckgo,brave", BRAVE_API_KEY: "k" });
+  const calls: string[] = [];
+  const hitsFor = (id: string) => [{ title: id, url: "https://" + id + ".example/job", snippet: "" }];
+  const r = await searchWeb(s.search, "q", "week", 8, async (id, _s, _q, time) => {
+    calls.push(id + ":" + time);
+    if (id === "searxng") throw new ToolError("SearXNG could not be reached.");
+    return hitsFor(id);
+  });
+  assert.deepEqual(calls, ["searxng:week", "duckduckgo:week"], "Tavily without a key is never called; the window is passed on");
+  assert.equal(r.provider, "duckduckgo");
+  assert.deepEqual(r.skipped.map((x) => x.provider), ["searxng", "tavily"]);
+  const empty = await searchWeb(s.search, "q", null, 8, async (id) => (id === "brave" ? hitsFor("brave") : []));
+  assert.equal(empty.provider, "brave", "no results moves on too");
+  await assert.rejects(searchWeb(s.search, "q", null, 8, async () => { throw new ToolError("down"); }), /Every search provider failed/);
+  assert.deepEqual((await searchWeb(s.search, "q", null, 8, async () => [])).hits, [], "nothing found anywhere is an empty answer, not an error");
+});
+
+test("the agent's time_filter reaches the search: a window, any, or the default from .env", async () => {
+  const asked: Array<TimeFilter | null | undefined> = [];
+  const chat = scripted([[call("1", "web_search", { query: "a", time_filter: "week" }), call("2", "web_search", { query: "b", time_filter: "any" }), call("3", "web_search", { query: "c" })], "done"]);
+  await runAgentSearch("x", deps(chat, { search: async (_q, time) => { asked.push(time); return { hits: [], provider: null, skipped: [] }; } }), limits, () => undefined);
+  assert.deepEqual(asked, ["week", null, undefined]);
+});
+
+test("DuckDuckGo's HTML results: the real URL out of its redirect, title and snippet as text, ads left out", () => {
+  const html = `<div class="result results_links result--ad"><a class="result__a" href="https://duckduckgo.com/y.js?ad=1">Ad</a></div>
+    <div class="result results_links results_links_deep web-result"><h2 class="result__title"><a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fjobs.example.com%2Fdata%2Danalyst&amp;rut=abc">Data <b>Analyst</b> &amp; BI</a></h2>
+    <a class="result__snippet" href="//duckduckgo.com/l/?uddg=x">Hiring in <b>Kuala Lumpur</b>.</a></div>`;
+  const hits = parseDuckDuckGo(html).filter(Boolean);
+  assert.equal(hits.length, 1);
+  assert.deepEqual(hits[0], { title: "Data Analyst & BI", url: "https://jobs.example.com/data-analyst", snippet: "Hiring in Kuala Lumpur." });
 });

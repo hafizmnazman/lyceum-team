@@ -2,7 +2,7 @@
 // this computer and this screen sees only their last four characters. Editing .env takes effect on the next request.
 
 import { useEffect, useState } from "react";
-import { ENV, MODEL_PROVIDERS, SEARCH_PROVIDERS, type PublicAgentSettings } from "../../lib/agentSettings.ts";
+import { ENV, MODEL_PROVIDERS, SEARCH_ENV, SEARCH_PROVIDERS, type PublicAgentSettings } from "../../lib/agentSettings.ts";
 import { Button, Page, PageHead, Spinner, Tag } from "../primitives/index.tsx";
 
 type Loaded = { settings: PublicAgentSettings; missing: string[]; path: string };
@@ -56,12 +56,19 @@ export function SettingsScreen() {
         </section>
 
         <section className="workspace-panel" aria-labelledby="settings-search">
-          <div className="section-heading"><div><h2 id="settings-search">Web search</h2><p className="muted">Tavily, Brave, Serper or Google need a key from their website. SearXNG needs no key: <code>npm run search:up</code> starts one on this computer with Docker, at http://localhost:8080.</p></div></div>
+          <div className="section-heading"><div><h2 id="settings-search">Web search</h2><p className="muted">Tried in order, as Odysseus does: the first provider, then each fallback when one fails or finds nothing. A provider missing its key is skipped.</p></div></div>
+          <ol className="search-chain">
+            {s.search.chain.map((p, i) => <li key={p.id} className={p.usable ? "" : "is-off"}>
+              <span className="search-chain-name">{SEARCH_PROVIDERS[p.id].label}</span>
+              <span className="muted">{i === 0 ? "First" : "Fallback " + i}</span>
+              {p.usable ? <Tag tone="ok">Ready</Tag> : <Tag tone="warn">Needs {p.missing.join(", ")}</Tag>}
+              <span className="muted search-chain-note">{SEARCH_PROVIDERS[p.id].note}{p.id === "searxng" ? " At " + s.search.searxngUrl + "." : ""}</span>
+            </li>)}
+          </ol>
           <dl className="context-list">
-            {row("Provider", ENV.searchProvider, SEARCH_PROVIDERS[s.search.provider].label + " (" + s.search.provider + ")")}
-            {SEARCH_PROVIDERS[s.search.provider].needs.includes("apiKey") ? row("API key", ENV.searchKey, s.search.keyHint ? "Set, " + s.search.keyHint : "") : null}
-            {SEARCH_PROVIDERS[s.search.provider].needs.includes("cx") ? row("Search engine id", ENV.searchCx, s.search.cx) : null}
-            {SEARCH_PROVIDERS[s.search.provider].needs.includes("url") ? row("Address", ENV.searchUrl, s.search.url) : null}
+            {row("Order", ENV.searchProvider + ", " + ENV.searchFallback, [s.search.provider, ...s.search.fallback].join(" then "))}
+            {row("Default time window", ENV.searchTime, s.search.timeFilter ? "Past " + s.search.timeFilter + " (the agent can ask for another)" : "Any date")}
+            {(["tavily", "brave", "serper", "google"] as const).filter((k) => s.search.keyHints[k]).map((k) => row(SEARCH_PROVIDERS[k].label + " key", SEARCH_ENV[k], "Set, " + s.search.keyHints[k]))}
           </dl>
           <div className="button-row"><Button loading={busy === "search"} disabled={Boolean(busy)} onClick={() => void test("search")}>{busy === "search" ? "Testing the search..." : "Test the search"}</Button></div>
           {testLine(tests.search)}

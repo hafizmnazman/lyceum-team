@@ -130,6 +130,14 @@
       "terms": "Microsoft Fabric Assets License (November 2019, https://aka.ms/fluentui-assets-license): product icons may illustrate that an application integrates with Microsoft products; in a lineup that is not clickable, each icon is labelled with the full product name in body copy beside or below it; full colour, unmodified, never more prominent than the application's own name, never as a logo or in a corner, no endorsement implied"
     },
     {
+      "file": "google-g.png",
+      "product": "Google (Sign in with Google)",
+      "role": "The Continue with Google button on sign in",
+      "source": "https://developers.google.com/static/identity/images/signin-assets.zip, Android + Web/PNG @4x/Light/Theme=Light, Show text=No, Shape=Pill, Platform=Android+Web@4x.png, retrieved 2026-10-27",
+      "sha256": "77189d3d322bf41c675d889bc1e64c8e2c6c59648963de40979803b45283a5a2",
+      "terms": "Google's Sign in with Google branding guidelines (https://developers.google.com/identity/branding-guidelines): the standard multicolour G, unmodified, on a sign-in button beside the words Continue with Google"
+    },
+    {
       "file": "lever.png",
       "product": "Lever",
       "role": "A job board Lyceum reads",

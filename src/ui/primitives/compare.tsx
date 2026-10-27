@@ -15,6 +15,7 @@ import type { CourseDefinition } from "../../types.ts";
 import { SlideSvg, type SlideHighlight } from "./DeckPreview.tsx";
 import { Button, Tag } from "./index.tsx";
 import { reducedMotion } from "../motion.ts";
+import { Segmented } from "./Segmented.tsx";
 
 /** One text before and after, in one run of prose: what went struck through in the danger token, what came underlined in
  *  the emerald text token, each with a hidden "deleted" or "inserted". With `hide`, the clean new text alone. */
@@ -198,9 +199,8 @@ export function SlideCompare({ before, after, number, beforeLabel, afterLabel, m
   // skin it is how far the later version has faded in, so moving right shows more of the later one.
   const swipe = mode === "swipe";
   return <div className="slide-compare" data-demo-id="slide-compare">
-    <div className="button-row" role="group" aria-label="How to compare the two">
-      <Button aria-pressed={mode === "swipe"} onClick={() => setMode("swipe")}>Swipe</Button>
-      <Button aria-pressed={mode === "fade"} onClick={() => setMode("fade")}>Onion skin</Button>
+    <div className="button-row">
+      <Segmented label="How to compare the two" value={mode} onChange={setMode} options={[{ value: "swipe", label: "Swipe" }, { value: "fade", label: "Onion skin" }]} />
       <Button variant="quiet" onClick={() => setValue(100)}>Show before</Button>
       <Button variant="quiet" onClick={() => setValue(0)}>Show after</Button>
     </div>

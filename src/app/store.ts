@@ -114,7 +114,7 @@ import { DEMO_LINE } from "../data/sample-course/index.ts";
 import { listedStudents, obeReport } from "../lib/attainment.ts";
 import { templateItems } from "../lib/items.ts";
 import { PRIOR_SURVEYS, PRIOR_SURVEY_RESPONSES } from "../data/sample-course/surveys.ts";
-import { loadWorkspace, renameAccount, saveWorkspace, signOut, whoAmI, type AccountUser } from "./account.ts";
+import { loadWorkspace, saveWorkspace, signOut, updateProfile, whoAmI, type AccountUser } from "./account.ts";
 import {
   CANONICAL_PROPOSAL,
   CLOS,
@@ -706,10 +706,10 @@ function setQuiet(patch: Partial<AppState>) {
 }
 /** A new account's workspace: this person alone, no course yet, and an institution and programme named in onboarding.
  *  The demo's courses, people, surveys and sandbox data are left out. */
-function freshWorkspace(me: Person): Partial<AppState> {
+function freshWorkspace(me: Person, institution = ""): Partial<AppState> {
   return {
     programme: { id: "PRG-" + me.id, title: "My programme", departmentOwnerId: me.id, subjectIds: [] },
-    institution: { ...structuredClone(DEMO_INSTITUTION), name: "My institution", shortName: "Mine", demo: false, showMark: false },
+    institution: { ...structuredClone(DEMO_INSTITUTION), name: institution || "My institution", shortName: institution ? shortNameOf(institution) : "Mine", demo: false, showMark: false },
     assignments: [], subjects: [], clos: [], survey: [], proposals: [], notifications: [], predictions: [], resultUploads: [], dataSources: [],
     subjectVersions: [], testDrafts: [], teachingPlans: [], courseDefinitions: {}, rubrics: [], curriculumDrafts: [], evidenceSources: [],
     skillMentions: [], skillMappings: [], evidenceBriefs: [], evidenceSnapshots: [], briefDecisions: [], events: [], surveys: [],
@@ -720,7 +720,7 @@ const accountPerson = (user: AccountUser): Person => ({ id: user.personId, name:
 /** Open a signed-in account's workspace: the saved one, or a fresh one that starts at onboarding. */
 export function openAccountWorkspace(user: AccountUser, saved: { backup: string; version: number } | null): SaveResult {
   const me = accountPerson(user);
-  let data: Partial<AppState> = freshWorkspace(me);
+  let data: Partial<AppState> = freshWorkspace(me, user.institution);
   if (saved) {
     const parsed = parseWorkspaceBackup(saved.backup, [me.id]);
     if (!parsed.ok) return parsed;
@@ -783,20 +783,27 @@ function syncAccountWorkspace() {
     if (accountDirty) { accountDirty = false; syncAccountWorkspace(); }
   });
 }
-/** Onboarding's first step: the person's name (kept on the account), their institution and their programme. */
-export async function saveOnboardingProfile(input: { name: string; institution: string; programme: string }): Promise<SaveResult> {
+/** An institution's initials for its short name: Universiti Teknologi PETRONAS, UTP. */
+function shortNameOf(institution: string): string {
+  return institution.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).map((w) => w[0]).join("").toUpperCase().slice(0, 10) || institution.slice(0, 10);
+}
+/** Onboarding's first step: the person's name, role and institution (kept on the account) and their programme. */
+export async function saveOnboardingProfile(input: { name: string; institution: string; programme: string; jobRole?: string }): Promise<SaveResult> {
   const account = state.account;
   if (!account) return { ok: false, error: "Sign in first." };
   const name = input.name.trim(), institution = input.institution.trim(), programme = input.programme.trim();
   if (!name || name.length > 100) return { ok: false, error: "Enter your name, up to 100 characters." };
   if (!institution || institution.length > 200) return { ok: false, error: "Enter your institution's name." };
   if (!programme || programme.length > 200) return { ok: false, error: "Enter the programme your courses belong to." };
-  if (name !== account.user.name) {
-    const renamed = await renameAccount(name);
-    if (!renamed.ok) return renamed;
+  if (input.jobRole !== undefined && !input.jobRole) return { ok: false, error: "Choose your role." };
+  let user = account.user;
+  const changes = { ...(name !== user.name ? { name } : {}), ...(institution !== user.institution ? { institution } : {}), ...(input.jobRole && input.jobRole !== user.jobRole ? { jobRole: input.jobRole } : {}) };
+  if (Object.keys(changes).length) {
+    const saved = await updateProfile(changes);
+    if (!saved.ok) return saved;
+    user = saved.user;
   }
-  const user = { ...account.user, name };
-  const shortName = institution.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).map((w) => w[0]).join("").toUpperCase().slice(0, 10) || institution.slice(0, 10);
+  const shortName = shortNameOf(institution);
   set((s) => ({ account: { ...account, user }, people: s.people.map((p) => (p.id === user.personId ? { ...p, name } : p)),
     institution: { ...s.institution, name: institution, shortName }, programme: { ...s.programme, title: programme } }));
   return { ok: true };

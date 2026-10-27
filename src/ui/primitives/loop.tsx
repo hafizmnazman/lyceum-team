@@ -12,6 +12,7 @@ import type { BriefDecision, EvidenceSource } from "../../types.ts";
 import { Button, Tag } from "./index.tsx";
 import { ShareBar } from "./ShareBar.tsx";
 import { TooltipBubble, useTooltipAnchor } from "./Tooltip.tsx";
+import { useSlider } from "./Segmented.tsx";
 
 const pct = (x: number | null) => (x === null ? "Unknown" : Math.round(x * 1000) / 10 + "%");
 
@@ -170,8 +171,9 @@ export function SourcePane({ source, excerpt, term }: { source: EvidenceSource; 
 // ---------- the Report sub-rail ----------
 
 export function SubRail({ active, onSelect, done }: { active: ReportTab; onSelect: (tab: ReportTab) => void; done?: Partial<Record<ReportTab, boolean>> }) {
+  const rail = useSlider<HTMLDivElement>(active);
   return (
-    <div className="sub-rail" role="tablist" aria-label="Report sub-steps">
+    <div ref={rail} className="sub-rail slider" role="tablist" aria-label="Report sub-steps">
       {REPORT_TABS.map((tab, index) => (
         <button key={tab} type="button" role="tab" id={"subrail-tab-" + tab} aria-controls={"subrail-panel-" + tab} aria-selected={active === tab} tabIndex={active === tab ? 0 : -1}
           className="sub-rail-tab" data-demo-id={"subrail-" + tab}
