@@ -125,6 +125,21 @@ try {
     check(`loop step ${step} renders at its address`, await page.evaluate((target) => window.__lyceum.getState().screen === target, screen) && (step === "course" ? /^#\/course\/[^/]+$/.test(hash) : hash.includes("/" + step)), hash);
   }
 
+  // Track C's two new addresses: the course's term recap from History, and the judge's page from the Guide, signed in.
+  await click("history-recap");
+  await sleep(450);
+  await shot("12-recap");
+  check("the term recap renders at its address", await page.evaluate(() => window.__lyceum.getState().screen === "recap" && /^#\/course\/[^/]+\/recap$/.test(location.hash) && Boolean(document.querySelector('[data-demo-id="recap"]'))));
+  await click("nav-guide");
+  await sleep(300);
+  await click("guide-judge");
+  await sleep(450);
+  await shot("13-judge");
+  check("the judge's page renders signed in", await page.evaluate(() => location.hash === "#/judge" && Boolean(document.querySelector('[data-demo-id="judge-greeting"]'))));
+  // Back to the course's History, where the path across the top leads on to Learn.
+  await page.evaluate(() => (window.location.hash = "#/course/" + window.__lyceum.getState().selectedSubjectId + "/history"));
+  await sleep(450);
+
   // The real upload pipeline on a sample file, from Learn (xlsx parses in-browser
   // here, since there is no api server: the fallback path under test).
   await click("rail-learn");
@@ -137,6 +152,60 @@ try {
   const receipt = await page.$('[data-demo-id="upload-receipt"]');
   check("sample results file files end to end", Boolean(receipt));
   await shot("21-upload-receipt");
+
+  // Tier 2: the OBE course report, saved as printed, on CS310's results filed under the loop's term as the tour files them;
+  // and the student's survey address, which renders outside the shell and, with no collector behind a short link, says so.
+  const term = "2026/2027 semester 1";
+  await page.evaluate(() => (window.location.hash = "#/course/CS310"));
+  await page.waitForSelector('[data-demo-id="course-term"]', { timeout: 8000 });
+  await page.click('[data-demo-id="course-term"]', { clickCount: 3 });
+  await page.keyboard.press("Backspace");
+  await page.type('[data-demo-id="course-term"]', term);
+  await click("course-term-save");
+  await sleep(300);
+  await page.evaluate(() => (window.location.hash = "#/course/CS310/learn"));
+  await page.waitForSelector('[data-demo-id="sample-results"]', { timeout: 8000 });
+  await click("sample-results");
+  await page.waitForSelector('[data-demo-id="upload-confirm"]', { timeout: 15000 });
+  await page.click('[data-demo-id="upload-term"]', { clickCount: 3 });
+  await page.keyboard.press("Backspace");
+  await page.type('[data-demo-id="upload-term"]', term);
+  await click("upload-confirm");
+  await page.waitForSelector('[data-demo-id="obe-live"]', { timeout: 10000 });
+  check("the OBE course report renders from the filed results", await page.evaluate(() => /at 55 or above/i.test(document.querySelector('[data-demo-id="obe-live"]')?.textContent ?? "") && document.querySelectorAll('[data-demo-id="obe-live"] tbody tr').length > 0));
+  await click("obe-save");
+  await sleep(300);
+  check("the OBE course report saves as printed", await page.evaluate(() => window.__lyceum.getState().obeReports.length === 1));
+  await page.evaluate(() => (window.location.hash = "#/survey/t/" + "A".repeat(22)));
+  await page.waitForSelector('[data-demo-id="survey-page"]', { timeout: 8000 });
+  await sleep(800);
+  await shot("22-survey-page");
+  check("the student's survey address renders alone, and says when its collector is not there", await page.evaluate(() => !document.querySelector(".app-header") && /could not be loaded/i.test(document.body.innerText)));
+  await page.evaluate(() => (window.location.hash = "#/course/" + window.__lyceum.getState().selectedSubjectId + "/learn"));
+  await sleep(450);
+
+  // Tier 3: the week 7 sample quiz on Teach, the programme wall on Courses, and the booth's kiosk, signed in, left again so
+  // its idle return does not follow the rest of the walk.
+  await page.evaluate(() => (window.location.hash = "#/course/CS310/teach"));
+  await page.waitForSelector('[data-demo-id^="session-items-list-"]', { timeout: 8000 });
+  check("the week 7 sample quiz shows its ten items on Teach", await page.evaluate(() => [...document.querySelectorAll('[data-demo-id^="session-items-list-"]')]
+    .some((list) => list.querySelectorAll('[data-demo-id^="item-"]:not([data-demo-id^="item-editor-"])').length === 10)));
+  await page.evaluate(() => (window.location.hash = "#/courses"));
+  await page.waitForSelector('[data-demo-id="programme-heat"]', { timeout: 8000 });
+  check("the programme wall shows every course of the programme, and the matrix only the recorded outline", await page.evaluate(() =>
+    document.querySelectorAll('[data-demo-id="wall-rings"] > li').length === window.__lyceum.getState().programme.subjectIds.length
+    && document.querySelectorAll('[data-demo-id="programme-heat"] td.heat-none').length === window.__lyceum.getState().programme.subjectIds.length - 1));
+  await page.evaluate(() => (window.location.hash = "#/kiosk"));
+  await page.waitForSelector('[data-demo-id="kiosk"]', { timeout: 8000 });
+  await page.waitForFunction(() => document.querySelector('[data-demo-id="kiosk-film"]') || /not on this laptop/.test(document.querySelector('[data-demo-id="kiosk-film-missing"]')?.textContent ?? ""), { timeout: 8000 });
+  await shot("23-kiosk");
+  check("the kiosk renders bare, Tualang resting, with its film or the line saying it is not on this laptop", await page.evaluate(() => !document.querySelector(".app-header")
+    && Boolean(document.querySelector('[data-demo-id="kiosk-touch"]')) && sessionStorage.getItem("lyceum.kiosk") === "on"));
+  await click("kiosk-leave");
+  await page.waitForSelector('[data-demo-id="judge-greeting"]', { timeout: 8000 });
+  check("leaving kiosk mode ends it", await page.evaluate(() => sessionStorage.getItem("lyceum.kiosk") === null));
+  await page.evaluate(() => (window.location.hash = "#/course/CS310/learn"));
+  await sleep(450);
 
   // Persistence: reload and confirm we are still signed in on the same screen.
   await page.reload({ waitUntil: "networkidle0" });

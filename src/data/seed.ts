@@ -25,6 +25,12 @@ import type {
 } from "../types.ts";
 import type { RawCohort } from "../lib/spine/cohort.ts";
 import { SYNTHETIC_COHORT } from "./synthetic-cohort.ts";
+import type { CourseDefinition, Rubric, TeachingPlan } from "../types.ts";
+import { CS310_BEFORE, CS310_OUTCOME_IDS, CS310_RUBRICS, DEMO_PLOS } from "./sample-course/cs310.ts";
+import { CS310_TEACHING_PLAN } from "./sample-course/sessions.ts";
+import { RESULTS_HEADER, RESULTS_PRIOR } from "./sample-course/results.ts";
+import { DEMO_INSTITUTION } from "./institution.ts";
+import { interpretLocally } from "../agents/intakeLocal.ts";
 
 // ---------- identifiers ----------
 export const PROGRAMME_ID = "BSC-CS";
@@ -136,12 +142,24 @@ export const SUBJECTS_BY_ID: Record<string, Subject> = Object.fromEntries(
   SUBJECTS.map((s) => [s.id, s]),
 );
 
+// ---------- the workspace's seed, with Track C's sample course record (depth plan Section 4.3) ----------
+// CS310 opens with its sample record: five outcomes (CLO5 keeps its id) and the outline as the term begins. The
+// constants above stay the illustrative sandbox's catalogue: its synthetic cohort rated one outcome per course,
+// so the survey, the signal and the analogy agent read CLOS and SUBJECTS, while the store starts from these.
+export const SEED_CLOS: CLO[] = [...CLOS.filter((c) => c.subjectId !== "CS310"), ...CS310_BEFORE.outcomes];
+export const SEED_SUBJECTS: Subject[] = SUBJECTS.map((s) => (s.id === "CS310" ? { ...s, cloIds: [...CS310_OUTCOME_IDS] } : s));
+export const SEED_COURSE_DEFINITIONS: Record<string, CourseDefinition> = { CS310: CS310_BEFORE };
+export const SEED_RUBRICS: Rubric[] = CS310_RUBRICS;
+// Its fourteen sample sessions, one a week (depth plan Section 5.1): labelled sample and never counted as this term's teaching.
+export const SEED_TEACHING_PLANS: TeachingPlan[] = [CS310_TEACHING_PLAN];
+
 // ---------- programme ----------
 export const PROGRAMME: Programme = {
   id: PROGRAMME_ID,
   title: "Bachelor of Computer Science",
   departmentOwnerId: PEOPLE_IDS.rahman,
   subjectIds: SUBJECTS.map((s) => s.id),
+  plos: DEMO_PLOS, // eight demo programme outcomes, synthetic (depth plan Section 4.2)
 };
 
 // ---------- the survey (real ground), mapped from v1's 200-student cohort ----------
@@ -205,6 +223,14 @@ export const DATA_SOURCES: DataSource[] = [
 ];
 
 // ---------- a prior filed result (closed-loop context) ----------
+/** Last term's sample results for CS310 (depth plan Section 8.4), read by the same local intake a lecturer's file goes
+ *  through: each outcome's marks sorted with no identifier, at the profile's pass mark. */
+function priorCs310Rows(): ResultUpload["rows"] {
+  const table = { name: RESULTS_PRIOR.sheetName, rows: [RESULTS_HEADER, ...RESULTS_PRIOR.rows.map((r) => r.map(String))] };
+  const interp = interpretLocally({ fileName: RESULTS_PRIOR.fileName, kind: "xlsx", pages: [], tables: [table] }, SEED_SUBJECTS, SEED_CLOS);
+  return (interp.mappedRows ?? []).map((r) => ({ ...r, passMarkAtFiling: DEMO_INSTITUTION.kpi.passMark }));
+}
+
 export const SEED_RESULT_UPLOADS: ResultUpload[] = [
   {
     id: "RU-CS220-2024S2",
@@ -213,6 +239,18 @@ export const SEED_RESULT_UPLOADS: ResultUpload[] = [
     term: PRIOR_TERM,
     rows: [{ cloId: "CLO4", meanScore: 0.59, sd: 0.21, n: 198 }],
     filedAt: "2026-01-22T14:40:00Z",
+  },
+  // CS310's prior term on version CS310-v1, sample and synthetic: an example of the report's direct line, never counted.
+  {
+    id: "RU-CS310-2025-26-S2",
+    subjectId: "CS310",
+    uploadedBy: PEOPLE_IDS.tan,
+    term: RESULTS_PRIOR.term,
+    rows: priorCs310Rows(),
+    filedAt: "2026-07-08T03:00:00Z",
+    sourceFileName: RESULTS_PRIOR.fileName,
+    courseVersionId: "CS310-v1",
+    sample: true,
   },
 ];
 
@@ -262,6 +300,18 @@ export const SEED_SUBJECT_VERSIONS: SubjectVersion[] = [
     changedBy: PEOPLE_IDS.rahman,
     changedAt: "2025-08-01T00:00:00Z",
     reason: "Subject created with the current curriculum.",
+  },
+  {
+    // The sample course record as the term begins. No effective term is set, so the course's term stays the one the
+    // lecturer sets at the Course step (app/loop.ts termWindow).
+    id: "CS310-v1",
+    subjectId: "CS310",
+    snapshot: { title: CS310_BEFORE.title, cloIds: [...CS310_OUTCOME_IDS], prerequisiteSubjectIds: [] },
+    cloSnapshot: CS310_BEFORE.outcomes,
+    definition: CS310_BEFORE,
+    changedBy: PEOPLE_IDS.sobri,
+    changedAt: "2026-01-05T00:00:00Z",
+    reason: "The sample course record, written for this prototype and labelled sample: the outline taught in 2025/2026 semester 2.",
   },
 ];
 

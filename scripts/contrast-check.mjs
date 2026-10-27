@@ -8,6 +8,9 @@
 //      preloads, the bundled fonts), or a generated SVG uses a colour that is
 //      not a token;
 //   4. a hand-written rule in global.css uses lime outside a forest context.
+// One exception, approved by the owner on 22 October 2026 (docs/lyceum-depth-plan.md Section 3.2, CLAUDE.md):
+// a third-party mark under public/brand/partners/ keeps its owner's colours, so parts 2 and 3 leave that folder
+// alone; nothing in it is used for Lyceum's own surfaces, and a hex anywhere else still fails.
 // Usage: node scripts/contrast-check.mjs
 
 import { spawnSync } from "node:child_process";
@@ -114,7 +117,8 @@ for (const file of files) {
 const gen = spawnSync(process.execPath, [join(ROOT, "scripts/gen-theme-css.mjs"), "--check"], { cwd: ROOT, encoding: "utf8" });
 if (gen.status !== 0) problems.push((gen.stderr || gen.stdout).trim());
 const tokenHex = new Set(Object.values(C).map((h) => h.toUpperCase()));
-const generated = [...new Set(listed.stdout.split("\0").filter(Boolean))].filter((p) => /^(public\/brand\/.*\.svg|docs\/presentation\/.*\.svg|\.github\/readme\/.*\.svg|.*\.generated\.[a-z]+)$/.test(p) && existsSync(join(ROOT, p)));
+const PARTNER_MARKS = /^public\/brand\/partners\//; // the owners' colours, by the exception above
+const generated = [...new Set(listed.stdout.split("\0").filter(Boolean))].filter((p) => /^(public\/brand\/.*\.svg|docs\/presentation\/.*\.svg|\.github\/readme\/.*\.svg|.*\.generated\.[a-z]+)$/.test(p) && !PARTNER_MARKS.test(p) && existsSync(join(ROOT, p)));
 for (const file of generated) {
   const found = readFileSync(join(ROOT, file), "utf8").match(/#[0-9a-fA-F]{6}\b/g) ?? [];
   for (const hex of new Set(found)) if (!tokenHex.has(hex.toUpperCase())) problems.push("Generated " + file + " uses " + hex + ", which is not a token.");

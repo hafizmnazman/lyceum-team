@@ -12,8 +12,9 @@ import { extname } from "node:path";
 
 const TEXT = new Set([".md", ".ts", ".tsx", ".mjs", ".js", ".cjs", ".css", ".html", ".json", ".txt", ".srt", ".yml", ".yaml", ".svg", ".d2"]);
 const KEPT_AS_WRITTEN = [/^docs\/history\//, /^docs\/review\//];
-// The door's sample workspace stores the same postings, verbatim, as its sources (docs/decisions.md, A0 and A5).
-const VERBATIM_EVIDENCE = [/^public\/demo\/collected-sample\.json$/, /^mcp\/sample-workspace\.json$/];
+// The door's sample workspace stores the same postings, verbatim, as its sources (docs/decisions.md, A0 and A5); the copy in
+// public/demo/ is the same file, for the judge's walk, and node mcp/sample.ts --check keeps the two identical.
+const VERBATIM_EVIDENCE = [/^public\/demo\/collected-sample\.json$/, /^mcp\/sample-workspace\.json$/, /^public\/demo\/sample-workspace\.json$/];
 const all = process.argv.includes("--all");
 
 const listed = spawnSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { encoding: "utf8", maxBuffer: 1 << 28 });

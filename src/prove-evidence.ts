@@ -199,7 +199,7 @@ test("backups keep evidence, reject misquotes and accept the earliest schema", (
   const id = posting(); quote(id, "Excel", "maintain Excel models"); setEvidenceSourceReviewed(id, true);
   setSkillMapping("BUS205", { skill: "Excel", cloIds: ["BUS205-outcome-1"], stage: "practised", target: "assessed", evidence: "Week 3 lab." });
   const raw = exportWorkspaceBackup(), people = getState().people.map((p) => p.id);
-  assert.equal(JSON.parse(raw).schemaVersion, 5);
+  assert.equal(JSON.parse(raw).schemaVersion, 6);
   const parsed = parseWorkspaceBackup(raw, people);
   assert.ok(parsed.ok);
   assert.equal(parsed.backup.data.evidenceSources.length, 1); assert.equal(parsed.backup.data.skillMappings.length, 1);
@@ -214,10 +214,11 @@ test("backups keep evidence, reject misquotes and accept the earliest schema", (
     assert.equal(parseWorkspaceBackup(JSON.stringify(candidate), people).ok, false);
   }
   const legacy = JSON.parse(raw); legacy.schemaVersion = 1;
-  for (const key of ["evidenceSources", "skillMentions", "skillMappings", "evidenceBriefs", "evidenceSnapshots", "briefDecisions", "events", "skillLexicon"]) delete legacy.data[key];
+  for (const key of ["evidenceSources", "skillMentions", "skillMappings", "evidenceBriefs", "evidenceSnapshots", "briefDecisions", "events", "skillLexicon", "institution"]) delete legacy.data[key];
   const older = parseWorkspaceBackup(JSON.stringify(legacy), people);
   assert.ok(older.ok); assert.deepEqual(older.backup.data.evidenceSources, []);
   assert.deepEqual(older.backup.data.briefDecisions, []); assert.deepEqual(older.backup.data.events, []);
+  assert.ok(older.backup.data.institution.name.includes("(demo)")); // a backup from before the profile takes the demo institution
   removeEvidenceSource(id);
   assert.equal(getState().evidenceSources.length, 0);
   const preview = previewWorkspaceBackup(raw); assert.ok(preview.ok);

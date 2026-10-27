@@ -114,10 +114,15 @@ try {
   await shot(".ladder-list", "shot-report-map.png");
   await click("rail-decide");
   await shotUntil(".decide-panel", ".decide-records", "shot-decide.png");
+  // Track C's two for the deck's slides 6 and 7 (depth plan Section 18 item 6): the change in use against the version before,
+  // down to the dumbbell's second row, and the OBE course report down to its table.
+  await click("rail-update");
+  await shotUntil(sel("update-last-change"), ".dumbbell-rows > li:nth-child(2)", "shot-update-change.png");
   await click("rail-teach");
   await shot(".session-card", "shot-teach.png");
   await click("rail-learn");
   await shot(sel("learn-attainment"), "shot-learn.png");
+  await shotUntil(sel("obe-live"), ".obe-table", "shot-learn-obe.png");
   await click("rail-history");
   await shot(sel("history-timeline"), "shot-history.png");
   await click("nav-office");

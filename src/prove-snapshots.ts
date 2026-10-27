@@ -145,10 +145,10 @@ test("a re-imported posting with new text is reported as changed, not as new", a
   assert.equal(c.textChanged[0].after.title, "Data Analyst 5");
 });
 
-test("backups carry snapshots at schema 5, reject inconsistent ones, and older backups restore without them", async () => {
+test("backups carry snapshots at schema 6, reject inconsistent ones, and older backups restore without them", async () => {
   await twoSemesters();
   const raw = exportWorkspaceBackup(), people = getState().people.map((p) => p.id);
-  assert.equal(JSON.parse(raw).schemaVersion, 5);
+  assert.equal(JSON.parse(raw).schemaVersion, 6);
   assert.equal(JSON.parse(raw).data.events.filter((e: any) => e.kind === "snapshot-frozen").length, 1, "a frozen snapshot is on the event log");
   const parsed = parseWorkspaceBackup(raw, people);
   assert.ok(parsed.ok); assert.equal(parsed.backup.data.evidenceSnapshots.length, 1);

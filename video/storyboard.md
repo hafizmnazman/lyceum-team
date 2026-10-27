@@ -2,7 +2,7 @@
 
 What is on screen for every scene of `script.md`, in the same order, with the cue words that time each move. A `Cue:` line names a move and the word it waits for (`Cue: slip at "receipt"`); `scripts/sync.mjs` finds the word in the scene's lines and fails if it is missing, so the words and the pictures cannot drift apart. The `Receipt:` line names the posting the receipt quotes (its fingerprint and the skill), which the sync looks up in `mcp/sample-workspace.json`, the dataset of the deck and the shots. Drawn scenes follow `style.md`; app scenes play excerpts of the recorded tour inside a drawn frame, labelled as the saved sample.
 
-Every number shown comes from `docs/claims.md` through the sync: 1 of 9 (`deck-receipt`), 12 to 18 months and 39% (`world-skills-and-approval`), TRL 6 (`deck-trl`) and 185 (`proof-checks`).
+Every number shown comes from `docs/claims.md` through the sync: 1 of 9 (`deck-receipt`), 12 to 18 months and 39% (`world-skills-and-approval`), TRL 6 (`deck-trl`) and 259 (`proof-checks`).
 
 # Loop90
 
@@ -87,9 +87,9 @@ Cue: pack at "pack"
 The tour: the sample results read, filed under the loop's term and the version taught, the attainment per outcome with n of N. Lens at the edge.
 
 ## aft-proof
-Three cards on the field: "TRL 6" in lime with NASA's software wording under it; "185 automated checks" counting up to the register's value; and an amber card, "Not built yet", listing the remote assistant doors, the LMS door, Learn's statistics and the benchmark run.
+Three cards on the field: "TRL 6" in lime with NASA's software wording under it; "259 automated checks" counting up to the register's value; and an amber card, "Not built yet", listing the remote assistant doors, the LMS door, pooling and predictions, and the benchmark run.
 Cue: trl at "TRL"
-Cue: checks at "185"
+Cue: checks at "259"
 Cue: amber at "amber"
 
 ## aft-doors

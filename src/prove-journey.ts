@@ -7,7 +7,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PEOPLE_IDS } from "./data/seed.ts";
+import { PEOPLE_IDS, SEED_RESULT_UPLOADS } from "./data/seed.ts";
 import {
   adoptCurriculumRevision, checkCurriculumRevision, confirmProposals, createCourseWorkspace, getState, importCollectedPostings, login, openNotification,
   prepareEvidenceBrief, recordDecision, removeEvidenceSnapshot, resetDemoState, runCollection, saveCurriculumRevision, saveTeachingPlanDetails,
@@ -325,7 +325,8 @@ test("Learn counts a term's results only when they are matched to the version ta
   const s = getState();
   const taught = taughtVersionId(s, "CS310")!;
   assert.equal(taught, s.teachingPlans.find((p) => p.subjectId === "CS310")!.sessions.at(-1)!.courseVersionId, "the version the term's sessions were saved on");
-  const upload = s.resultUploads.find((u) => u.subjectId === "CS310")!;
+  // The file the loop filed, not last term's seeded example (depth plan Section 8.4), which is never counted.
+  const upload = s.resultUploads.find((u) => u.subjectId === "CS310" && !SEED_RESULT_UPLOADS.some((x) => x.id === u.id))!;
   assert.equal(upload.courseVersionId, taught, "filed results are bound to the version taught");
   assert.equal(step("CS310", "learn").done, true);
   const unmatched = { ...s, resultUploads: s.resultUploads.map((u) => (u.id === upload.id ? { ...u, courseVersionId: undefined } : u)) };

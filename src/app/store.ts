@@ -23,6 +23,12 @@
 
 import { useSyncExternalStore } from "react";
 import type {
+  SurveyDefinition,
+  SurveyResponse,
+  CqiNote,
+  ObeReport,
+  DraftItem,
+  TeachingSession,
   AgentName,
   AgentRun,
   AssessmentBlueprint,
@@ -42,6 +48,7 @@ import type {
   RelevanceRating,
   ResultUpload,
   RoleAssignment,
+  Rubric,
   Subject,
   SubjectId,
   SubjectVersion,
@@ -61,13 +68,14 @@ import type {
   EvidenceBrief,
   EvidenceSnapshot,
   EvidenceSource,
+  InstitutionProfile,
   SkillMapping,
   SkillMention,
   VerdictReport,
 } from "../types.ts";
 import type { Screen } from "./roles.ts";
 import { confirmLeaveEditor } from "./unsaved.ts";
-import { can, landingScreen, navAllows, hatsOn } from "./roles.ts";
+import { can, landingScreen, navAllows, hatsOn, isCoordinatorAnywhere } from "./roles.ts";
 import type { SimState } from "./sim.ts";
 import { initSim, SIM_TICK_MS, stepSim } from "./sim.ts";
 import type { SignalSimState } from "./signalSim.ts";
@@ -84,7 +92,7 @@ import { runAnalogy } from "../agents/analogy.ts";
 import { runSignal } from "../agents/signal.ts";
 import { computeRelevanceRatings } from "../data/market.ts";
 import { backupSummary, parseWorkspaceBackup, serializeWorkspaceBackup, workspaceFingerprint } from "../lib/workspaceBackup.ts";
-import { courseDefinition, curriculumChanges, curriculumImpact, draftStructureError, validateCourseDefinition } from "../lib/curriculum.ts";
+import { courseDefinition, curriculumChanges, curriculumImpact, draftStructureError, validateCourseDefinition, withDerivedFields } from "../lib/curriculum.ts";
 import { sessionIssues, type SaveResult, type SessionInput } from "../lib/teachingPlan.ts";
 import {
   evidenceReport, evidenceSourceError, mappingError, meetingBriefMarkdown, mentionError, normaliseWhitespace, proposeMentions, RECOMMENDATION_LABEL, skillKey, textFingerprint,
@@ -99,6 +107,13 @@ import { courseVersionIds, stepDef, stepForTab, taughtVersionId, termWindow, typ
 export { REPORT_TABS, type ReportTab } from "./loop.ts";
 import { hashFor, type CourseRoute } from "./routes.ts";
 import { ITEMS, itemsForCLOs } from "../data/items.ts";
+import { DEMO_INSTITUTION } from "../data/institution.ts";
+import { institutionError } from "../lib/institution.ts";
+import { boothAnswers, courseOutcomeSurvey, formTokenFor, gradesReleased, importResponseRows, newReaderSecret, readPasteCodes, ssrtSurvey, studentForm, type ImportResult, type PasteResult } from "../lib/surveys.ts";
+import { DEMO_LINE } from "../data/sample-course/index.ts";
+import { listedStudents, obeReport } from "../lib/attainment.ts";
+import { templateItems } from "../lib/items.ts";
+import { PRIOR_SURVEYS, PRIOR_SURVEY_RESPONSES } from "../data/sample-course/surveys.ts";
 import {
   CANONICAL_PROPOSAL,
   CLOS,
@@ -106,8 +121,13 @@ import {
   PEOPLE,
   PROGRAMME,
   ROLE_ASSIGNMENTS,
+  SEED_CLOS,
+  SEED_COURSE_DEFINITIONS,
   SEED_PREDICTIONS,
   SEED_RESULT_UPLOADS,
+  SEED_RUBRICS,
+  SEED_SUBJECTS,
+  SEED_TEACHING_PLANS,
   SEED_SUBJECT_VERSIONS,
   SUBJECTS,
   SURVEY,
@@ -155,6 +175,7 @@ export interface AppState {
   subjects: Subject[];
   clos: CLO[];
   survey: SurveyRecord[];
+  institution: InstitutionProfile; // the campus and every setting that shapes a figure (depth plan Section 3.1)
 
   // session
   currentPersonId: PersonId | null;
@@ -175,6 +196,7 @@ export interface AppState {
   testDrafts: TestDraft[];
   teachingPlans: TeachingPlan[];
   courseDefinitions: Record<string, CourseDefinition>;
+  rubrics: Rubric[]; // the assessment rubrics a course definition's components name (depth plan Section 4.2)
   curriculumDrafts: CurriculumDraft[];
   evidenceSources: EvidenceSource[];
   skillMentions: SkillMention[];
@@ -183,6 +205,10 @@ export interface AppState {
   evidenceSnapshots: EvidenceSnapshot[]; // frozen evidence windows, compared to watch change over time
   briefDecisions: BriefDecision[]; // the decision record on briefs (plan Section 4); never edited
   events: LoopEvent[]; // append-only: decisions, snapshots, adoptions, briefs prepared, sent and read, term changes
+  surveys: SurveyDefinition[]; // the two student surveys per course and term (depth plan Section 7)
+  surveyResponses: SurveyResponse[]; // answers keyed by question id; nothing that identifies a student
+  obeReports: ObeReport[]; // the OBE course report as printed, a snapshot (depth plan Section 8.3)
+  cqiNotes: CqiNote[]; // the lecturer's continuous quality improvement notes, per course and term
   skillLexicon: Record<string, string[]>; // per course: the terms the lecturer scans for
   relevanceRatings: RelevanceRating[];
 
@@ -211,7 +237,7 @@ export interface AppState {
 }
 
 /** A real request in flight. A mascot shows "working" only while one of these exists (plan Section 7.2). */
-export interface InFlightRequest { id: string; kind: "collect" | "parse" | "pack"; subjectId: SubjectId | null; startedAt: string }
+export interface InFlightRequest { id: string; kind: "collect" | "parse" | "pack" | "course-file"; subjectId: SubjectId | null; startedAt: string }
 
 function idleAgents(): Record<AgentId, AgentState> {
   return {
@@ -230,9 +256,10 @@ function seedState(): AppState {
     people: PEOPLE,
     assignments: [...ROLE_ASSIGNMENTS],
     programme: PROGRAMME,
-    subjects: [...SUBJECTS],
-    clos: [...CLOS],
+    subjects: structuredClone(SEED_SUBJECTS),
+    clos: structuredClone(SEED_CLOS),
     survey: SURVEY,
+    institution: structuredClone(DEMO_INSTITUTION),
 
     currentPersonId: null,
     screen: "login",
@@ -249,8 +276,9 @@ function seedState(): AppState {
     dataSources: [...DATA_SOURCES],
     subjectVersions: [...SEED_SUBJECT_VERSIONS],
     testDrafts: [],
-    teachingPlans: [],
-    courseDefinitions: {},
+    teachingPlans: structuredClone(SEED_TEACHING_PLANS),
+    courseDefinitions: structuredClone(SEED_COURSE_DEFINITIONS),
+    rubrics: structuredClone(SEED_RUBRICS),
     curriculumDrafts: [],
     evidenceSources: [],
     skillMentions: [],
@@ -259,6 +287,10 @@ function seedState(): AppState {
     evidenceSnapshots: [],
     briefDecisions: [],
     events: [],
+    surveys: structuredClone(PRIOR_SURVEYS),
+    surveyResponses: structuredClone(PRIOR_SURVEY_RESPONSES),
+    obeReports: [],
+    cqiNotes: [],
     skillLexicon: {},
     relevanceRatings: computeRelevanceRatings(SUBJECTS, CLOS, SEED_NOW),
 
@@ -296,6 +328,7 @@ const PERSISTED_KEYS = [
   "subjects",
   "clos",
   "survey",
+  "institution",
   "currentPersonId",
   "screen",
   "selectedSubjectId",
@@ -309,6 +342,7 @@ const PERSISTED_KEYS = [
   "testDrafts",
   "teachingPlans",
   "courseDefinitions",
+  "rubrics",
   "curriculumDrafts",
   "evidenceSources",
   "skillMentions",
@@ -317,6 +351,10 @@ const PERSISTED_KEYS = [
   "evidenceSnapshots",
   "briefDecisions",
   "events",
+  "surveys",
+  "surveyResponses",
+  "obeReports",
+  "cqiNotes",
   "skillLexicon",
   "relevanceRatings",
   "idSeq",
@@ -464,18 +502,97 @@ export function saveTeachingPlanDetails(subjectId: SubjectId, details: { term: s
 export function saveTeachingSession(subjectId: SubjectId, input: SessionInput): SaveResult {
   if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can edit this teaching plan." };
   const previous = state.teachingPlans.find((p) => p.subjectId === subjectId);
-  if (input.id && !previous?.sessions.some((s) => s.id === input.id))
+  const target = input.id ? previous?.sessions.find((s) => s.id === input.id) : undefined;
+  if (input.id && !target)
     return { ok: false, error: "This session no longer exists. Add a new session instead." };
+  // The term's sample sessions stay as written for the prototype (depth plan Section 5.1); what a lecturer saves is their own.
+  if (target?.sample) return { ok: false, error: "Sample sessions stay as written for the prototype. Add your own session for week " + target.week + " instead." };
   const issues = sessionIssues(input, state.clos.filter((c) => c.subjectId === subjectId));
   if (issues.length) return { ok: false, error: issues.join(" ") };
+  // The slides, lab sheets and brief in this build are sample fixtures; a lecturer's own session never carries their text (CLAUDE.md).
+  const { sample: _sample, slides: _slides, labSheet: _labSheet, projectBrief: _projectBrief, items: _items, ...own } = input as SessionInput & { items?: unknown };
   const session = {
-    ...input, id: input.id ?? nextId("TS"), topic: input.topic.trim(),
+    ...own, id: input.id ?? nextId("TS"), topic: input.topic.trim(),
     cloIds: [...new Set(input.cloIds)], activity: input.activity.trim(),
     learningCheck: input.learningCheck.trim(), resources: input.resources.trim(),
     updatedAt: nowIso(), updatedBy: state.currentPersonId!,
     courseVersionId: subjectById(subjectId)?.currentVersionId, needsReview: false,
+    // The session's items are kept as they are; they change only through the item actions below.
+    ...(target?.items ? { items: target.items } : {}),
   };
   updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: [...plan.sessions.filter((s) => s.id !== session.id), session] }));
+  return { ok: true };
+}
+
+// ---------- the check's items (depth plan Section 10) ----------
+
+function sessionOf(subjectId: SubjectId, sessionId: string): TeachingSession | undefined {
+  return state.teachingPlans.find((p) => p.subjectId === subjectId)?.sessions.find((s) => s.id === sessionId);
+}
+function setSessionItems(subjectId: SubjectId, sessionId: string, items: DraftItem[]) {
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: plan.sessions.map((s) => (s.id === sessionId ? { ...s, items } : s)) }));
+}
+function itemError(item: DraftItem): string | null {
+  if (!item.stem.trim() || item.stem.length > 2000) return "Write the stem, under 2,000 characters.";
+  if (!(item.marks > 0 && item.marks <= 100)) return "Give the item a mark above 0 and up to 100.";
+  if (item.kind === "multichoice" && ((item.options ?? []).length < 2 || (item.options ?? []).length > 6 || (item.options ?? []).some((o) => o.text.length > 500)))
+    return "A multiple-choice item has two to six options, each under 500 characters.";
+  if (item.kind === "shortanswer" && ((item.answers ?? []).length > 10 || (item.answers ?? []).some((a) => a.length > 100))) return "Up to ten accepted answers, each under 100 characters.";
+  if (item.kind === "essay" && ((item.graderInfo ?? "").length > 4000 || !((item.responseLines ?? 15) >= 3 && (item.responseLines ?? 15) <= 40))) return "Keep the marker's guidance under 4,000 characters and the answer box between 3 and 40 lines.";
+  return null;
+}
+const ownSession = (subjectId: SubjectId, sessionId: string): TeachingSession | string => {
+  if (!mayPlan(subjectId)) return "Only an assigned lecturer or coordinator can change this course's items.";
+  const session = sessionOf(subjectId, sessionId);
+  if (!session) return "This session no longer exists.";
+  if (session.sample) return "Sample sessions stay as written for the prototype; a person can mark their items reviewed.";
+  return session;
+};
+
+/** Draft items for one of the lecturer's own sessions from Lyceum's templates; each key and accepted answer is theirs to write. */
+export function draftSessionItems(subjectId: SubjectId, sessionId: string): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  const definition = definitionForCourse(subjectId);
+  const outcomes = definition?.outcomes ?? [];
+  if (!session.cloIds.some((id) => outcomes.some((o) => o.id === id))) return { ok: false, error: "Link the session to an outcome first; the templates write from it." };
+  const drafted = templateItems(definition, session, outcomes, () => nextId("ITEM-" + subjectId));
+  setSessionItems(subjectId, sessionId, [...(session.items ?? []), ...drafted]);
+  set({ toast: drafted.length + " items drafted for your review. Write each key and accepted answer; the lint shows what is left." });
+  return { ok: true };
+}
+
+/** Save one item of the lecturer's own session. A change clears its review: a person reviews what is there now. */
+export function saveSessionItem(subjectId: SubjectId, sessionId: string, item: DraftItem): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  const current = (session.items ?? []).find((i) => i.id === item.id);
+  if (!current) return { ok: false, error: "This item no longer exists." };
+  const error = itemError(item);
+  if (error) return { ok: false, error };
+  const content = (i: DraftItem) => JSON.stringify({ ...i, reviewedBy: null, reviewedAt: null });
+  const next: DraftItem = { ...item, kind: current.kind, source: current.source };
+  const saved = content(next) === content(current) ? current : { ...next, reviewedBy: null, reviewedAt: null };
+  setSessionItems(subjectId, sessionId, (session.items ?? []).map((i) => (i.id === item.id ? saved : i)));
+  return { ok: true };
+}
+
+export function removeSessionItem(subjectId: SubjectId, sessionId: string, itemId: string): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  if (!(session.items ?? []).some((i) => i.id === itemId)) return { ok: false, error: "This item no longer exists." };
+  setSessionItems(subjectId, sessionId, (session.items ?? []).filter((i) => i.id !== itemId));
+  return { ok: true };
+}
+
+/** A person on the course marks a session's items reviewed: a record of who and when, never the app's approval. */
+export function markItemsReviewed(subjectId: SubjectId, sessionId: string): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can review this course's items." };
+  const session = sessionOf(subjectId, sessionId);
+  if (!session?.items?.length) return { ok: false, error: "This session has no items to review." };
+  const at = nowIso(), person = currentPerson()!;
+  setSessionItems(subjectId, sessionId, session.items.map((i) => ({ ...i, reviewedBy: person.id, reviewedAt: at })));
+  set({ toast: session.items.length + " items marked reviewed by " + person.name + ". The app records the review; it approves nothing." });
   return { ok: true };
 }
 
@@ -641,6 +758,19 @@ export function dismissToast() {
 }
 export function showToast(message: string) {
   set({ toast: message });
+}
+
+// ---------- the institution profile (depth plan Section 3.1) ----------
+/** May this person change the institution's settings? A course coordinator, as the plan's Guide panel says. */
+export function mayEditInstitution(person = currentPerson()): boolean {
+  return !!person && person.orgRole === "academic" && isCoordinatorAnywhere(person.id, state.assignments);
+}
+export function saveInstitutionProfile(profile: InstitutionProfile): SaveResult {
+  if (!mayEditInstitution()) return { ok: false, error: "Only a course coordinator can change the institution's settings." };
+  const error = institutionError(profile);
+  if (error) return { ok: false, error };
+  set({ institution: structuredClone(profile), toast: "Institution settings saved." });
+  return { ok: true };
 }
 
 // ---------- notifications ----------
@@ -812,7 +942,7 @@ export function confirmPendingIntake(): string | null {
       subjectId,
       uploadedBy: person.id,
       term,
-      rows: interp.mappedRows,
+      rows: interp.mappedRows.map((r) => (r.marks ? { ...r, passMarkAtFiling: state.institution.kpi.passMark } : r)),
       filedAt: at,
       sourceFileName: doc.fileName,
       ...(courseVersionId ? { courseVersionId } : {}),
@@ -822,7 +952,7 @@ export function confirmPendingIntake(): string | null {
       kind: "results",
       subjectId,
       term,
-      recordCount: upload.rows.reduce((m, r) => Math.max(m, r.n), 0),
+      recordCount: listedStudents(upload),
       ingestedAt: at,
       verified: false,
       sourceFileName: doc.fileName,
@@ -1838,7 +1968,7 @@ export function saveCurriculumRevision(draftId: string, expectedRevision: number
     return { ok: false, error: "Invalid revision rationale or teaching term." };
   const revision = draft.revision + 1;
   set(s => ({ curriculumDrafts: s.curriculumDrafts.map(d => d.id === draftId ? {
-    ...d, definition: structuredClone(input.definition), reason: input.reason.trim(), effectiveTerm: input.effectiveTerm.trim(),
+    ...d, definition: withDerivedFields(input.definition), reason: input.reason.trim(), effectiveTerm: input.effectiveTerm.trim(),
     revision, checkedRevision: null, history: [...d.history, { at: nowIso(), byPersonId: currentPerson()!.id,
       action: "saved", note: "Candidate edited; previous checks invalidated.", revision }] } : d), toast: "Revision saved. Current course version is unchanged." }));
   return { ok: true };
@@ -1951,6 +2081,209 @@ export function restoreWorkspaceBackup(raw: string, expectedFingerprint: string,
   state = next;
   emit();
   return { ok: true };
+}
+
+/** The guided walk's starting point (depth plan Section 9.1): the tour's end state from the sample workspace, restored the
+ *  way a backup is, with the current workspace kept as the recovery copy, and signed in as the person the walk follows. */
+export function restoreSampleWorkspace(raw: string, personId: PersonId): SaveResult {
+  if (!state.people.some(p => p.id === personId)) return { ok: false, error: "The walk's person is not in this workspace." };
+  const parsed = parseWorkspaceBackup(raw, state.people.map(p => p.id));
+  if (!parsed.ok) return parsed;
+  const recovery = exportWorkspaceBackup();
+  const next: AppState = { ...seedState(), ...structuredClone(parsed.backup.data),
+    currentPersonId: personId, screen: "inbox", persistenceStatus: "saved", selectedSubjectId: null, selectedProposalId: null, toast: null };
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(RECOVERY_KEY, recovery);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(PERSISTED_KEYS.map(k => [k, next[k]]))));
+    } catch {
+      // The walk still runs in memory; the recovery copy stays in memory for this visit.
+    }
+  }
+  if (saveTimer) clearTimeout(saveTimer);
+  if (simTimer) clearInterval(simTimer);
+  if (signalTimer) clearInterval(signalTimer);
+  if (drillTimer) clearInterval(drillTimer);
+  saveTimer = null; simTimer = null; signalTimer = null; drillTimer = null;
+  recoveryBackup = recovery;
+  state = next;
+  emit();
+  return { ok: true };
+}
+
+// ---------- the two student surveys (depth plan Section 7) ----------
+
+/** The term's two instruments for a course, built from its course record and the institution profile: the Course
+ *  Outcome Survey (one item per outcome) and the SSRT (a demo instrument). Once per course and term. */
+export function createCourseSurveys(subjectId: SubjectId): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can prepare this course's surveys." };
+  const subject = subjectById(subjectId)!;
+  const term = termWindow(state, subjectId).term;
+  if (!term) return { ok: false, error: "Set the term this loop runs for first, on the Course step; a survey belongs to a term." };
+  if (state.surveys.some((x) => x.subjectId === subjectId && x.term === term && !x.sample)) return { ok: false, error: "This term's surveys already exist." };
+  const at = nowIso(), by = currentPerson()!.id;
+  const definition = definitionForCourse(subjectId)!;
+  const upload = state.resultUploads.filter((u) => u.subjectId === subjectId && u.term === term).at(-1);
+  const classSize = upload ? listedStudents(upload) || null : null;
+  const common = { subject, institution: state.institution, term, versionId: subject.currentVersionId, classSize, at, by };
+  set((s) => ({ surveys: [...s.surveys,
+    courseOutcomeSurvey({ ...common, id: nextId("SURV-" + subjectId), outcomes: definition.outcomes }),
+    ssrtSurvey({ ...common, id: nextId("SURV-" + subjectId) })], toast: "The term's two surveys are ready to open." }));
+  return { ok: true };
+}
+
+/** Open a survey for the booth collector: a reader secret held only here, and the submission token derived from it. */
+export async function openSurveyForCollection(formId: string, classSize: number | null): Promise<SaveResult> {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form || form.sample) return { ok: false, error: "Choose one of this term's surveys." };
+  if (!mayPlan(form.subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can open this survey." };
+  if (classSize !== null && !(Number.isInteger(classSize) && classSize > 0 && classSize <= 5000)) return { ok: false, error: "The class size is a whole number of students, or left blank." };
+  const readerSecret = form.readerSecret ?? newReaderSecret();
+  const formToken = await formTokenFor(readerSecret);
+  set((s) => ({ surveys: s.surveys.map((x) => (x.id === formId ? { ...x, readerSecret, formToken, classSize } : x)) }));
+  if (!form.formToken) logEvent("survey-opened", { subjectId: form.subjectId, formId, term: form.term });
+  return { ok: true };
+}
+
+/** Leave the student's form with the booth collector, so the QR can carry the short link; the long link carries the form itself. */
+export async function publishSurveyForm(formId: string): Promise<SaveResult> {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form?.formToken || !form.readerSecret) return { ok: false, error: "Open the survey for collection first." };
+  const subject = subjectById(form.subjectId)!;
+  const demoLine = state.courseDefinitions[form.subjectId]?.sample ? DEMO_LINE : null;
+  try {
+    const res = await fetch("/api/survey/" + form.formToken + "/form", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reader: form.readerSecret, form: studentForm(form, subject, state.institution, demoLine) }) });
+    return res.ok ? { ok: true } : { ok: false, error: "The collector answered " + res.status + "." };
+  } catch {
+    return { ok: false, error: "The collector on this laptop could not be reached, so only the long link works; it carries the whole form." };
+  }
+}
+
+/** Collect the booth's responses: one per device, each checked against the questions, stored as booth responses, which
+ *  are a demonstration of the collector and never course evidence. */
+export async function collectBoothResponses(formId: string): Promise<SaveResult & { added?: number }> {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form?.formToken || !form.readerSecret) return { ok: false, error: "Open the survey for collection first." };
+  if (!mayPlan(form.subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can collect this survey." };
+  let body: { responses?: Array<{ clientId?: unknown; answers?: unknown }> };
+  try {
+    const res = await fetch("/api/survey/" + form.formToken + "/responses?reader=" + encodeURIComponent(form.readerSecret));
+    if (!res.ok) return { ok: false, error: res.status === 403 ? "The collector refused the reader secret." : "The collector answered " + res.status + "." };
+    body = await res.json();
+  } catch {
+    return { ok: false, error: "The collector on this laptop could not be reached. Start the local API (npm run booth, or npm run dev) and collect again." };
+  }
+  const known = new Set(state.surveyResponses.filter((r) => r.formId === formId && r.clientId).map((r) => r.clientId));
+  const fresh: SurveyResponse[] = [];
+  for (const r of body.responses ?? []) {
+    const clientId = typeof r.clientId === "string" && /^[A-Za-z0-9-]{8,64}$/.test(r.clientId) ? r.clientId : null;
+    const answers = boothAnswers(form, r.answers);
+    if (!clientId || !answers || known.has(clientId)) continue;
+    known.add(clientId);
+    fresh.push({ id: nextId("SR-" + form.subjectId), formId, term: form.term, answers, collectedAt: nowIso(), clientId, source: "booth" });
+  }
+  if (fresh.length) {
+    set((s) => ({ surveyResponses: [...s.surveyResponses, ...fresh] }));
+    logEvent("survey-collected", { subjectId: form.subjectId, formId, term: form.term, count: fresh.length, source: "booth" });
+  }
+  return { ok: true, added: fresh.length };
+}
+
+/** Import a Microsoft Forms, Google Forms or Moodle Feedback export (its rows, the header first, the format read from the
+ *  header), matched on the question ids (depth plan Section 7.2). */
+export function importSurveyRows(formId: string, rows: unknown[][]): SaveResult & { result?: ImportResult } {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form || form.sample) return { ok: false, error: "Choose one of this term's surveys to import into." };
+  if (!mayPlan(form.subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can import into this survey." };
+  const result = importResponseRows(rows, form, nowIso(), () => nextId("SR-" + form.subjectId));
+  if (!result.responses.length) return { ok: false, error: "No response in the file matched this survey's question ids (Q1., Q2., ...).", result };
+  set((s) => ({ surveyResponses: [...s.surveyResponses, ...result.responses] }));
+  logEvent("survey-collected", { subjectId: form.subjectId, formId, term: form.term, count: result.responses.length, source: "imported" });
+  return { ok: true, result };
+}
+
+/** Read the codes students pasted into a course page or an email (the paste way, Section 7.2): each checked against the
+ *  survey, a device already read counted once, a code for another survey refused. */
+export function readPastedSurveyCodes(formId: string, text: string): SaveResult & { result?: PasteResult } {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form || form.sample) return { ok: false, error: "Choose one of this term's surveys to read codes into." };
+  if (!mayPlan(form.subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can read codes into this survey." };
+  if (!form.formToken) return { ok: false, error: "Open the survey first; its codes are bound to it." };
+  const known = state.surveyResponses.filter((r) => r.formId === formId && r.clientId).map((r) => r.clientId!);
+  const result = readPasteCodes(text, form, nowIso(), () => nextId("SR-" + form.subjectId), known);
+  if (!result.codes) return { ok: false, error: "No code in the text: each one starts LYC1-.", result };
+  if (result.responses.length) {
+    set((s) => ({ surveyResponses: [...s.surveyResponses, ...result.responses] }));
+    logEvent("survey-collected", { subjectId: form.subjectId, formId, term: form.term, count: result.responses.length, source: "pasted" });
+  }
+  return { ok: true, result };
+}
+
+/** The coordinator records that the term's grades are released: from then on, never before, the term's survey results show. */
+export function recordGradesReleased(subjectId: SubjectId, term: string): SaveResult {
+  if (!mayAdopt(subjectId)) return { ok: false, error: "Only the course coordinator records that grades are released." };
+  if (!term.trim()) return { ok: false, error: "Set the term first." };
+  if (gradesReleased(state.events, subjectId, term)) return { ok: false, error: "Grades are already recorded as released for " + term + "." };
+  logEvent("grades-released", { subjectId, term });
+  set({ toast: "Grades recorded as released for " + term + ". The term's survey results open." });
+  return { ok: true };
+}
+
+// ---------- attainment against a stated threshold (depth plan Section 8) ----------
+
+/** The results file a course's report for a term reads: the latest filed for that term, never a seeded example. */
+export function reportUpload(s: AppState, subjectId: SubjectId, term: string): ResultUpload | null {
+  const seeded = new Set(SEED_RESULT_UPLOADS.map((u) => u.id));
+  return s.resultUploads.filter((u) => u.subjectId === subjectId && u.term === term && !seeded.has(u.id))
+    .sort((a, b) => a.filedAt.localeCompare(b.filedAt)).at(-1) ?? null;
+}
+
+/** The OBE course report for a course and term, built from records and the profile as they stand: the term's results
+ *  file, its Course Outcome Survey (booth responses never counted) and the term's latest CQI note. */
+export function obeReportFor(s: AppState, subjectId: SubjectId, term: string, upload: ResultUpload, at: string, by: PersonId, id = "OBE-preview"): ObeReport {
+  const definition = s.courseDefinitions[subjectId];
+  return obeReport({ id, subjectId, term, upload, at, by,
+    clos: s.clos.filter((c) => c.subjectId === subjectId), outcomes: definition?.outcomes ?? [], plos: s.programme.plos ?? [],
+    institution: s.institution, survey: s.surveys.find((x) => x.subjectId === subjectId && x.term === term && x.kind === "course-outcome") ?? null,
+    responses: s.surveyResponses, events: s.events,
+    cqiNoteId: s.cqiNotes.filter((n) => n.subjectId === subjectId && n.term === term).at(-1)?.id ?? null });
+}
+
+/** Save the term's OBE course report as printed: a snapshot of its figures and of the version, threshold, method and
+ *  survey they were printed with, so a later setting change cannot relabel it. */
+export function saveObeReport(subjectId: SubjectId): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can save this course's report." };
+  const term = termWindow(state, subjectId).term;
+  if (!term) return { ok: false, error: "Set the term this loop runs for first, on the Course step." };
+  const upload = reportUpload(state, subjectId, term);
+  if (!upload) return { ok: false, error: "File this term's results first; the report reads them." };
+  if (!upload.rows.some((r) => r.marks)) return { ok: false, error: "This results file kept no distribution; file the results again to compute the shares." };
+  const report = obeReportFor(state, subjectId, term, upload, nowIso(), currentPerson()!.id, nextId("OBE-" + subjectId));
+  set((s) => ({ obeReports: [...s.obeReports, report], toast: "The OBE course report is saved as printed, at a pass mark of " + report.passMark + "." }));
+  return { ok: true };
+}
+
+/** The lecturer's continuous quality improvement note for the course and term, a saved record History shows. */
+export function saveCqiNote(subjectId: SubjectId, text: string): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can write this course's CQI note." };
+  const term = termWindow(state, subjectId).term;
+  if (!term) return { ok: false, error: "Set the term this loop runs for first, on the Course step." };
+  const note = text.trim();
+  if (!note) return { ok: false, error: "Write what will change next term, and why." };
+  if (note.length > NOTE_MAX) return { ok: false, error: "Keep the note under " + NOTE_MAX + " characters." };
+  const at = nowIso(), id = nextId("CQI-" + subjectId);
+  const upload = reportUpload(state, subjectId, term);
+  const cqi: CqiNote = { id, subjectId, term, versionId: upload?.courseVersionId ?? taughtVersionId(state, subjectId) ?? null, text: note, at, byPersonId: currentPerson()!.id };
+  set((s) => ({ cqiNotes: [...s.cqiNotes, cqi], toast: "The CQI note is saved for " + term + "." }));
+  logEvent("cqi-noted", { subjectId, term, noteId: id }, at);
+  return { ok: true };
+}
+
+/** A course's term recap (depth plan Section 9.1 item 4), at #/course/:id/recap. */
+export function openRecap(subjectId: SubjectId) {
+  if (!confirmLeaveEditor()) return;
+  set({ screen: "recap", selectedSubjectId: subjectId, courseStep: null });
 }
 
 

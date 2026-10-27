@@ -1,6 +1,6 @@
 // The local door (plan Section 11.4): a stdio MCP server, on the official
 // TypeScript SDK, over a workspace backup exported from Lyceum and named by
-// LYCEUM_WORKSPACE. Five tools only read; the sixth writes one teaching pack to
+// LYCEUM_WORKSPACE. Seven tools only read; the eighth writes one teaching pack to
 // a path the user names. No tool confirms a quotation, adopts a revision,
 // records a decision or sends a brief: those stay human actions in the
 // workspace (Section 11.3). Every call is logged to stderr with the host, the
@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { briefDraftText, courseOutlineText, evidenceReportText, listCourses, listSources, loadWorkspace, writeTeachingPack, type Loaded, type ToolText } from "./workspace.ts";
+import { attainmentText, briefDraftText, courseOutlineText, courseRecordText, evidenceReportText, listCourses, listSources, loadWorkspace, writeTeachingPack, type Loaded, type ToolText } from "./workspace.ts";
 
 export const SERVER_NAME = "lyceum";
 export const SERVER_VERSION = "3.0.0";
@@ -21,6 +21,7 @@ export const WRITES_A_NEW_FILE = { readOnlyHint: false, destructiveHint: false, 
 
 const INSTRUCTIONS = "Lyceum is a lecturer's course workspace. This local door reads one exported workspace and never changes it. "
   + "Quote counts with their denominator and interval, name the source of every quotation with its link and date, and never call a share a score. "
+  + "Quote attainment with its pass mark, its n of N and the KPI, and never average the survey's share with the marks' share. "
   + "Confirming quotations, adopting a revision, recording a decision and sending a brief are done by people in the workspace, not here. "
   + "No learning gain is claimed; the benchmark has not been run.";
 
@@ -69,6 +70,20 @@ export function createLyceumServer(options: DoorOptions = {}): McpServer {
     inputSchema: courseArg,
     annotations: READ_ONLY,
   }, async ({ course }) => answer("lyceum_course_outline", { course }, ({ backup }) => courseOutlineText(backup, course)));
+
+  server.registerTool("lyceum_course_record", {
+    title: "The course record, as a course file",
+    description: "One course's record in the shape of a course file: outcomes with the CLO to PLO matrix, the assessment plan and table of specifications, the schedule, learning time and references, then the manifest of the course file the app exports, marking each item present, sample, not yet built or not included. Read-only.",
+    inputSchema: courseArg,
+    annotations: READ_ONLY,
+  }, async ({ course }) => answer("lyceum_course_record", { course }, ({ backup }) => courseRecordText(backup, course)));
+
+  server.registerTool("lyceum_attainment", {
+    title: "Attainment against the stated threshold",
+    description: "The OBE course report for one course and term: per outcome, the students at or above the institution's pass mark over n, with N beside it, the KPI, and an interval only when some students have no mark; the Course Outcome Survey's share beside it, never averaged and never from booth responses; the programme outcomes listed with no index; and the CQI note. The report saved as printed if there is one. Read-only.",
+    inputSchema: { ...courseArg, term: z.string().min(1).max(60).optional().describe("The term, for example 2026/2027 semester 1; the course's current term if left out.") },
+    annotations: READ_ONLY,
+  }, async ({ course, term }) => answer("lyceum_attainment", { course, term }, ({ backup }) => attainmentText(backup, course, term)));
 
   server.registerTool("lyceum_brief_draft", {
     title: "A meeting brief draft",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PEOPLE_IDS } from "./data/seed.ts";
+import { PEOPLE_IDS, SEED_TEACHING_PLANS } from "./data/seed.ts";
 import { deleteTeachingSession, getState, login, logout, resetDemoState, saveTeachingPlanDetails, saveTeachingSession, startDraft } from "./app/store.ts";
 import { planSummary, teachingPlanMarkdown, type SessionInput } from "./lib/teachingPlan.ts";
 import { SECTION_GUIDES } from "./app/sectionGuides.ts";
@@ -12,6 +12,8 @@ const session = (patch: Partial<SessionInput> = {}): SessionInput => ({
   resources: "Two worked examples; a short slide brief.", status: "ready", ...patch,
 });
 function setup() { resetDemoState(); login(PEOPLE_IDS.sobri); }
+// CS310 starts with its sample plan (depth plan Section 5.1), so a course's plan is found by its course, never by position.
+const planOf = (subjectId: string) => getState().teachingPlans.find((p) => p.subjectId === subjectId)!;
 
 test("only assigned academics can change teaching plans, including through direct actions", () => {
   setup();
@@ -20,7 +22,7 @@ test("only assigned academics can change teaching plans, including through direc
     assert.equal(saveTeachingSession("CS220", session()).ok, false);
     assert.equal(saveTeachingPlanDetails("CS220", { term: "T1", notes: "Wrong actor" }).ok, false);
     assert.equal(deleteTeachingSession("CS220", "anything").ok, false);
-    assert.deepEqual(getState().teachingPlans, []);
+    assert.deepEqual(getState().teachingPlans, SEED_TEACHING_PLANS, "nothing saved beyond the seeded sample plan");
   }
 });
 
@@ -28,7 +30,7 @@ test("invalid week/duration and cross-course outcomes are rejected before state 
   setup();
   for (const input of [session({ week: 0 }), session({ week: 1.5 }), session({ week: 53 }), session({ minutes: NaN }), session({ minutes: 0 }), session({ minutes: 601 }), session({ cloIds: ["CLO5"] }), session({ topic: "  " })]) {
     assert.equal(saveTeachingSession("CS220", input).ok, false);
-    assert.deepEqual(getState().teachingPlans, []);
+    assert.deepEqual(getState().teachingPlans, SEED_TEACHING_PLANS, "nothing saved beyond the seeded sample plan");
   }
   assert.equal(saveTeachingSession("unknown", session()).ok, false);
 });
@@ -41,16 +43,16 @@ test("drafts can be incomplete, but ready and delivered sessions require prepara
     assert.equal(saveTeachingSession("CS220", { ...incomplete, status }).ok, false);
   assert.equal(saveTeachingSession("CS220", session({ activity: " " })).ok, false);
   assert.equal(saveTeachingSession("CS220", session({ learningCheck: " " })).ok, false);
-  assert.equal(getState().teachingPlans[0].sessions.length, 1);
+  assert.equal(planOf("CS220").sessions.length, 1);
 });
 
 test("editing replaces a session, deduplicates CLO links and stamps the real author", () => {
   setup();
   saveTeachingSession("CS220", session({ cloIds: ["CLO4", "CLO4"] }));
-  const saved = getState().teachingPlans[0].sessions[0];
+  const saved = planOf("CS220").sessions[0];
   assert.deepEqual(saved.cloIds, ["CLO4"]);
   assert.equal(saveTeachingSession("CS220", { ...saved, topic: "  Revised topic  ", status: "delivered" }).ok, true);
-  const plan = getState().teachingPlans[0];
+  const plan = planOf("CS220");
   assert.equal(plan.sessions.length, 1);
   assert.equal(plan.sessions[0].topic, "Revised topic");
   assert.equal(plan.sessions[0].status, "delivered");
@@ -76,7 +78,7 @@ test("preparation summary shows actual minutes, distinct mappings and the next u
   saveTeachingSession("CS220", session({ week: 1, status: "delivered", minutes: 45 }));
   saveTeachingSession("CS220", session({ week: 2, status: "ready", minutes: 60 }));
   const clos = getState().clos.filter((c) => c.subjectId === "CS220");
-  const summary = planSummary(getState().teachingPlans[0], clos);
+  const summary = planSummary(planOf("CS220"), clos);
   assert.deepEqual(summary.sessions.map((s) => s.week), [1, 2, 3]);
   assert.equal(summary.minutes, 195);
   assert.equal(summary.ready, 1);
@@ -91,7 +93,7 @@ test("export includes saved content, scope limits, CLO text, checks and teaching
   saveTeachingPlanDetails("CS220", { term: "September 2026", notes: "Check prerequisite knowledge." });
   saveTeachingSession("CS220", session({ week: 3 }));
   saveTeachingSession("CS220", session({ week: 1, topic: "First session" }));
-  const text = teachingPlanMarkdown(getState().subjects.find((s) => s.id === "CS220")!, getState().teachingPlans[0], getState().clos.filter((c) => c.subjectId === "CS220"));
+  const text = teachingPlanMarkdown(getState().subjects.find((s) => s.id === "CS220")!, planOf("CS220"), getState().clos.filter((c) => c.subjectId === "CS220"));
   for (const expected of ["September 2026", "Check prerequisite knowledge.", "CLO4", "Machine learning", "recall matters", "short slide brief", "not demonstrated mastery", "does not change the approved curriculum"])
     assert.ok(text.includes(expected), expected);
   assert.ok(text.indexOf("### Week 1") < text.indexOf("### Week 3"));
@@ -100,11 +102,11 @@ test("export includes saved content, scope limits, CLO text, checks and teaching
 test("deletion updates coverage and repeated deletion fails safely", () => {
   setup();
   saveTeachingSession("CS220", session());
-  const id = getState().teachingPlans[0].sessions[0].id;
+  const id = planOf("CS220").sessions[0].id;
   assert.equal(deleteTeachingSession("CS310", id).ok, false);
   assert.equal(deleteTeachingSession("CS220", id).ok, true);
   assert.equal(deleteTeachingSession("CS220", id).ok, false);
-  assert.equal(planSummary(getState().teachingPlans[0], getState().clos.filter((c) => c.subjectId === "CS220")).unmapped.length, 1);
+  assert.equal(planSummary(planOf("CS220"), getState().clos.filter((c) => c.subjectId === "CS220")).unmapped.length, 1);
 });
 
 test("a fresh proposal cannot be created on someone else's course", () => {

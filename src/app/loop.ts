@@ -92,7 +92,7 @@ export function taughtVersionId(state: AppState, subjectId: string): string | nu
   if (!subject) return null;
   const since = termWindow(state, subjectId).since;
   const sessions = (state.teachingPlans.find((p) => p.subjectId === subjectId)?.sessions ?? [])
-    .filter((s) => s.courseVersionId && s.updatedAt >= since).sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+    .filter((s) => !s.sample && s.courseVersionId && s.updatedAt >= since).sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
   return sessions.at(-1)?.courseVersionId ?? subject.currentVersionId;
 }
 
@@ -146,7 +146,8 @@ export function loopState(state: AppState, subjectId: string): LoopState {
   const adoptedSince = governing ? state.curriculumDrafts.filter((d) => d.subjectId === subjectId).flatMap((d) => d.history.filter((h) => h.action === "adopted" && inWindow(h.at) && afterDecision(d.id, h.at))) : [];
   const adoptions = governing?.outcome === "adopt" ? adoptedSince : [];
   const versions = state.subjectVersions.filter((v) => v.subjectId === subjectId);
-  const sessions = (state.teachingPlans.find((p) => p.subjectId === subjectId)?.sessions ?? []).filter((s) => inWindow(s.updatedAt));
+  // A sample session (a labelled fixture written for the prototype) is never this term's teaching.
+  const sessions = (state.teachingPlans.find((p) => p.subjectId === subjectId)?.sessions ?? []).filter((s) => !s.sample && inWindow(s.updatedAt));
   const seeded = new Set(SEED_RESULT_UPLOADS.map((u) => u.id));
   const versionsOfCourse = courseVersionIds(state, subjectId);
   const filedThisTerm = state.resultUploads.filter((u) => u.subjectId === subjectId && !seeded.has(u.id) && inWindow(u.filedAt));

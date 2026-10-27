@@ -7,7 +7,7 @@
 //   (a date, an id, a clause number) sits in an element marked data-ref; the
 //   notes carry only figures shown on their slide; the receipt on slide 1 is in
 //   its source in mcp/sample-workspace.json, with its employer, title, dates and
-//   the reviewed denominator; the cells of the two graphics on slide 2 match
+//   the reviewed denominator; the cells of the two graphics on slide 3 match
 //   their figures; each quoted clause is word for word in src/data/accreditors.ts;
 //   no text runs into a footer or off a slide; every image loads; no en or em dash.
 // The exports, into deck/export/ (not committed; run this again after any edit):

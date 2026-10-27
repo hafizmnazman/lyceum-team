@@ -6,6 +6,7 @@
 // fresh export from the app instead (docs/doors.md).
 //
 // Write it:  node mcp/sample.ts        Check it: node mcp/sample.ts --check
+// It writes the same file to public/demo/ too, where the judge's guided walk fetches it.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -14,9 +15,12 @@ import { PEOPLE_IDS } from "../src/data/seed.ts";
 import { interpretLocally } from "../src/agents/intakeLocal.ts";
 import { parseSheet } from "../server/parse/sheet.ts";
 import type { CollectedPosting } from "../src/types.ts";
+import { cs310After } from "../src/data/sample-course/cs310.ts";
 
 const ROOT = new URL("../", import.meta.url);
 export const SAMPLE_PATH = fileURLToPath(new URL("mcp/sample-workspace.json", ROOT));
+/** The same file where the browser fetches it, for the judge's guided walk (depth plan Section 9.1 item 2). */
+export const PUBLIC_SAMPLE_PATH = fileURLToPath(new URL("public/demo/sample-workspace.json", ROOT));
 
 const must = (result: { ok: boolean; error?: string }, step: string) => { if (!result.ok) throw new Error(step + ": " + (result.error ?? "failed")); };
 
@@ -54,9 +58,8 @@ export async function buildSampleBackup(): Promise<string> {
   store.login(PEOPLE_IDS.sobri);
   const started = store.startCurriculumRevision("CS310"); must(started, "revision");
   const draft = S().curriculumDrafts.find((d) => d.id === started.draftId)!;
-  const definition = structuredClone(draft.definition);
-  definition.outcomes[0].text = definition.outcomes[0].text + " with dashboards that answer a stakeholder's question";
-  definition.topics.push({ id: "CS310-topic-dashboards", title: "Dashboards and data storytelling", week: 6, contactHours: 3, selfStudyHours: 0, cloIds: ["CLO5"], prerequisiteTopicIds: [], protected: false, resources: "" });
+  // The tour's typed change: CLO5's wording extended, the dashboard topic with three contact hours in the next free slot.
+  const definition = cs310After(draft.definition);
   must(store.saveCurriculumRevision(draft.id, draft.revision, { definition, reason: "Adopted by the programme owner on the brief: add a dashboard exercise within the existing hours.", effectiveTerm: "2026/2027 semester 1" }), "save");
   const saved = S().curriculumDrafts.find((d) => d.id === draft.id)!;
   must(store.checkCurriculumRevision(saved.id, saved.revision), "check");
@@ -77,10 +80,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const raw = await buildSampleBackup();
   if (process.argv.includes("--check")) {
     // A Windows checkout may hold the file with CRLF line ends (core.autocrlf); the content is what is compared.
-    if (readFileSync(SAMPLE_PATH, "utf8").replace(/\r\n/g, "\n") !== raw) throw new Error("mcp/sample-workspace.json is stale. Run node mcp/sample.ts.");
-    console.log("The sample workspace matches the tour's end state.");
+    for (const [path, name] of [[SAMPLE_PATH, "mcp/sample-workspace.json"], [PUBLIC_SAMPLE_PATH, "public/demo/sample-workspace.json"]])
+      if (readFileSync(path, "utf8").replace(/\r\n/g, "\n") !== raw) throw new Error(name + " is stale. Run node mcp/sample.ts.");
+    console.log("The sample workspace matches the tour's end state, in mcp/ and in public/demo/.");
   } else {
     writeFileSync(SAMPLE_PATH, raw, "utf8");
-    console.log("Wrote mcp/sample-workspace.json (" + raw.length + " characters).");
+    writeFileSync(PUBLIC_SAMPLE_PATH, raw, "utf8");
+    console.log("Wrote mcp/sample-workspace.json and public/demo/sample-workspace.json (" + raw.length + " characters).");
   }
 }

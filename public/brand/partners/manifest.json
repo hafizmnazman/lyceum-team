@@ -1,0 +1,15 @@
+{
+  "utp": {
+    "source": "utp.svg, supplied by the owner on 22 October 2026",
+    "sha256": "f0661eb0fd5a858c46e25123aeccdb6393fc51d23b7c15c7e90bc477c1b7c750",
+    "png": [
+      "utp-1024.png",
+      "utp-256.png"
+    ],
+    "wide": {
+      "file": "utp-wide.png",
+      "width": 1200,
+      "height": 474
+    }
+  }
+}

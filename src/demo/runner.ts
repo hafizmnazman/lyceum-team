@@ -6,6 +6,7 @@
 
 import { getState } from "../app/store.ts";
 import { SCRIPT, type DemoStep } from "./script.ts";
+import type { WalkStop } from "./walk.ts";
 import { PRE_ACT_MS, SWITCH_PAD_MS, TWEEN_MS, TYPE_CHAR_MS, isSampleTour, scaleMs } from "./timing.ts";
 
 export interface DemoCtx {
@@ -173,7 +174,7 @@ function predicate(key: string): boolean {
   if (key === "signal-done") return s.signalSim?.phase === "done";
   if (key === "drill-done") return s.drillStep >= 5;
   if (key === "revision-adopted") return s.curriculumDrafts.some((d) => d.subjectId === "CS310" && d.status === "adopted");
-  if (key === "session-saved") return (s.teachingPlans.find((p) => p.subjectId === "CS310")?.sessions.length ?? 0) > 0;
+  if (key === "session-saved") return (s.teachingPlans.find((p) => p.subjectId === "CS310")?.sessions.filter((x) => !x.sample).length ?? 0) > 0;
   if (key === "items-generated") return s.testDrafts.some((t) => t.subjectId === "CS310" && t.items.length > 0);
   if (key === "collect-done") return s.collectRun?.status === "done" || s.collectRun?.status === "failed";
   if (key === "sources-imported") return s.evidenceSources.some((x) => x.subjectId === "CS310");
@@ -266,6 +267,55 @@ export function tourSteps(): DemoStep[] {
   if (!isSampleTour()) return SCRIPT;
   return SCRIPT.filter((s) => s.target !== "collect-board" && s.target !== "collect-query")
     .map((s) => (s.target === "collect-provider" && s.action === "select" ? { ...s, value: "sample" } : s));
+}
+
+// ---------- the guided walk (depth plan Section 9.1 item 2) ----------
+
+/** What the walk's overlay does for the runner: show a stop with its element (null when the target is missing), and wait for
+ *  the person's choice, which is the only thing that moves the walk on. */
+export interface WalkCtx {
+  show: (index: number, el: HTMLElement | null) => void;
+  choice: () => Promise<"next" | "back" | "end">;
+  shouldAbort: () => boolean;
+}
+
+/** Bring a stop's element into view inside the shell's scrolling column, above the walk's dock: centred in the room left when
+ *  it fits, its top near the top when it is taller. The window itself never scrolls, so the header stays in place. */
+function revealForWalk(el: HTMLElement) {
+  const s = scroller();
+  if (!s) { el.scrollIntoView({ block: "center" }); return; }
+  const dock = (document.querySelector(".walk-dock") as HTMLElement | null)?.getBoundingClientRect().height ?? (window.innerWidth < 760 ? 260 : 140);
+  const r = el.getBoundingClientRect(), box = s.getBoundingClientRect();
+  const room = box.height - dock - 24;
+  const offset = r.height > room ? 16 : (room - r.height) / 2;
+  s.scrollTo({ top: Math.max(0, s.scrollTop + (r.top - box.top) - offset) });
+  if (window.scrollY) window.scrollTo(0, 0);
+}
+
+/** Open a stop's route, wait for its target, open its disclosure when the stop asks, and bring it into view. */
+export async function findStop(stop: WalkStop): Promise<HTMLElement | null> {
+  if (window.location.hash !== stop.route) window.location.hash = stop.route;
+  const el = await waitForSelector(sel(stop.target), 8000);
+  if (!el) return null;
+  if (stop.open) {
+    const details = (el.matches("details") ? el : el.closest("details")) as HTMLDetailsElement | null;
+    if (details && !details.open) details.open = true;
+  }
+  revealForWalk(el);
+  await waitScrollSettle();
+  return el;
+}
+
+/** The guided mode: one stop at a time, moved by Next, Back or Escape, never by a timer. */
+export async function runWalk(stops: WalkStop[], ctx: WalkCtx): Promise<void> {
+  let i = 0;
+  while (i < stops.length) {
+    if (ctx.shouldAbort()) return;
+    ctx.show(i, await findStop(stops[i]));
+    const choice = await ctx.choice();
+    if (choice === "end" || ctx.shouldAbort()) return;
+    i = choice === "next" ? i + 1 : Math.max(0, i - 1);
+  }
 }
 
 export async function runDemo(ctx: DemoCtx): Promise<void> {

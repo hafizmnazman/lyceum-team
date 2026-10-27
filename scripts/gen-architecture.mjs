@@ -46,7 +46,7 @@ export function architectureSvg() {
   const parts = [];
   // ---------- title, scope and legend ----------
   parts.push(text(64, 78, "Lyceum: one core, many doors", { family: F.display, size: 40, weight: 800 }));
-  parts.push(text(64, 110, "System context and containers, Track A, 22 October 2026. Solid lines and tiles are built; dashed ones are planned.", { size: 17, fill: K.ink2 }));
+  parts.push(text(64, 110, "System context and containers, as built on 23 October 2026. Solid lines and tiles are built; dashed ones are planned.", { size: 17, fill: K.ink2 }));
   parts.push(rect(1440, 36, 416, 84, { fill: K.white }));
   parts.push(`<path d="M1462 62 L1532 62" stroke="${K.ink2}" stroke-width="2"/>` + text(1544, 67, "Built", { size: 14 }));
   parts.push(`<path d="M1462 96 L1532 96" stroke="${K.ink2}" stroke-width="2" stroke-dasharray="7 6"/>` + text(1544, 101, "Planned", { size: 14 }));
@@ -57,7 +57,7 @@ export function architectureSvg() {
   for (const [y, label] of bands) parts.push(eyebrow(64, y, label));
 
   // ---------- 1. people ----------
-  const people = [["Lecturer", "runs the loop"], ["Coordinator", "decides, adopts"], ["Programme committee", "decides on briefs"], ["Students", "via their results"], ["Quality office", "reads the pack (planned)"]];
+  const people = [["Lecturer", "runs the loop"], ["Coordinator", "decides, adopts"], ["Programme committee", "decides on briefs"], ["Students", "via results and surveys"], ["Quality office", "reads the pack (planned)"]];
   people.forEach(([name, role], i) => {
     const x = 280 + i * 318;
     parts.push(rect(x, 150, 296, 58, { fill: K.white, r: 29 }) + person(x + 32, 182) + text(x + 58, 175, name, { size: 16, weight: 700 }) + text(x + 58, 196, role, { size: 13, fill: K.ink2 }));
@@ -101,14 +101,14 @@ export function architectureSvg() {
   parts.push(text(cx, cy - 4, "Seven helpers", { size: 16, weight: 700, fill: K.white, anchor: "middle" }) + text(cx, cy + 16, "people decide", { size: 13, fill: K.onForest, anchor: "middle" }));
   // the engines
   const engines = [["Collector", "permitted boards, on request"], ["Citation validator", "exact substrings only"], ["Counter", "Wilson 95% intervals"], ["Mapper", "coverage ladder, targets"],
-    ["Constraint engine", "hours, links, protected topics"], ["Brief composer", "a receipt for every claim"], ["Pack renderer", "editable PPTX, no model text"], ["Benchmark", "a labelled scan set"]];
+    ["Constraint engine", "hours, links, protected topics"], ["Brief composer", "a receipt for every claim"], ["Pack renderer", "editable PPTX, adds no model text"], ["Benchmark", "a labelled scan set"]];
   engines.forEach(([name, sub], i) => {
     const x = 610 + (i % 4) * 236, y = 560 + Math.floor(i / 4) * 92;
     parts.push(`<rect x="${x}" y="${y}" width="220" height="76" rx="12" fill="${K.forest2}" stroke="${K.forestBorder}" stroke-width="1.5"/>`);
     parts.push(text(x + 16, y + 32, name, { size: 16, weight: 700, fill: K.white }) + text(x + 16, y + 56, sub, { size: 12.5, fill: K.onForest }));
   });
   parts.push(eyebrow(610, 548, "The deterministic engines", K.lime));
-  for (const [i, [name, sub, tech]] of [["Store and event log", "validated backups, schema 5", "browser storage"], ["Skill folder", "the loop for an assistant", "Agent Skills, SKILL.md"]].entries()) {
+  for (const [i, [name, sub, tech]] of [["Store and event log", "validated backups, schema 6", "browser storage"], ["Skill folder", "the loop for an assistant", "Agent Skills, SKILL.md"]].entries()) {
     const y = 560 + i * 92;
     parts.push(`<rect x="1572" y="${y}" width="260" height="76" rx="12" fill="${K.forest2}" stroke="${K.forestBorder}" stroke-width="1.5"/>`);
     parts.push(text(1588, y + 28, name, { size: 16, weight: 700, fill: K.white }) + text(1588, y + 48, sub, { size: 12.5, fill: K.onForest }) + text(1588, y + 66, tech, { family: F.mono, size: 11.5, fill: K.lime }));
