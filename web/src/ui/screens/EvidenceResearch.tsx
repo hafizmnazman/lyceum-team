@@ -171,7 +171,7 @@ export function QuoteProposals({ state, subject, mayEdit }: Props) {
   const askLens = async () => {
     const request = quoteRequest(postings, state.skillMentions.filter((m) => m.subjectId === subject.id), saved);
     setLensBusy(true);
-    const result = await fetchQuoteProposals(request);
+    const result = await fetchQuoteProposals(request, subject.id);
     setLensBusy(false);
     setMessage(result.ok ? "Lens read " + request.postings.length + " postings and proposed " + addProposals(subject.id, result.list) + " quotations, each found word for word in its posting. Confirm the ones you accept." : result.error);
   };

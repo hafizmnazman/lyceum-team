@@ -8,6 +8,7 @@ import type { Db } from "./db.ts";
 import { type AuthDeps, signedInAs } from "./account.ts";
 import { collectBoard } from "./collect.ts";
 import { liveDeps, loadAgentSettings, runAgentSearch } from "./agentSearch.ts";
+import { describePosting, newContext, recordedChat, recordProposals } from "./record.ts";
 import { BOARD_TOKEN, filterPostings } from "../shared/lib/collect.ts";
 import { missingSettings } from "../shared/lib/agentSettings.ts";
 import type { CollectedPosting } from "../shared/types.ts";
@@ -16,7 +17,7 @@ export type WatchProvider = "greenhouse" | "lever" | "agent";
 export interface WatchSchedule { subjectId: string; provider: WatchProvider; board: string; query: string; inText: boolean; everyDays: number; nextRunAt: string }
 export interface WatchRun { id: number; subjectId: string; ranAt: string; provider: string; board: string; status: "ok" | "failed"; error: string | null; total: number; postings: CollectedPosting[] }
 /** Fetch one schedule's postings: the source's total and the postings its keywords keep. */
-export type Collector = (s: WatchSchedule) => Promise<{ total: number; postings: CollectedPosting[] }>;
+export type Collector = (s: WatchSchedule, userId: string) => Promise<{ total: number; postings: CollectedPosting[] }>;
 
 export const KEEP_RUNS = 10;
 export const TICK_MS = 15 * 60 * 1000;
@@ -76,7 +77,7 @@ export async function runDue(db: Db, collect: Collector, now = new Date(), onlyU
       [new Date(now.getTime() + s.everyDays * DAY_MS), userId, s.subjectId, row.next_run_at]);
     if (!claimed.count) continue;
     let result: { total: number; postings: CollectedPosting[] } | null = null, error: string | null = null;
-    try { result = await collect(s); } catch (err) { error = (err instanceof Error ? err.message : String(err)).slice(0, 500); }
+    try { result = await collect(s, userId); } catch (err) { error = (err instanceof Error ? err.message : String(err)).slice(0, 500); }
     await db.query("INSERT INTO watch_runs (user_id, subject_id, ran_at, provider, board, status, error, total, postings) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
       [userId, s.subjectId, now, s.provider, s.board, result ? "ok" : "failed", error, result?.total ?? 0, JSON.stringify(result?.postings ?? [])]);
     await db.query(`DELETE FROM watch_runs WHERE user_id = $1 AND subject_id = $2 AND id NOT IN
@@ -87,20 +88,22 @@ export async function runDue(db: Db, collect: Collector, now = new Date(), onlyU
 }
 
 /** The real sources: the permitted board collector, or agent web search on the model and search provider in .env. */
-export const liveCollector: Collector = async (s) => {
+/** Agent runs record their model calls (api/record.ts) under the schedule's account and course. */
+export const liveCollector = (db: Db | null = null): Collector => async (s, userId) => {
   if (s.provider === "agent") {
     const settings = await loadAgentSettings(), missing = missingSettings(settings);
     if (missing.length) throw new Error("Agent search is not set up: add " + missing.join(", ") + " to .env.");
     // ponytail: shares no lock with a search run by hand; two at once only cost two model runs.
-    const result = await runAgentSearch(s.board, liveDeps(settings), settings, () => undefined, AbortSignal.timeout(AGENT_RUN_MS));
-    return { total: result.postings.length, postings: filterPostings(result.postings, s.query, s.inText) };
+    const ctx = newContext("scout", "watch (scheduled)", userId, s.subjectId), chat = recordedChat(db, settings, ctx);
+    const result = await runAgentSearch(s.board, liveDeps(settings, chat), settings, () => undefined, AbortSignal.timeout(AGENT_RUN_MS));
+    return { total: result.postings.length, postings: await recordProposals(db, ctx, filterPostings(result.postings, s.query, s.inText), describePosting) };
   }
   const result = await collectBoard(s.provider, s.board);
   return { total: result.postings.length, postings: filterPostings(result.postings, s.query, s.inText).slice(0, 300) };
 };
 
 /** Check for due schedules now and every tick after. A tick that finds the database down tries again on the next. */
-export function startWatching(db: Db, collect: Collector = liveCollector, everyMs = TICK_MS): () => void {
+export function startWatching(db: Db, collect: Collector = liveCollector(db), everyMs = TICK_MS): () => void {
   let busy = false;
   const tick = async () => {
     if (busy) return;
@@ -115,7 +118,7 @@ export function startWatching(db: Db, collect: Collector = liveCollector, everyM
 }
 
 /** The signed-in account's schedules and runs. A demo person has no account, so watching needs a sign in. */
-export function watchRoutes(app: Hono, deps: AuthDeps, db: Db, collect: Collector = liveCollector) {
+export function watchRoutes(app: Hono, deps: AuthDeps, db: Db, collect: Collector = liveCollector(db)) {
   const course = (c: Context) => c.req.param("subjectId") ?? "";
   const route = (fn: (c: Context, userId: string) => Promise<Response>) => async (c: Context) => {
     try {

@@ -20,7 +20,7 @@ import { Button, Disclosure, Field, Input, Select, Tag, Textarea } from "../prim
 import { SkillCard } from "../primitives/loop.tsx";
 import { ShareBar } from "../primitives/ShareBar.tsx";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
-import { fetchMappingSuggestions } from "../../../../shared/agents/client.ts";
+import { fetchMappingSuggestions, sendVerdict, type Proposed } from "../../../../shared/agents/client.ts";
 import { mappingRequest, outcomeLabel, type MappingSuggestion } from "../../../../shared/lib/proposals.ts";
 
 type Props = { state: AppState; person: Person; subject: Subject; mayEdit: boolean };
@@ -246,22 +246,22 @@ export function CountTable({ state, subject }: { state: AppState; subject: Subje
 /** Atlas proposes which outcomes each unmapped skill belongs to. Applying one records the mapping with its stage and target
  *  still unknown: those are the lecturer's judgement, set on the ladder below. */
 export function AtlasSuggestions({ state, subject }: { state: AppState; subject: Subject }) {
-  const [list, setList] = useState<MappingSuggestion[] | null>(null);
+  const [list, setList] = useState<Array<MappingSuggestion & Proposed> | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const outcomes = state.clos.filter((c) => c.subjectId === subject.id);
   const request = mappingRequest(subject.id, courseReport(state, subject.id), state.skillMentions, outcomes);
   const ask = async () => {
     setBusy(true); setMessage("");
-    const r = await fetchMappingSuggestions(request);
+    const r = await fetchMappingSuggestions(request, subject.id);
     setBusy(false);
     if (r.ok) setList(r.list); else setMessage(r.error);
   };
-  const apply = (m: MappingSuggestion) => {
+  const apply = (m: MappingSuggestion & Proposed) => {
     const cloIds = m.outcomes.map((l) => outcomes.find((c) => outcomeLabel(c) === l)?.id).filter((id): id is string => Boolean(id));
     const result = setSkillMapping(subject.id, { skill: m.skill, cloIds, stage: "unknown", target: "unknown", evidence: "" });
     setMessage(result.ok ? "Mapped " + m.skill + ". Set its stage and target on the ladder below." : result.error);
-    if (result.ok) setList((l) => l && l.filter((x) => x !== m));
+    if (result.ok) { void sendVerdict(m.proposalId, "accepted"); setList((l) => l && l.filter((x) => x !== m)); }
   };
   return <div className="curriculum-object" data-demo-id="atlas-suggestions">
     <div className="section-heading"><div><h4>Suggested by Atlas</h4>
@@ -272,7 +272,7 @@ export function AtlasSuggestions({ state, subject }: { state: AppState; subject:
     {list?.length ? <ul className="source-list">{list.map((m) => <li key={m.skill}>
       <strong>{m.skill}</strong><span>{m.outcomes.length ? "→ " + m.outcomes.join(", ") : "Fits no current outcome: a gap to discuss"} · {m.reason}</span>
       <div className="button-row">{m.outcomes.length ? <Button onClick={() => apply(m)}>Apply</Button> : null}
-        <Button variant="quiet" onClick={() => setList((l) => l && l.filter((x) => x !== m))}>Dismiss</Button></div>
+        <Button variant="quiet" onClick={() => { void sendVerdict(m.proposalId, "dismissed"); setList((l) => l && l.filter((x) => x !== m)); }}>Dismiss</Button></div>
     </li>)}</ul> : null}
   </div>;
 }

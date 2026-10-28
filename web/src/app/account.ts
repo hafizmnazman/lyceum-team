@@ -2,6 +2,7 @@
 // session; every call to Lyceum's own API carries that session's access token, which the API checks (api/account.ts).
 import type { AuthChangeEvent } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase.ts";
+import { setSessionToken } from "../../../shared/agents/client.ts";
 import type { JobRole } from "../../../shared/types.ts";
 export { JOB_ROLES, JOB_ROLE_LABEL, type JobRole } from "../../../shared/types.ts";
 export interface AccountUser {
@@ -191,3 +192,13 @@ export const saveWorkspace = (backup: string, version: number) =>
     { backup, version },
     backup.length < 60000,
   );
+
+// The helpers' calls carry the session's token too, so the API records whose they were (api/record.ts). No settings, or
+// nobody signed in: no token, and the call is recorded as a demo persona's.
+setSessionToken(async () => {
+  try {
+    return (await supabase().auth.getSession()).data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+});

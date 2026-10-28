@@ -105,6 +105,18 @@ export interface InterpretOutcome {
   via: "live" | "fallback";
 }
 
+// Who is asking and for which course, for the API's record of model calls (api/record.ts). The browser registers how to
+// read the Supabase session's token (web/src/app/account.ts); a demo persona has none and is recorded as demo.
+let sessionToken: () => Promise<string | null> = async () => null;
+export function setSessionToken(read: () => Promise<string | null>) { sessionToken = read; }
+async function agentHeaders(course?: string | null, extra: Record<string, string> = {}): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { "content-type": "application/json", ...extra };
+  const token = await sessionToken().catch(() => null);
+  if (token) headers.authorization = "Bearer " + token;
+  if (course) headers["x-lyceum-course"] = course;
+  return headers;
+}
+
 export async function interpretDoc(
   doc: ParsedDoc,
   subjects: Subject[],
@@ -114,7 +126,7 @@ export async function interpretDoc(
     const res = await withTimeout(
       fetch("/api/agent/intake", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: await agentHeaders(),
         body: JSON.stringify({
           doc,
           subjects: subjects.map((s) => ({ id: s.id, title: s.title, cloIds: s.cloIds })),
@@ -143,7 +155,7 @@ export async function streamAgent(
     const res = await withTimeout(
       fetch(`/api/agent/${name}`, {
         method: "POST",
-        headers: { "content-type": "application/json", accept: "text/event-stream" },
+        headers: await agentHeaders(null, { accept: "text/event-stream" }),
         body: JSON.stringify(payload),
       }),
       AGENT_TIMEOUT_MS,
@@ -186,14 +198,14 @@ export async function streamAgent(
 
 // ---------- the research run: a permitted board through the local API, or the saved sample ----------
 const COLLECT_TIMEOUT_MS = 45000;
-export interface CollectionRequest { provider: CollectionProvider; board: string; query: string; inText: boolean }
+export interface CollectionRequest { provider: CollectionProvider; board: string; query: string; inText: boolean; subjectId?: string }
 export type CollectionOutcome =
   | { ok: true; postings: CollectedPosting[]; retrievedAt: string; cached: boolean; total: number; label: string; endpoint?: string; bytes?: number | null; durationMs?: number | null }
   | { ok: false; error: string };
 const AGENT_TIMEOUT_MS_TOTAL = 7 * 60 * 1000;
 /** Agent web search: the local API streams one JSON object per line, log lines as the agent works and then the result. */
 async function fetchAgentCollection(request: CollectionRequest, onLog: (line: string) => void): Promise<CollectionOutcome> {
-  const res = await withTimeout(fetch("/api/agent-search", { method: "POST", headers: { "content-type": "application/json" },
+  const res = await withTimeout(fetch("/api/agent-search", { method: "POST", headers: await agentHeaders(request.subjectId),
     body: JSON.stringify({ brief: request.board, q: request.query, scope: request.inText ? "text" : "title" }) }), AGENT_TIMEOUT_MS_TOTAL);
   if (!res.ok || !res.body) {
     const body = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -252,10 +264,10 @@ export async function fetchCollection(request: CollectionRequest, onLog: (line: 
 
 // ---------- Update: Quill's suggestions on an open revision (shared/lib/revision.ts) ----------
 /** Ask the model in .env for suggestions on a revision. Nothing is applied here; the lecturer applies each one. */
-export async function fetchRevisionSuggestions(request: RevisionRequest): Promise<{ ok: true; suggestions: RevisionSuggestion[] } | { ok: false; error: string }> {
+export async function fetchRevisionSuggestions(request: RevisionRequest, course?: string): Promise<{ ok: true; suggestions: Array<RevisionSuggestion & Proposed> } | { ok: false; error: string }> {
   try {
-    const res = await withTimeout(fetch("/api/agent/revision", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request) }), OUTLINE_TIMEOUT_MS);
-    const body = (await res.json().catch(() => null)) as { suggestions?: RevisionSuggestion[]; error?: string } | null;
+    const res = await withTimeout(fetch("/api/agent/revision", { method: "POST", headers: await agentHeaders(course ?? request.course.code), body: JSON.stringify(request) }), OUTLINE_TIMEOUT_MS);
+    const body = (await res.json().catch(() => null)) as { suggestions?: Array<RevisionSuggestion & Proposed>; error?: string } | null;
     if (!res.ok || !body?.suggestions) return { ok: false, error: body?.error ?? "No suggestions came back (HTTP " + res.status + ")." };
     return { ok: true, suggestions: body.suggestions };
   } catch (err) {
@@ -263,13 +275,28 @@ export async function fetchRevisionSuggestions(request: RevisionRequest): Promis
   }
 }
 
+// ---------- the lecturer's verdict on a helper's proposal (api/record.ts) ----------
+/** A proposal the API recorded carries its id; one without (no database, or recording paused) is simply not followed. */
+export interface Proposed { proposalId?: string }
+export type Verdict = "accepted" | "edited" | "dismissed";
+/** Tell the API what the lecturer did with a proposal. Only an account's verdicts are recorded (a demo persona's are not),
+ *  and a lost one never gets in the lecturer's way, so this never throws and is not awaited by the screens. */
+export async function sendVerdict(proposalId: string | undefined, verdict: Verdict, reason?: string): Promise<void> {
+  if (!proposalId) return;
+  try {
+    const headers = await agentHeaders();
+    if (!headers.authorization) return;
+    await fetch("/api/proposals/" + encodeURIComponent(proposalId) + "/verdict", { method: "POST", headers, body: JSON.stringify({ verdict, reason }) });
+  } catch { /* the record misses one verdict; the lecturer's work is unaffected */ }
+}
+
 // ---------- Report: Lens's quotations and Atlas's mappings (shared/lib/proposals.ts) ----------
 const OUTLINE_TIMEOUT_MS = 180000;
 // Prism's items can take three model calls (a draft, one more if it was unreadable, a repair), each allowed two minutes.
 const PROPOSAL_TIMEOUT_MS = { quotes: OUTLINE_TIMEOUT_MS, mappings: OUTLINE_TIMEOUT_MS, items: 3 * 120000 + 30000, slides: OUTLINE_TIMEOUT_MS };
-async function postProposals<T>(path: "quotes" | "mappings" | "items" | "slides", request: unknown): Promise<{ ok: true; list: T[] } | { ok: false; error: string }> {
+async function postProposals<T>(path: "quotes" | "mappings" | "items" | "slides", request: unknown, course?: string): Promise<{ ok: true; list: T[] } | { ok: false; error: string }> {
   try {
-    const res = await withTimeout(fetch("/api/agent/" + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request) }), PROPOSAL_TIMEOUT_MS[path]);
+    const res = await withTimeout(fetch("/api/agent/" + path, { method: "POST", headers: await agentHeaders(course), body: JSON.stringify(request) }), PROPOSAL_TIMEOUT_MS[path]);
     const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
     const list = body?.[path];
     if (!res.ok || !Array.isArray(list)) return { ok: false, error: typeof body?.error === "string" ? body.error : "Nothing came back (HTTP " + res.status + ")." };
@@ -278,10 +305,10 @@ async function postProposals<T>(path: "quotes" | "mappings" | "items" | "slides"
     return { ok: false, error: err instanceof Error && err.message === "timeout" ? "The model took too long. Try again." : "The local API is not reachable. Start it with npm run dev." };
   }
 }
-export const fetchQuoteProposals = (request: QuoteRequest) => postProposals<MentionProposal>("quotes", request);
-export const fetchMappingSuggestions = (request: MappingRequest) => postProposals<MappingSuggestion>("mappings", request);
-export const fetchModelItems = (request: ItemRequest) => postProposals<DraftItem>("items", request);
-export const fetchModelSlides = (request: SlideRequest) => postProposals<SlideDraft>("slides", request);
+export const fetchQuoteProposals = (request: QuoteRequest, course?: string) => postProposals<MentionProposal & Proposed>("quotes", request, course);
+export const fetchMappingSuggestions = (request: MappingRequest, course?: string) => postProposals<MappingSuggestion & Proposed>("mappings", request, course);
+export const fetchModelItems = (request: ItemRequest, course?: string) => postProposals<DraftItem & Proposed>("items", request, course);
+export const fetchModelSlides = (request: SlideRequest, course?: string) => postProposals<SlideDraft>("slides", request, course);
 
 // ---------- Watch on a schedule (api/watch.ts): the signed-in account's schedule and runs for one course ----------
 export interface WatchSchedule { subjectId: string; provider: "greenhouse" | "lever" | "agent"; board: string; query: string; inText: boolean; everyDays: number; nextRunAt: string }
@@ -296,7 +323,7 @@ export async function readOutlineFile(file: File): Promise<{ ok: true; outline: 
   if (!parsed.doc) return { ok: false, error: parsed.error ?? "The file could not be read." };
   const text = [...parsed.doc.pages.map((p) => p.text), ...parsed.doc.tables.map((t) => t.rows.map((r) => r.join("  |  ")).join("\n"))].join("\n\n");
   try {
-    const res = await withTimeout(fetch("/api/agent/outline", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, fileName: file.name }) }), OUTLINE_TIMEOUT_MS);
+    const res = await withTimeout(fetch("/api/agent/outline", { method: "POST", headers: await agentHeaders(), body: JSON.stringify({ text, fileName: file.name }) }), OUTLINE_TIMEOUT_MS);
     const body = (await res.json().catch(() => null)) as { outline?: OutlineProposal; truncated?: boolean; error?: string } | null;
     if (!res.ok || !body?.outline) return { ok: false, error: body?.error ?? "The outline could not be read (HTTP " + res.status + ")." };
     return { ok: true, outline: body.outline, truncated: Boolean(body.truncated) };

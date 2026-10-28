@@ -63,6 +63,30 @@ has real data; the demo runs on the fixtures.
 - [ ] **Steward drafts the brief's prose.** The numbers stay computed; the model writes the summary and recommendation,
       citing only confirmed quotations.
 
+### Recording what the helpers do (designed 29 October 2026, by grilling)
+- [x] **Every model call and every proposal recorded in Supabase** (`feat/live-agents`). `agent_calls`: one row per call
+      (helper, route, account or demo, course, provider, model, tokens, cost when the provider reports it, duration, ok,
+      unreadable, timeout or error), with the prompt and reply kept 30 days, then cleared hourly. `agent_proposals`: each
+      thing a helper offers (Folio's outline rows, Scout's postings, Atlas's mappings, Lens's quotations, Quill's
+      suggestions, Prism's items) with the lecturer's verdict: accepted, edited, or dismissed with a reason
+      (`POST /api/proposals/:id/verdict`, accounts only). Views `agent_calls_daily` and `agent_acceptance` for the
+      dashboard. `api/record.ts`, migration `20261029090000_agent_records.sql`, `npm run prove:record`. A database that is
+      down pauses recording for a minute; the helpers carry on.
+- [ ] **An in-app metrics page** reading the same views, after the dashboard has shown which numbers matter.
+
+### Prism: slide suggestions instead of slide drafts (designed 29 October 2026, by grilling)
+- [ ] **Suggestions on the lecturer's own slides.** On a session: upload the deck (`.pptx` or PDF; the text is kept, the
+      original goes to R2 once that is built), then "Suggest with Prism": a checklist, each item with where (slide N, or a
+      new slide after N), the kind (add, change, remove, reorder, pacing), what to do, and why, citing a record (an
+      outcome, a recorded misconception, or employer evidence with its count and quotation); only layout and pacing advice
+      may stand without one. Each item is marked done or dismissed, and recorded as a proposal.
+- [ ] **No deck: a session plan** of timed segments (minutes, what, which outcome, the cited record), the same checklist.
+- [ ] **Slides to add**, not a pack: the record-built slides (cover, outcomes, employer evidence, check, resources,
+      closing) as a set to copy into the lecturer's deck; suggestions can point at them.
+- [ ] **A revised deck is a new round**; earlier rounds stay under History with their marks. Checking whether an earlier
+      suggestion was addressed comes later, as its own check.
+- [ ] **Remove "Draft slides with Prism"** (the model writing the slides) once the above is in.
+
 ### Scheduling and running in the background
 - [x] **Watch on a schedule** (`feat/scheduled-watch`). A signed-in lecturer saves the Watch form's source (Greenhouse or
       Lever board, or an agent search brief) as a schedule every 1 to 90 days. The API checks every 15 minutes

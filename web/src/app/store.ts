@@ -86,7 +86,7 @@ import {
   runAcceptanceWithDistribution,
   type AcceptanceDistribution,
 } from "../../../shared/agents/acceptance.ts";
-import { streamAgent } from "../../../shared/agents/client.ts";
+import { sendVerdict, streamAgent } from "../../../shared/agents/client.ts";
 import { runIntake, type ParsedSheet } from "../../../shared/agents/intake.ts";
 import { runAuthoring } from "../../../shared/agents/authoring.ts";
 import { runAnalogy } from "../../../shared/agents/analogy.ts";
@@ -623,7 +623,9 @@ export function saveSessionItem(subjectId: SubjectId, sessionId: string, item: D
   if (error) return { ok: false, error };
   const content = (i: DraftItem) => JSON.stringify({ ...i, reviewedBy: null, reviewedAt: null });
   const next: DraftItem = { ...item, kind: current.kind, source: current.source };
-  const saved = content(next) === content(current) ? current : { ...next, reviewedBy: null, reviewedAt: null };
+  const changed = content(next) !== content(current);
+  const saved = changed ? { ...next, reviewedBy: null, reviewedAt: null, ...(current.source === "model" ? { edited: true } : {}) } : current;
+  if (changed && current.source === "model") void sendVerdict(current.proposalId, "edited");
   setSessionItems(subjectId, sessionId, (session.items ?? []).map((i) => (i.id === item.id ? saved : i)));
   return { ok: true };
 }
@@ -631,7 +633,9 @@ export function saveSessionItem(subjectId: SubjectId, sessionId: string, item: D
 export function removeSessionItem(subjectId: SubjectId, sessionId: string, itemId: string): SaveResult {
   const session = ownSession(subjectId, sessionId);
   if (typeof session === "string") return { ok: false, error: session };
-  if (!(session.items ?? []).some((i) => i.id === itemId)) return { ok: false, error: "This item no longer exists." };
+  const removed = (session.items ?? []).find((i) => i.id === itemId);
+  if (!removed) return { ok: false, error: "This item no longer exists." };
+  if (removed.source === "model") void sendVerdict(removed.proposalId, "dismissed");
   setSessionItems(subjectId, sessionId, (session.items ?? []).filter((i) => i.id !== itemId));
   return { ok: true };
 }
@@ -643,6 +647,8 @@ export function markItemsReviewed(subjectId: SubjectId, sessionId: string): Save
   if (!session?.items?.length) return { ok: false, error: "This session has no items to review." };
   const at = nowIso(), person = currentPerson()!;
   setSessionItems(subjectId, sessionId, session.items.map((i) => ({ ...i, reviewedBy: person.id, reviewedAt: at })));
+  // Prism's items, reviewed: taken as drafted, or edited first (that verdict was sent when the edit was saved).
+  for (const i of session.items) if (i.source === "model" && !i.edited && !i.reviewedBy) void sendVerdict(i.proposalId, "accepted");
   set({ toast: session.items.length + " items marked reviewed by " + person.name + ". The app records the review; it approves nothing." });
   return { ok: true };
 }
@@ -2645,7 +2651,7 @@ export async function runCollection(subjectId: SubjectId, input: { provider: Col
     const live = state.collectRun;
     if (live && live.status === "running" && live.subjectId === subjectId && live.board === board && live.provider === input.provider) set({ collectRun: { ...live, log: [...live.log, clock() + " " + line] } });
   };
-  const result = await trackRequest("collect", subjectId, () => loader(run, onLog));
+  const result = await trackRequest("collect", subjectId, () => loader({ ...run, subjectId }, onLog));
   const current = state.collectRun;
   if (!current || current.status !== "running" || current.subjectId !== subjectId || current.board !== board || current.provider !== input.provider) return { ok: true };
   if (result.ok) {
@@ -2690,6 +2696,7 @@ export function importCollectedPostings(subjectId: SubjectId, postingIds: string
       collection: { provider: posting.provider, board: posting.board, postingId: posting.id, retrievedAt: posting.retrievedAt, label: run.label || SOURCE_POLICIES[posting.provider].name },
       reviewed: false, addedBy: person.id, addedAt: nowIso() });
     already.add(posting.id); imported += 1;
+    void sendVerdict(posting.proposalId, "accepted");
   }
   set((s) => ({ evidenceSources: [...s.evidenceSources, ...added],
     toast: imported + " postings imported as sources, " + skipped + " skipped. Quote their requirements, then mark the extraction reviewed." }));
@@ -2726,12 +2733,16 @@ export function confirmProposals(subjectId: SubjectId, proposals: MentionProposa
     if (!source || source.subjectId !== subjectId) { skipped += 1; continue; }
     const result = addSkillMention(proposal.sourceId, { skill: proposal.skill, excerpt: proposal.excerpt, requirement: proposal.requirement });
     if (result.ok) added += 1; else skipped += 1;
+    // Lens's proposals: taken as proposed, or with the lecturer's own requirement level (edited).
+    const original = state.scanProposals.find((p) => p.sourceId === proposal.sourceId && p.term === proposal.term);
+    if (result.ok) void sendVerdict(original?.proposalId, original && original.requirement !== proposal.requirement ? "edited" : "accepted");
     handled.add(proposal.sourceId + "\n" + proposal.term);
   }
   set((s) => ({ scanProposals: s.scanProposals.filter((p) => !handled.has(p.sourceId + "\n" + p.term)), toast: added + " quotations recorded, " + skipped + " skipped." }));
   return { added, skipped };
 }
 export function dismissProposal(sourceId: string, term: string) {
+  void sendVerdict(state.scanProposals.find((p) => p.sourceId === sourceId && p.term === term)?.proposalId, "dismissed");
   set((s) => ({ scanProposals: s.scanProposals.filter((p) => !(p.sourceId === sourceId && p.term === term)) }));
 }
 export function clearProposals() { set({ scanProposals: [] }); }

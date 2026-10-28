@@ -14,7 +14,7 @@ import { ChangeSummary, CountUpSummary, Dumbbell, OutcomeChanges, SlideDiffList,
 import { useMarkData } from "../primitives/DeckPreview.tsx";
 import { packMaker, previousVersion } from "./packCompare.ts";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
-import { fetchRevisionSuggestions } from "../../../../shared/agents/client.ts";
+import { fetchRevisionSuggestions, sendVerdict, type Proposed } from "../../../../shared/agents/client.ts";
 import { applySuggestion, revisionRequest, type RevisionSuggestion } from "../../../../shared/lib/revision.ts";
 
 type Props = { state: AppState; person: Person; subject: Subject };
@@ -92,7 +92,7 @@ const SUGGESTION_LABEL: Record<RevisionSuggestion["kind"], string> = { "edit-out
 /** Quill reads the open revision and the skills the course is behind on, and suggests single changes. Applying one edits the
  *  revision in this editor only; saving, checking and adopting stay the lecturer's. */
 function QuillSuggestions({ state, subject, definition, onApply }: { state: AppState; subject: Subject; definition: CourseDefinition; onApply: (s: RevisionSuggestion) => void }) {
-  const [list, setList] = useState<RevisionSuggestion[] | null>(null);
+  const [list, setList] = useState<Array<RevisionSuggestion & Proposed> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const request = revisionRequest(subject.id, definition, evidenceReportForCourse(subject.id), state.skillMentions);
@@ -114,7 +114,7 @@ function QuillSuggestions({ state, subject, definition, onApply }: { state: AppS
       <p><Tag>{SUGGESTION_LABEL[s.kind]}{s.kind === "edit-outcome" ? " " + s.outcome : ""}</Tag> {s.kind === "add-topic" ? <><strong>{s.title}</strong> · {s.hours} h{s.outcomes.length ? " · " + s.outcomes.join(", ") : ""}</> : <><strong>{s.text}</strong> · {s.bloom}</>}</p>
       <p className="muted">{s.reason}</p>
       {g ? <p className="muted">{g.skill}: {g.postings} of {g.eligible} reviewed postings{g.quote ? <>, e.g. “{g.quote}”</> : null}</p> : <p className="muted">Not tied to a quoted skill.</p>}
-      <div className="button-row"><Button onClick={() => { onApply(s); drop(i); }}>Apply to the revision</Button><Button variant="quiet" onClick={() => drop(i)}>Dismiss</Button></div>
+      <div className="button-row"><Button onClick={() => { onApply(s); void sendVerdict(s.proposalId, "accepted"); drop(i); }}>Apply to the revision</Button><Button variant="quiet" onClick={() => { void sendVerdict(s.proposalId, "dismissed"); drop(i); }}>Dismiss</Button></div>
     </li>; })}</ol> : null}
   </section>;
 }

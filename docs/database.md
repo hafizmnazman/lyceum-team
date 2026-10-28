@@ -66,6 +66,12 @@ npm run db:push                                 # applies new migrations to the 
 | `workspaces` | One row per account: its workspace as JSON (`jsonb`), and a version number that stops two windows saving over each other |
 | `watch_schedules` | One row per account and course being watched: the board or agent brief, keywords, every how many days, and the next run (`api/watch.ts`) |
 | `watch_runs` | Each scheduled run: when, the source, ok or failed with the error, the source's total and the postings kept (`jsonb`); the last 10 per course are kept |
+| `agent_calls` | Every call to the model: which helper and route, the account (or none, for a demo persona), the course, provider, model, tokens, cost when the provider reports it, duration, and ok, unreadable, timeout or error. The prompt and the reply are kept 30 days, then cleared (`api/record.ts`) |
+| `agent_proposals` | Every thing a helper offered (an outline row, a posting, a mapping, a quotation, a suggestion, a quiz item) and what the lecturer did: accepted, edited, or dismissed with a reason |
+
+Two views read them, for the dashboard's SQL editor: `agent_calls_daily` (calls, failures, tokens, cost and time per day,
+helper and model) and `agent_acceptance` (how often lecturers take each helper's proposals). Try
+`select * from agent_acceptance order by taken_pct;`.
 
 Every Lyceum table belongs to an account in `auth.users` and goes with it when the account is deleted. Row-level security
 is on with no policies, so Supabase's automatic REST API cannot read them even with the publishable key; only the API,

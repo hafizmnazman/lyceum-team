@@ -9,7 +9,7 @@
 // deterministic local path.
 
 import "./env.ts"; // first: loads api/.env before any other module reads its settings
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { serve, type HttpBindings } from "@hono/node-server";
 import { parseSheet } from "./parse/sheet.ts";
@@ -23,10 +23,15 @@ import { missingSettings, publicSettings, type AgentSettings } from "../shared/l
 import type { MappingRequest, QuoteRequest } from "../shared/lib/proposals.ts";
 import type { ItemRequest } from "../shared/lib/items.ts";
 import type { SlideRequest } from "../shared/lib/slides.ts";
-import { ENV_PATH, liveDeps, loadAgentSettings, openAiChat, runAgentSearch, TOOLS } from "./agentSearch.ts";
+import { ENV_PATH, liveDeps, loadAgentSettings, runAgentSearch, TOOLS, type Chat } from "./agentSearch.ts";
 import { searchWeb } from "./webTools.ts";
 import { readOutline, MAX_OUTLINE_CHARS } from "./outline.ts";
-import { AccountStore, accountRoutes, requireUser, supabaseDeps } from "./account.ts";
+import { AccountStore, accountRoutes, requireUser, signedInAs, supabaseDeps } from "./account.ts";
+import { clearOldContent, newContext, recordedChat, describePosting, recordProposals, recordVerdict, VERDICTS, type Helper, type Offer, type Verdict } from "./record.ts";
+import type { MentionProposal } from "../shared/lib/evidence.ts";
+import type { MappingSuggestion } from "../shared/lib/proposals.ts";
+import type { RevisionSuggestion } from "../shared/lib/revision.ts";
+import type { DraftItem, SlideDraft } from "../shared/types.ts";
 import { DATABASE_URL, postgresDb } from "./db.ts";
 import { createHash } from "node:crypto";
 import { networkInterfaces } from "node:os";
@@ -61,6 +66,32 @@ if (process.env.LYCEUM_REQUIRE_SIGN_IN === "1")
 const purgePending = () => accounts.purgePending().catch((err) => console.error("purging unfinished sign-ups failed:", err instanceof Error ? err.message : err));
 void purgePending();
 setInterval(purgePending, 60 * 60 * 1000).unref();
+// Every model call is recorded (api/record.ts): by whom (the session's token, or nobody for a demo persona), for which
+// course (the x-lyceum-course header the browser sends), through which helper. What was sent and came back is cleared
+// after 30 days, hourly; the rest stays for the metrics.
+const callContext = async (c: Context, helper: Helper) =>
+  newContext(helper, c.req.path, (await signedInAs(c, authDeps).catch(() => null))?.id ?? null, c.req.header("x-lyceum-course") ?? null);
+const chatFor = async (c: Context, helper: Helper, s: AgentSettings) => recordedChat(database, s, await callContext(c, helper));
+/** A route's recorded context and model client together, when the route also records what the helper offers. */
+const recording = async (c: Context, helper: Helper, s: AgentSettings) => { const ctx = await callContext(c, helper); return { ctx, chat: recordedChat(database, s, ctx) }; };
+// The lecturer's verdict on one proposal: accepted, edited (then accepted) or dismissed with an optional reason. Only an
+// account's own proposals; a demo persona's are recorded without an account and take no verdicts.
+app.post("/api/proposals/:id/verdict", async (c) => {
+  const who = await signedInAs(c, authDeps).catch(() => null);
+  if (!who) return c.json({ error: "Sign in first." }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { verdict?: unknown; reason?: unknown };
+  if (!VERDICTS.includes(body.verdict as Verdict)) return c.json({ error: "The verdict is accepted, edited or dismissed." }, 400);
+  try {
+    const found = await recordVerdict(database, who.id, c.req.param("id") ?? "", body.verdict as Verdict, typeof body.reason === "string" ? body.reason : null);
+    return found ? c.json({ ok: true }) : c.json({ error: "No such proposal of yours." }, 404);
+  } catch (err) {
+    console.error("verdict failed:", err);
+    return c.json({ error: "The verdict could not be recorded." }, 503);
+  }
+});
+const clearContent = () => clearOldContent(database).catch((err) => console.error("clearing old model content failed:", err instanceof Error ? err.message : err));
+void clearContent();
+setInterval(clearContent, 60 * 60 * 1000).unref();
 // Watching on a schedule (api/watch.ts): each signed-in account's courses, checked every 15 minutes.
 watchRoutes(app, authDeps, database);
 if (process.env.LYCEUM_WATCH !== "off") startWatching(database);
@@ -117,7 +148,7 @@ app.post("/api/agent-settings/test/:target", async (c) => {
   try {
     if (target === "model") {
       if (!s.model.baseUrl || !s.model.model) return c.json({ ok: false, error: "Set LYCEUM_AGENT_MODEL (and LYCEUM_AGENT_BASE_URL for a custom endpoint) in .env first." });
-      const reply = await openAiChat(s)([{ role: "user", content: "Call the web_search tool with the query \"connection test\". Do nothing else." }], TOOLS);
+      const reply = await (await chatFor(c, "settings", s))([{ role: "user", content: "Call the web_search tool with the query \"connection test\". Do nothing else." }], TOOLS);
       const called = reply.tool_calls?.some((t) => t.function.name === "web_search");
       return c.json({ ok: true, detail: called ? "The model answered and called a tool, so tool calling works." : "The model answered but did not call the tool. It may not support tool calling well; try another model.", toolCalling: Boolean(called) });
     }
@@ -142,7 +173,11 @@ app.post("/api/agent/outline", async (c) => {
   const { s, missing: needs } = await agentModel();
   if (needs.length) return c.json({ error: "Reading an outline needs the model set up: add " + needs.join(", ") + " to .env (see Settings). You can type the outcomes below instead." }, 400);
   try {
-    return c.json({ outline: await readOutline(text, fileName, s), truncated: text.length > MAX_OUTLINE_CHARS });
+    const { ctx, chat } = await recording(c, "folio", s);
+    const outline = await readOutline(text, fileName, s, chat);
+    const outcomes = await recordProposals(database, ctx, outline.outcomes, (o) => ({ kind: "outcome", summary: o.text, payload: o }));
+    const topics = await recordProposals(database, ctx, outline.topics, (t) => ({ kind: "topic", summary: t.title, payload: t }));
+    return c.json({ outline: { ...outline, outcomes, topics }, truncated: text.length > MAX_OUTLINE_CHARS });
   } catch (err) {
     console.error("outline read failed:", err);
     return c.json({ error: "The model could not read this outline: " + (err instanceof Error ? err.message : String(err)).slice(0, 300) + " You can type the outcomes below instead." }, 502);
@@ -157,7 +192,9 @@ app.post("/api/agent/revision", async (c) => {
   const { s, missing } = await agentModel();
   if (missing.length) return c.json({ error: "Suggestions need the model set up: add " + missing.join(", ") + " to .env (see Settings)." }, 400);
   try {
-    return c.json({ suggestions: await suggestRevision(s, request) });
+    const { ctx, chat } = await recording(c, "quill", s);
+    return c.json({ suggestions: await recordProposals(database, ctx, await suggestRevision(s, request, chat), (r: RevisionSuggestion) =>
+      ({ kind: "revision", summary: r.kind + ": " + (r.kind === "add-topic" ? r.title : r.text), payload: r })) });
   } catch (err) {
     console.error("revision suggestions failed:", err);
     return c.json({ error: "The model could not suggest changes: " + (err instanceof Error ? err.message : String(err)).slice(0, 300) }, 502);
@@ -165,7 +202,8 @@ app.post("/api/agent/revision", async (c) => {
 });
 
 // Lens's quotations and Atlas's mappings on Report (shared/lib/proposals.ts): checked proposals out, nothing recorded.
-function proposalRoute<B>(path: string, valid: (body: B) => boolean, run: (s: AgentSettings, body: B) => Promise<unknown>) {
+function proposalRoute<B, T extends object>(path: string, helper: Helper, valid: (body: B) => boolean, run: (s: AgentSettings, body: B, chat: Chat) => Promise<T[]>,
+  describe: ((offer: T) => Offer) | null) {
   app.post("/api/agent/" + path, async (c) => {
     let body: B;
     try { body = await c.req.json(); } catch { return c.json({ error: "Send the request as JSON." }, 400); }
@@ -173,17 +211,22 @@ function proposalRoute<B>(path: string, valid: (body: B) => boolean, run: (s: Ag
     const { s, missing } = await agentModel();
     if (missing.length) return c.json({ error: "This needs the model set up: add " + missing.join(", ") + " to .env (see Settings)." }, 400);
     try {
-      return c.json({ [path]: await run(s, body) });
+      const { ctx, chat } = await recording(c, helper, s);
+      const offers = await run(s, body, chat);
+      return c.json({ [path]: describe ? await recordProposals(database, ctx, offers, describe) : offers });
     } catch (err) {
       console.error(path + " proposals failed:", err);
       return c.json({ error: "The model could not propose " + path + ": " + (err instanceof Error ? err.message : String(err)).slice(0, 300) }, 502);
     }
   });
 }
-proposalRoute<QuoteRequest>("quotes", (b) => Array.isArray(b?.postings), proposeQuotes);
-proposalRoute<MappingRequest>("mappings", (b) => Array.isArray(b?.skills) && Array.isArray(b?.outcomes), proposeMappings);
-proposalRoute<SlideRequest>("slides", (b) => typeof b?.topic === "string" && Array.isArray(b?.outcomes), draftSlides);
-proposalRoute<ItemRequest>("items", (b) => Array.isArray(b?.outcomes) && b.outcomes.length > 0 && Array.isArray(b?.misconceptions), draftModelItems);
+proposalRoute<QuoteRequest, MentionProposal>("quotes", "lens", (b) => Array.isArray(b?.postings), proposeQuotes,
+  (q) => ({ kind: "quote", summary: q.skill + ": \"" + q.excerpt + "\"", payload: q }));
+proposalRoute<MappingRequest, MappingSuggestion>("mappings", "atlas", (b) => Array.isArray(b?.skills) && Array.isArray(b?.outcomes), proposeMappings,
+  (m) => ({ kind: "mapping", summary: m.skill + " -> " + (m.outcomes.join(", ") || "no outcome (a gap)"), payload: m }));
+proposalRoute<SlideRequest, SlideDraft>("slides", "prism", (b) => typeof b?.topic === "string" && Array.isArray(b?.outcomes), draftSlides, null);
+proposalRoute<ItemRequest, DraftItem>("items", "prism", (b) => Array.isArray(b?.outcomes) && b.outcomes.length > 0 && Array.isArray(b?.misconceptions), draftModelItems,
+  (i) => ({ kind: "item", summary: i.kind + ": " + i.stem, payload: i }));
 
 // One agent run, streamed as lines of JSON: {type:"log"} as it works, then {type:"done"} with the postings or {type:"error"}.
 const AGENT_RUN_MS = 6 * 60 * 1000;
@@ -197,6 +240,7 @@ app.post("/api/agent-search", async (c) => {
   if (missing.length) return c.json({ error: "Agent search is not set up yet. Add " + missing.join(", ") + " to .env (see .env.example and Settings)." }, 400);
   if (agentRunning) return c.json({ error: "An agent search is already running. Wait for it to finish." }, 429);
   agentRunning = true;
+  const { ctx, chat } = await recording(c, "scout", s);
   const started = Date.now(), enc = new TextEncoder();
   c.header("content-type", "application/x-ndjson");
   c.header("cache-control", "no-cache");
@@ -207,9 +251,9 @@ app.post("/api/agent-search", async (c) => {
       const stop = new AbortController();
       const timer = setTimeout(() => stop.abort(new Error("The agent did not finish within " + AGENT_RUN_MS / 60000 + " minutes.")), AGENT_RUN_MS);
       try {
-        const result = await runAgentSearch(brief, liveDeps(s), s, (line) => send({ type: "log", line }), stop.signal);
+        const result = await runAgentSearch(brief, liveDeps(s, chat), s, (line) => send({ type: "log", line }), stop.signal);
         const query = typeof body.q === "string" ? body.q : "";
-        send({ type: "done", postings: filterPostings(result.postings, query, body.scope === "text"), total: result.postings.length, retrievedAt: new Date(started).toISOString(),
+        send({ type: "done", postings: await recordProposals(database, ctx, filterPostings(result.postings, query, body.scope === "text"), describePosting), total: result.postings.length, retrievedAt: new Date(started).toISOString(),
           durationMs: Date.now() - started, summary: result.summary, pagesRead: result.pagesRead, searches: result.searches,
           endpoint: "/api/agent-search (" + s.model.model + ", " + s.search.provider + ")" });
       } catch (err) {
@@ -317,7 +361,7 @@ app.post("/api/agent/intake", async (c) => {
   if (missing.length) return c.json({ fallback: true });
   try {
     const payload = (await c.req.json()) as Parameters<typeof runIntakeLLM>[1];
-    const interpretation = await runIntakeLLM(s, payload);
+    const interpretation = await runIntakeLLM(s, payload, await chatFor(c, "folio", s));
     if (!interpretation) return c.json({ fallback: true });
     return c.json({ interpretation });
   } catch (err) {
@@ -334,6 +378,7 @@ app.post("/api/agent/:name", async (c) => {
   const { s, missing } = await agentModel();
   if (missing.length) return c.json({ fallback: true }, 503);
   const payload = await c.req.json();
+  const chat = await chatFor(c, "sandbox", s);
   c.header("content-type", "text/event-stream");
   c.header("cache-control", "no-cache");
   return c.body(
@@ -343,7 +388,7 @@ app.post("/api/agent/:name", async (c) => {
         try {
           await streamAgentLLM(s, name, payload, (text) => {
             controller.enqueue(enc.encode(`data: ${JSON.stringify({ text })}\n\n`));
-          });
+          }, chat);
           controller.enqueue(enc.encode("data: [DONE]\n\n"));
         } catch (err) {
           console.error("agent stream failed:", name, err);

@@ -8,7 +8,7 @@
 import { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, FileUp, Plus, X } from "lucide-react";
 import { JOB_ROLE_LABEL, JOB_ROLES } from "../../app/account.ts";
-import { readOutlineFile } from "../../../../shared/agents/client.ts";
+import { readOutlineFile, sendVerdict } from "../../../../shared/agents/client.ts";
 import { applyOnboardingOutline, completeOnboarding, createCourseWorkspace, saveOnboardingProfile, signOutAccount, useStore } from "../../app/store.ts";
 import { BLOOM_LEVELS } from "../../../../shared/lib/outline.ts";
 import type { BloomLevel } from "../../../../shared/types.ts";
@@ -17,8 +17,11 @@ import { Button, Field, Input, Tag, Textarea } from "../primitives/index.tsx";
 import { Dropdown } from "../primitives/Dropdown.tsx";
 
 const STEPS = ["About you", "Your course", "Its outline"] as const;
-interface OutcomeRow { key: number; text: string; bloom: BloomLevel; keep: boolean; inDocument: boolean | null } // null: typed or edited here
-interface TopicRow { key: number; title: string; hours: string; week: number | null; outcomes: number[]; keep: boolean }
+// proposalId and from: a row Folio proposed, with what it proposed, so creating the course can record the lecturer's verdict.
+interface OutcomeRow { key: number; text: string; bloom: BloomLevel; keep: boolean; inDocument: boolean | null; proposalId?: string; from?: string } // inDocument null: typed or edited here
+interface TopicRow { key: number; title: string; hours: string; week: number | null; outcomes: number[]; keep: boolean; proposalId?: string; from?: string }
+const outcomeSig = (r: OutcomeRow) => JSON.stringify([r.text.trim(), r.bloom]);
+const topicSig = (r: TopicRow) => JSON.stringify([r.title.trim(), r.hours.trim(), r.week, r.outcomes]);
 let rowKey = 0;
 const numberOrNull = (s: string) => (s.trim() && Number.isFinite(Number(s)) && Number(s) > 0 ? Number(s) : null);
 
@@ -43,6 +46,7 @@ export function OnboardingScreen() {
   const [targetRoles, setTargetRoles] = useState("");
   // the outline
   const fileInput = useRef<HTMLInputElement>(null);
+  const proposed = useRef<string[]>([]); // the ids of the rows Folio proposed in the latest import
   const [reading, setReading] = useState(false);
   const [source, setSource] = useState("");
   const [note, setNote] = useState("");
@@ -76,8 +80,11 @@ export function OnboardingScreen() {
     if (o.code && !code) setCode(o.code);
     if (o.title && !title) setTitle(o.title);
     setSource(o.source);
-    setOutcomes(o.outcomes.map((x) => ({ key: ++rowKey, text: x.text, bloom: x.bloom, keep: true, inDocument: x.inDocument })));
-    setTopics(o.topics.map((t) => ({ key: ++rowKey, title: t.title, hours: t.hours === null ? "" : String(t.hours), week: t.week, outcomes: t.outcomes, keep: true })));
+    const outcomeRows = o.outcomes.map((x): OutcomeRow => ({ key: ++rowKey, text: x.text, bloom: x.bloom, keep: true, inDocument: x.inDocument, proposalId: x.proposalId }));
+    const topicRows = o.topics.map((t): TopicRow => ({ key: ++rowKey, title: t.title, hours: t.hours === null ? "" : String(t.hours), week: t.week, outcomes: t.outcomes, keep: true, proposalId: t.proposalId }));
+    setOutcomes(outcomeRows.map((r) => ({ ...r, from: outcomeSig(r) })));
+    setTopics(topicRows.map((r) => ({ ...r, from: topicSig(r) })));
+    proposed.current = [...outcomeRows, ...topicRows].flatMap((r) => (r.proposalId ? [r.proposalId] : []));
     if (o.contactHours) setContactHours(String(o.contactHours));
     if (o.teachingWeeks) setTeachingWeeks(String(o.teachingWeeks));
     if (o.credits) setCredits(String(o.credits));
@@ -108,6 +115,13 @@ export function OnboardingScreen() {
       credits: numberOrNull(credits), teachingWeeks: numberOrNull(teachingWeeks), contactHours: numberOrNull(contactHours),
       programmeOutcomes: plos, targetRoles,
     }, term, source);
+    // Folio's verdicts: each proposed row kept as proposed, kept after an edit, or dropped (unticked or removed).
+    const rows = [...outcomes.map((o) => ({ id: o.proposalId, kept: o.keep && Boolean(o.text.trim()), same: o.from === outcomeSig(o) })),
+      ...topics.map((t) => ({ id: t.proposalId, kept: t.keep && Boolean(t.title.trim()), same: t.from === topicSig(t) }))];
+    for (const id of proposed.current) {
+      const row = rows.find((r) => r.id === id);
+      void sendVerdict(id, !row?.kept ? "dismissed" : row.same ? "accepted" : "edited");
+    }
     // The course exists either way, so onboarding is finished; an outline that needs a fix says so on the course (a notice).
     const done = await completeOnboarding();
     setBusy(false);

@@ -30,7 +30,9 @@ export type ChatMessage =
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
 export interface ToolSpec { type: "function"; function: { name: string; description: string; parameters: Record<string, unknown> } }
-export type Chat = (messages: ChatMessage[], tools: ToolSpec[]) => Promise<{ content: string | null; tool_calls?: ToolCall[] }>;
+/** Tokens and, when the provider reports it (OpenRouter does), the cost in US dollars: for the call log (api/record.ts). */
+export interface ChatUsage { promptTokens: number | null; completionTokens: number | null; cost: number | null }
+export type Chat = (messages: ChatMessage[], tools: ToolSpec[]) => Promise<{ content: string | null; tool_calls?: ToolCall[]; usage?: ChatUsage }>;
 
 const MODEL_TIMEOUT_MS = 120_000;
 export function openAiChat(s: AgentSettings): Chat {
@@ -40,12 +42,13 @@ export function openAiChat(s: AgentSettings): Chat {
     try {
       res = await fetch(url, { method: "POST", signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
         headers: { "content-type": "application/json", ...(p.apiKey ? { authorization: "Bearer " + p.apiKey } : {}) },
-        body: JSON.stringify({ model: p.model, messages, ...(tools.length ? { tools, tool_choice: "auto" } : {}) }) });
+        body: JSON.stringify({ model: p.model, messages, ...(tools.length ? { tools, tool_choice: "auto" } : {}), ...(p.provider === "openrouter" ? { usage: { include: true } } : {}) }) });
     } catch (err) {
       throw new ToolError("The model endpoint " + url + " could not be reached" + (err instanceof Error && err.name === "TimeoutError" ? " in time." : "."));
     }
     const text = await res.text();
-    let body: { choices?: Array<{ message?: { content?: string | null; tool_calls?: ToolCall[] } }>; error?: { message?: string } | string } | null = null;
+    let body: { choices?: Array<{ message?: { content?: string | null; tool_calls?: ToolCall[] } }>; error?: { message?: string } | string;
+      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; cost?: unknown } } | null = null;
     try { body = JSON.parse(text); } catch { /* reported below */ }
     if (!res.ok || !body) {
       const why = typeof body?.error === "string" ? body.error : body?.error?.message ?? text.slice(0, 300);
@@ -53,7 +56,9 @@ export function openAiChat(s: AgentSettings): Chat {
     }
     const message = body.choices?.[0]?.message;
     if (!message) throw new ToolError("The model endpoint returned no message.");
-    return { content: message.content ?? null, tool_calls: message.tool_calls?.length ? message.tool_calls : undefined };
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+    return { content: message.content ?? null, tool_calls: message.tool_calls?.length ? message.tool_calls : undefined,
+      usage: { promptTokens: num(body.usage?.prompt_tokens), completionTokens: num(body.usage?.completion_tokens), cost: num(body.usage?.cost) } };
   };
 }
 
@@ -184,9 +189,9 @@ export async function runAgentSearch(brief: string, deps: AgentDeps, limits: { m
 }
 
 /** The real dependencies, from the saved settings. */
-export function liveDeps(s: AgentSettings): AgentDeps {
+export function liveDeps(s: AgentSettings, chat: Chat = openAiChat(s)): AgentDeps {
   return {
-    chat: openAiChat(s),
+    chat,
     search: (q, time) => searchWeb(s.search, q, time === undefined ? s.search.timeFilter : time),
     fetchPage: async (url) => readPage(await safeFetch(url)),
     collect: async (provider, board) => (await collectBoard(provider, board)).postings,

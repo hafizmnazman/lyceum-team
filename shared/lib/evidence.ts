@@ -258,7 +258,8 @@ export function parseLexicon(text: string): string[] {
   }
   return terms;
 }
-export interface MentionProposal { sourceId: string; sourceTitle: string; term: string; skill: string; excerpt: string; requirement: MentionRequirement }
+/** proposalId: Lens's proposals carry the id the API recorded them under (api/record.ts); the keyword scan's have none. */
+export interface MentionProposal { sourceId: string; sourceTitle: string; term: string; skill: string; excerpt: string; requirement: MentionRequirement; proposalId?: string }
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const REQUIRED_WORDS = /\b(must|required|require[sd]?|essential|need(?:s|ed)?|minimum|mandatory|expected)\b/i;
 const PREFERRED_WORDS = /\b(preferred|preferably|nice to have|bonus|a plus|desirable|ideally|advantage)\b/i;

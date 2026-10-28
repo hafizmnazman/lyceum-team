@@ -28,8 +28,8 @@ export const OutlineSchema = z.object({
   programmeOutcomes: z.array(z.string().min(3).max(400)).max(20).catch([]),
 });
 
-export interface OutlineOutcome { text: string; bloom: BloomLevel; inDocument: boolean }
-export interface OutlineTopic { title: string; hours: number | null; week: number | null; outcomes: number[] } // outcomes: 1-based, into the outcomes list
+export interface OutlineOutcome { text: string; bloom: BloomLevel; inDocument: boolean; proposalId?: string }
+export interface OutlineTopic { title: string; hours: number | null; week: number | null; outcomes: number[]; proposalId?: string } // outcomes: 1-based, into the outcomes list
 export interface OutlineProposal {
   code: string; title: string; credits: number | null; teachingWeeks: number | null; contactHours: number | null;
   outcomes: OutlineOutcome[]; topics: OutlineTopic[]; programmeOutcomes: string[]; source: string;

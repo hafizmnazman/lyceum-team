@@ -41,7 +41,7 @@ export function SessionItems({ subject, session, labels, misconceptions, mayEdit
     const request = sessionItemRequest(subject.id, session.id);
     if (typeof request === "string") { setMessage(request); return; }
     setDrafting(true); setMessage("");
-    const r = await fetchModelItems(request);
+    const r = await fetchModelItems(request, subject.id);
     setDrafting(false);
     if (r.ok) done(addModelItems(subject.id, session.id, r.list)); else setMessage(r.error);
   }

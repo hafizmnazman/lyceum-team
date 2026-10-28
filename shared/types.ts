@@ -291,6 +291,8 @@ export interface DraftItem {
   responseLines?: number; // essay: the answer box's height
   source: "template" | "sample" | "model"; // drafted by Lyceum's templates, a sample written for this prototype, or drafted by the model (Prism)
   reviewedBy: PersonId | null; reviewedAt: string | null;
+  proposalId?: string; // a model item: the id the API recorded Prism's proposal under (api/record.ts), for the lecturer's verdict
+  edited?: boolean; // a model item the lecturer changed after Prism drafted it
 }
 /** One slide a lecturer wrote: a title, bullets and speaker notes, with an optional second column or figure. */
 export interface SlideDraft {
@@ -635,6 +637,7 @@ export interface CollectedPosting {
   id: string; provider: CollectionProvider; board: string; title: string; organisation: string; location: string; url: string;
   publishedAt: string; // as published by the board, empty when unknown
   updatedAt: string; text: string; retrievedAt: string;
+  proposalId?: string; // found by Scout (agent search): the id the API recorded it under, so importing it counts as taking it
 }
 // ---------- watching the evidence over time ----------
 /** A reviewed posting as it stood when a snapshot was frozen. `identity` stays stable across re-imports of the same board posting. */
