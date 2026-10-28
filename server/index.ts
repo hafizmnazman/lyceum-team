@@ -1,10 +1,10 @@
 // The thin Lyceum server (spec Section 1). Its jobs:
 //   POST /api/parse            file bytes in, ParsedDoc out (xlsx/csv/pdf/pptx/docx)
-//   POST /api/agent/:name      LLM proxy: intake returns forced JSON; the
-//                              free-text agents stream SSE
+//   POST /api/agent/:name      LLM proxy on the LYCEUM_AGENT_* model: intake
+//                              returns JSON; the free-text agents answer as SSE
 //   /api/collect, /api/survey  the research run's board collection, and the
 //                              booth's survey collector (depth plan Section 7.2)
-// No key or an LLM error never breaks the client: routes answer with
+// No model or an LLM error never breaks the client: routes answer with
 // { fallback: true } or an error status and the client falls back to its
 // deterministic local path.
 
@@ -14,7 +14,7 @@ import { serve, type HttpBindings } from "@hono/node-server";
 import { parseSheet } from "./parse/sheet.ts";
 import { parsePdf } from "./parse/pdf.ts";
 import { parseDocx, parsePptx } from "./parse/office.ts";
-import { hasKey, MODEL, runIntakeLLM, streamAgentLLM } from "./llm.ts";
+import { agentModel, runIntakeLLM, streamAgentLLM } from "./llm.ts";
 import { CollectError, collectBoard } from "./collect.ts";
 import { filterPostings } from "../src/lib/collect.ts";
 import { missingSettings, publicSettings } from "../src/lib/agentSettings.ts";
@@ -59,9 +59,10 @@ authRoutes(app, getStore, {
   google: { clientId: process.env.GOOGLE_CLIENT_ID ?? "", clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "" },
 });
 
-app.get("/api/health", (c) =>
-  c.json({ ok: true, live: hasKey(), model: hasKey() ? MODEL : null }),
-);
+app.get("/api/health", async (c) => {
+  const { s, missing } = await agentModel();
+  return c.json({ ok: true, live: !missing.length, model: missing.length ? null : s.model.model });
+});
 
 app.post("/api/parse", async (c) => {
   const name = c.req.query("name") ?? "upload.bin";
@@ -132,8 +133,7 @@ app.post("/api/agent/outline", async (c) => {
   try { body = await c.req.json(); } catch { return c.json({ error: "Send the outline's text as JSON." }, 400); }
   const text = typeof body.text === "string" ? body.text : "", fileName = typeof body.fileName === "string" ? body.fileName.slice(0, 200) : "outline";
   if (text.trim().length < 40) return c.json({ error: "That file has too little text to read an outline from. Is it a scanned image?" }, 400);
-  const s = await loadAgentSettings();
-  const needs = missingSettings(s).filter((k) => k.startsWith("LYCEUM_AGENT"));
+  const { s, missing: needs } = await agentModel();
   if (needs.length) return c.json({ error: "Reading an outline needs the model set up: add " + needs.join(", ") + " to .env (see Settings). You can type the outcomes below instead." }, 400);
   try {
     return c.json({ outline: await readOutline(text, fileName, s), truncated: text.length > MAX_OUTLINE_CHARS });
@@ -271,10 +271,11 @@ app.get("/api/survey/:formToken/responses", (c) => {
 });
 
 app.post("/api/agent/intake", async (c) => {
-  if (!hasKey()) return c.json({ fallback: true });
+  const { s, missing } = await agentModel();
+  if (missing.length) return c.json({ fallback: true });
   try {
-    const payload = (await c.req.json()) as Parameters<typeof runIntakeLLM>[0];
-    const interpretation = await runIntakeLLM(payload);
+    const payload = (await c.req.json()) as Parameters<typeof runIntakeLLM>[1];
+    const interpretation = await runIntakeLLM(s, payload);
     if (!interpretation) return c.json({ fallback: true });
     return c.json({ interpretation });
   } catch (err) {
@@ -288,7 +289,8 @@ app.post("/api/agent/:name", async (c) => {
   if (!["authoring", "evaluator", "analogy", "signal"].includes(name)) {
     return c.json({ error: "unknown agent" }, 404);
   }
-  if (!hasKey()) return c.json({ fallback: true }, 503);
+  const { s, missing } = await agentModel();
+  if (missing.length) return c.json({ fallback: true }, 503);
   const payload = await c.req.json();
   c.header("content-type", "text/event-stream");
   c.header("cache-control", "no-cache");
@@ -297,7 +299,7 @@ app.post("/api/agent/:name", async (c) => {
       async start(controller) {
         const enc = new TextEncoder();
         try {
-          await streamAgentLLM(name, payload, (text) => {
+          await streamAgentLLM(s, name, payload, (text) => {
             controller.enqueue(enc.encode(`data: ${JSON.stringify({ text })}\n\n`));
           });
           controller.enqueue(enc.encode("data: [DONE]\n\n"));
@@ -314,7 +316,7 @@ app.post("/api/agent/:name", async (c) => {
 
 const port = Number(process.env.PORT || 8787);
 serve({ fetch: app.fetch, port }, () => {
-  console.log(
-    `lyceum api on http://localhost:${port}  (${hasKey() ? `live agents: ${MODEL}` : "no key: fixture mode"})`,
-  );
+  void agentModel().then(({ s, missing }) => console.log(
+    `lyceum api on http://localhost:${port}  (${missing.length ? "no model: fixture mode" : `live agents: ${s.model.model}`})`,
+  ));
 });

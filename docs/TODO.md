@@ -11,25 +11,27 @@ the branch name. Newest work at the top of each section.
 ## Next: a real loop, end to end (no fixtures on the main path)
 
 The goal: a fresh account, a real outline and real postings run Watch → Report → Decide → Update → Teach → Learn with
-nothing typed in by hand. The demo personas and the CS310 sample stay, but only behind a demo switch.
+nothing typed in by hand. **Nothing hardcoded is removed:** the fixtures, the demo personas and the CS310 sample stay for
+the short pitch and the booth demo, and the live path is added beside them. A course runs live when a model is set and it
+has real data; the demo runs on the fixtures.
 
 ### Agents: from fixtures to live
-- [ ] **One model config for every agent.** `server/llm.ts` (Anthropic, `ANTHROPIC_API_KEY`, `LYCEUM_MODEL`) and the
-      agent search / outline reader (`LYCEUM_AGENT_*`) are two separate setups. Move intake, authoring, evaluator, analogy and
-      signal onto the `LYCEUM_AGENT_*` client, and remove the second setup.
+- [x] **One model config for every agent** (`refactor/unify-agent-model`). Intake, authoring, evaluator, analogy and
+      signal now call the `LYCEUM_AGENT_*` model through `openAiChat`, like agent web search and the outline reader;
+      `ANTHROPIC_API_KEY`, `LYCEUM_MODEL` and the Anthropic SDK are gone. The fixtures still answer with no model set.
 - [ ] **Signal from real evidence.** `src/agents/signal.ts` hard-codes demand and coverage per CLO (CLO4 = 0.88 and so on)
       and its live mode throws. Compute demand per CLO from Lens's confirmed quotations and mappings (`src/lib/evidence.ts`,
       share and Wilson interval), coverage from the course's topics and hours, and the drift flag from those. Programme,
-      Trends and `routeDrift` (`src/app/store.ts:987`) read it.
+      Trends and `routeDrift` (`src/app/store.ts:987`) read it. Keep `SIGNAL_FIXTURE` for the demo programme.
 - [ ] **Signal reveal driven by the run.** `src/app/signalSim.ts` animates a fixed answer. Show the real run's steps (the
-      postings read, the skills found, the CLOs mapped) as they happen, or drop the animation.
+      postings read, the skills found, the CLOs mapped) as they happen; the scripted reveal stays for the demo.
 - [ ] **Market sources from real runs.** Replace `MARKET_SOURCES` (`src/data/market.ts`, the made-up JobStreet and
-      LinkedIn counts) with the research runs actually done: board, date, postings kept. Delete the synthetic list
-      (Trends, DataRoom, Index).
+      LinkedIn counts) with the research runs actually done: board, date, postings kept, on real courses. The synthetic
+      list stays, labelled, for the demo (Trends, DataRoom, Index).
 - [ ] **Intake live.** `src/agents/intake.ts` returns a canned filing that ignores the file. Run the model, with
-      `intakeLocal.ts` as the fallback with no model, and remove `liveNotImplemented` (`src/agents/mode.ts`).
+      `intakeLocal.ts` as the fallback with no model; the fixture stays as the demo's path (`src/agents/mode.ts`).
 - [ ] **Authoring live.** `store.ts:1278` and `:1316` pass `"fixture"`. Draft and critique with the model on the course's
-      real outline and evidence. The lecturer still accepts each change.
+      real outline and evidence when one is set; the fixture stays for the demo. The lecturer still accepts each change.
 - [ ] **Atlas proposes mappings.** Skill → CLO mapping is all by hand today. The model proposes a mapping with a reason;
       the lecturer confirms each one, the same way as quotations.
 - [ ] **Lens scan with a model.** `proposeMentions` uses a keyword list only. Add model-proposed quotations, still checked
@@ -50,12 +52,13 @@ nothing typed in by hand. The demo personas and the CS310 sample stay, but only 
 ### Decide and Learn: the mock cohort
 - [ ] **Cohort from the course's own data.** `src/data/synthetic-cohort.json` (200 made-up students) and the knobs in
       `src/config.ts` feed the verdict. Build the cohort from the course's uploaded results and CLO surveys; keep the
-      synthetic cohort for the demo only.
+      synthetic cohort for the demo.
 - [ ] **Lock predictions, then score them.** Freeze the cohort's predictions before a term starts, then score them against
       that term's results and CLO/SSRT survey on Learn. Until two terms are scored, keep "no learning gain is claimed".
 - [ ] **Backtest on uploaded history.** `src/data/historical-backtest.json` is a fixed v1 cohort; run the backtest on a
       past term the lecturer uploads.
-- [ ] **Staged reveal from the real run.** `src/app/sim.ts` replays a precomputed result over 16 s; show real progress.
+- [ ] **Staged reveal from the real run.** `src/app/sim.ts` replays a precomputed result over 16 s; show real progress on
+      real courses, and keep the replay for the demo.
 
 ### People and sharing
 - [ ] **Shared programme workspaces and invitations** (see role-based onboarding below). Without it, "send the brief to a
@@ -64,8 +67,9 @@ nothing typed in by hand. The demo personas and the CS310 sample stay, but only 
 - [ ] **Survey answers in the database.** The booth keeps responses in a `Map` in `server/index.ts`; a restart loses them.
 
 ### Data out of the code and into the database
-- [ ] **Delete the numbers that are fake, don't move them.** The Signal constants, the market source counts, the canned
-      intake and authoring fixtures are replaced by the work above, not copied into tables.
+- [ ] **Keep the fake numbers as demo data, not as tables.** The Signal constants, the market source counts and the canned
+      intake and authoring fixtures stay in the code for the pitch; the work above computes the real ones. They are not
+      copied into tables, since editing a made-up number does not make it real.
 - [ ] **Reference data as tables, editable from Settings.** Bloom verbs (`items.ts` `BLOOM_VERBS`), the skills lexicon,
       accreditors (`src/data/accreditors.ts`), institution details (`src/data/institution.ts`), pass marks and KPI
       targets, the model knobs (`src/config.ts`). One migration each, seeded with today's values, read through one
@@ -78,9 +82,15 @@ nothing typed in by hand. The demo personas and the CS310 sample stay, but only 
       evidence sources, quotations, mappings, decisions, versions. Keep the backup export working throughout.
 - [ ] **Stay Supabase-ready.** Plain Postgres and SQL migrations only (Supabase is Postgres, so the move is a
       `DATABASE_URL` change plus `pg_dump`). Keep auth and permissions in the server, not in Supabase-only features,
-      until the move; then decide whether Supabase Auth, Storage (uploaded files) and row-level security replace ours.
-- [ ] **Uploaded files in object storage.** Outlines, results and slides are parsed and dropped; keep the originals
-      (local disk now, Supabase Storage or S3 later) so a quotation or a figure can link back to its file.
+      until the move; then decide whether Supabase Auth and row-level security replace ours. Files stay on R2 either way.
+- [ ] **Uploaded files in Cloudflare R2.** Outlines, results and slides are parsed and dropped; keep the originals in R2
+      (free tier, S3-compatible, so the AWS S3 client works with R2's endpoint) so a quotation or a figure can link back
+      to its file. Keys in `.env`; a local folder when they are not set.
+
+### Front end
+- [ ] **Move the styles to Tailwind.** `src/theme/global.css` is about 2,600 lines of hand-written CSS with tokens in
+      `src/theme/tokens.ts` and `gen:theme`. Map the tokens into the Tailwind theme first, then move one screen at a time,
+      deleting its CSS as it goes, and keep `check:contrast` passing.
 
 ## Next
 

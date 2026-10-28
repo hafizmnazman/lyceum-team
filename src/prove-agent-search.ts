@@ -9,6 +9,7 @@ import { runAgentSearch, type AgentDeps, type Chat, type ToolCall } from "../ser
 import { assertPublicUrl, extractJobPosting, isPublicAddress, parseDuckDuckGo, readPage, searchWeb, ToolError, type ReadPage } from "../server/webTools.ts";
 import { missingSettings, publicSettings, settingsFromEnv, type TimeFilter } from "./lib/agentSettings.ts";
 import type { CollectedPosting } from "./types.ts";
+import { runIntakeLLM, streamAgentLLM } from "../server/llm.ts";
 
 const call = (id: string, name: string, args: Record<string, unknown>): ToolCall => ({ id, type: "function", function: { name, arguments: JSON.stringify(args) } });
 /** A model that plays a fixed script: each reply in turn, and records the tool results it was shown. */
@@ -179,4 +180,26 @@ test("DuckDuckGo's HTML results: the real URL out of its redirect, title and sni
   const hits = parseDuckDuckGo(html).filter(Boolean);
   assert.equal(hits.length, 1);
   assert.deepEqual(hits[0], { title: "Data Analyst & BI", url: "https://jobs.example.com/data-analyst", snippet: "Hiring in Kuala Lumpur." });
+});
+
+test("intake and the free-text agents run on the same model as agent web search", async () => {
+  const s = settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "llama" });
+  const payload = { doc: { pages: ["CLO1 mean 72%"] }, subjects: [{ id: "CS220", title: "ML" }], clos: [{ id: "CLO4", subjectId: "CS220", text: "Apply ML" }] };
+  const tool: Chat = async (_m, tools) => {
+    assert.equal(tools[0].function.name, "file_interpretation", "intake offers its tool");
+    return { content: null, tool_calls: [{ id: "1", type: "function", function: { name: "file_interpretation", arguments: '{"docType":"results","confidence":0.8,"notes":["read column B"]}' } }] };
+  };
+  assert.deepEqual(await runIntakeLLM(s, payload, tool), { docType: "results", confidence: 0.8, notes: ["read column B"] });
+  const text: Chat = async () => ({ content: 'Here it is: ```json\n{"docType":"syllabus","confidence":0.5,"notes":[]}\n```' });
+  assert.equal((await runIntakeLLM(s, payload, text))?.docType, "syllabus", "a model that answers in text still reads");
+  const other: Chat = async () => ({ content: '{"docType":"slides","confidence":0.4,"notes":[]}', tool_calls: [{ id: "2", type: "function", function: { name: "something_else", arguments: "{}" } }] });
+  assert.equal((await runIntakeLLM(s, payload, other))?.docType, "slides", "a call to some other tool is ignored");
+  assert.equal(await runIntakeLLM(s, payload, async () => ({ content: "no idea" })), null, "no JSON is no interpretation, so the client falls back");
+  const chunks: string[] = [];
+  await streamAgentLLM(s, "evaluator", { x: 1 }, (t) => { chunks.push(t); }, async (m) => {
+    assert.match(m[0].content ?? "", /Evaluator agent/);
+    return { content: "Recommendation: adopt." };
+  });
+  assert.deepEqual(chunks, ["Recommendation: adopt."]);
+  await assert.rejects(streamAgentLLM(s, "nope", {}, () => undefined, async () => ({ content: "" })), /unknown agent/);
 });

@@ -1,29 +1,25 @@
-// The LLM layer: one Anthropic client, the per-agent prompts, a forced-JSON
-// helper for Intake, and a streaming helper for the free-text agents. No key
-// means every route reports fallback and the client uses its deterministic
-// path; the app never depends on the network to function.
+// The LLM layer: the per-agent prompts, a JSON helper for Intake, and a helper for the free-text agents, all on the one
+// OpenAI-compatible model set in .env (LYCEUM_AGENT_*, the same one agent web search and the outline reader use). No model
+// set means every route reports fallback and the client uses its fixture or deterministic path; the app never depends on
+// the network to function.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { jsonFromReply } from "../src/lib/outline.ts";
+import { missingSettings, type AgentSettings } from "../src/lib/agentSettings.ts";
+import { loadAgentSettings, openAiChat, type Chat, type ToolSpec } from "./agentSearch.ts";
 
-export const MODEL = process.env.LYCEUM_MODEL || "claude-sonnet-5";
-const MAX_TOKENS = 1500;
-
-let client: Anthropic | null = null;
-export function hasKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
-}
-function getClient(): Anthropic {
-  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  return client;
+/** The model settings, read again on every call, and the LYCEUM_AGENT_* keys still missing before it can be called. */
+export async function agentModel(): Promise<{ s: AgentSettings; missing: string[] }> {
+  const s = await loadAgentSettings();
+  return { s, missing: missingSettings(s).filter((k) => k.startsWith("LYCEUM_AGENT")) };
 }
 
-// ---------- Intake: forced JSON via a tool schema ----------
+// ---------- Intake: JSON through a tool call ----------
 
-const INTAKE_TOOL = {
+const INTAKE_TOOL: ToolSpec = { type: "function", function: {
   name: "file_interpretation",
   description: "Your interpretation of the uploaded document, to be confirmed by the user before filing.",
-  input_schema: {
-    type: "object" as const,
+  parameters: {
+    type: "object",
     properties: {
       docType: { type: "string", enum: ["results", "clo-survey", "syllabus", "slides", "unknown"] },
       subjectGuess: { type: "string", description: "Subject code, e.g. CS220, from the provided curriculum only" },
@@ -51,38 +47,35 @@ const INTAKE_TOOL = {
     },
     required: ["docType", "confidence", "notes"],
   },
-};
+} };
 
-export async function runIntakeLLM(payload: {
+export async function runIntakeLLM(s: AgentSettings, payload: {
   doc: unknown;
   subjects: Array<{ id: string; title: string }>;
   clos: Array<{ id: string; subjectId: string; text: string }>;
-}): Promise<Record<string, unknown> | null> {
-  const res = await getClient().messages.create({
-    model: MODEL,
-    max_tokens: MAX_TOKENS,
-    system:
+}, chat: Chat = openAiChat(s)): Promise<Record<string, unknown> | null> {
+  const res = await chat([
+    { role: "system", content:
       "You are the Intake agent of Lyceum, a university curriculum platform. A lecturer dropped a file; " +
       "you classify it and map its content onto the known curriculum. Be conservative: if the subject or " +
       "term is not evident, leave the guess out and say so in notes. meanScore is always 0..1. " +
-      "Only use subject codes and CLO ids that appear in the provided curriculum.",
-    messages: [
-      {
-        role: "user",
-        content:
+      "Only use subject codes and CLO ids that appear in the provided curriculum." },
+    { role: "user", content:
           `The curriculum:\nSubjects: ${JSON.stringify(payload.subjects)}\nCLOs: ${JSON.stringify(payload.clos)}\n\n` +
           `The parsed document (pages of text and tables of cells):\n${JSON.stringify(payload.doc).slice(0, 24000)}\n\n` +
-          "Interpret it with the file_interpretation tool.",
-      },
-    ],
-    tools: [INTAKE_TOOL],
-    tool_choice: { type: "tool", name: "file_interpretation" },
-  });
-  const tool = res.content.find((b) => b.type === "tool_use");
-  return tool && tool.type === "tool_use" ? (tool.input as Record<string, unknown>) : null;
+          "Interpret it with the file_interpretation tool." },
+  ], [INTAKE_TOOL]);
+  // A model that answers in text instead of calling the tool is read as JSON; anything else is no interpretation.
+  const call = res.tool_calls?.find((t) => t.function.name === INTAKE_TOOL.function.name);
+  try {
+    const out = call ? JSON.parse(call.function.arguments) : jsonFromReply(res.content ?? "");
+    return out && typeof out === "object" ? (out as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
 }
 
-// ---------- Free-text agents: streaming ----------
+// ---------- Free-text agents ----------
 
 const SYSTEMS: Record<string, string> = {
   authoring:
@@ -104,21 +97,16 @@ const SYSTEMS: Record<string, string> = {
     "Note explicitly when sources disagree.",
 };
 
+// ponytail: the reply arrives whole and goes out as one chunk; token streaming needs stream: true in openAiChat.
 export async function streamAgentLLM(
+  s: AgentSettings,
   agent: string,
   payload: unknown,
   onChunk: (text: string) => Promise<void> | void,
+  chat: Chat = openAiChat(s),
 ): Promise<void> {
   const system = SYSTEMS[agent];
   if (!system) throw new Error(`unknown agent ${agent}`);
-  const stream = getClient().messages.stream({
-    model: MODEL,
-    max_tokens: MAX_TOKENS,
-    system,
-    messages: [{ role: "user", content: JSON.stringify(payload).slice(0, 24000) }],
-  });
-  stream.on("text", (text) => {
-    void onChunk(text);
-  });
-  await stream.finalMessage();
+  const res = await chat([{ role: "system", content: system }, { role: "user", content: JSON.stringify(payload).slice(0, 24000) }], []);
+  if (res.content) await onChunk(res.content);
 }
