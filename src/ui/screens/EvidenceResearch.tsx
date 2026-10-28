@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  clearCollection, clearProposals, definitionForCourse, navigate, confirmProposals, dismissProposal, downloadPack, evidenceTrendNote, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
+  addProposals, clearCollection, clearProposals, definitionForCourse, navigate, confirmProposals, dismissProposal, downloadPack, evidenceTrendNote, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
   scanForRequirements, selectBrief, sendEvidenceBrief, setSkillLexicon, setSourcesReviewed, type AppState,
 } from "../../app/store.ts";
 import { briefDeck } from "../../lib/slides.ts";
@@ -16,6 +16,8 @@ import type { BriefRecommendation, CollectionProvider, MentionRequirement, Perso
 import { Button, Disclosure, Field, Input, Select, Tag, Textarea } from "../primitives/index.tsx";
 import { Meter, SourcePane } from "../primitives/loop.tsx";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
+import { fetchQuoteProposals } from "../../agents/client.ts";
+import { quoteRequest } from "../../lib/proposals.ts";
 
 type Props = { state: AppState; person: Person; subject: Subject; mayEdit: boolean };
 const PROVIDERS = Object.keys(SOURCE_POLICIES) as CollectionProvider[];
@@ -108,14 +110,25 @@ export function QuoteProposals({ state, subject, mayEdit }: Props) {
   const dirty = JSON.stringify(parseLexicon(terms)) !== JSON.stringify(saved);
   useUnsavedEditor(dirty);
   const withLevel = (p: MentionProposal) => ({ ...p, requirement: levels[key(p)] ?? p.requirement });
+  const [lensBusy, setLensBusy] = useState(false);
+  // Lens reads the least-quoted postings; every quotation it returns was found word for word in its posting.
+  const askLens = async () => {
+    const request = quoteRequest(postings, state.skillMentions.filter((m) => m.subjectId === subject.id), saved);
+    setLensBusy(true);
+    const result = await fetchQuoteProposals(request);
+    setLensBusy(false);
+    setMessage(result.ok ? "Lens read " + request.postings.length + " postings and proposed " + addProposals(subject.id, result.list) + " quotations, each found word for word in its posting. Confirm the ones you accept." : result.error);
+  };
   if (!mayEdit) return <p className="muted">Only assigned lecturers and coordinators can quote evidence for this course.</p>;
   return <section aria-labelledby="requirement-scan">
     <div className="section-heading"><div><h3 id="requirement-scan">Proposed quotations</h3><p className="muted">Name the skills, then scan the kept postings for them.</p></div>
+      <div className="button-row">
       <Button variant="primary" data-demo-id="scan-run" disabled={dirty || !saved.length || !postings.length} onClick={() => {
         const result = scanForRequirements(subject.id);
         setMessage(result.ok ? result.count + " proposals across " + postings.length + " postings. Confirm the quotations you accept." : result.error);
         setLevels({});
-      }}>Scan postings</Button></div>
+      }}>Scan postings</Button>
+      <Button data-demo-id="lens-run" loading={lensBusy} disabled={!postings.length} onClick={() => void askLens()}>Find with Lens</Button></div></div>
     <Disclosure summary={saved.length ? "Skills to look for: " + saved.length + " saved" : "Skills to look for"} defaultOpen={!saved.length} data-demo-id="lexicon">
       <Field label="Skills to look for" hint="Comma-separated. Use | for an alias, for example machine learning|ML. Matching is whole-word and case-insensitive."><Textarea data-demo-id="lexicon-terms" value={terms} onChange={(e) => setTerms(e.target.value)} placeholder="e.g. SQL, Python, dashboards|dashboard, data visualisation, stakeholders|stakeholder" /></Field>
       <Button data-demo-id="lexicon-save" disabled={!dirty} onClick={() => { const result = setSkillLexicon(subject.id, parseLexicon(terms)); setMessage(result.ok ? "Terms saved with the course. Scan the postings next." : result.error); }}>Save terms</Button>

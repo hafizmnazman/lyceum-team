@@ -39,10 +39,14 @@ has real data; the demo runs on the fixtures.
       (`src/lib/revision.ts`: unknown outcomes and kinds dropped, Bloom levels normalised) and the lecturer applies or
       dismisses it into the open revision; saving, checking and adopting are unchanged. The sandbox Proposal screen
       (`draftWithAgent`, `requestAgentReview`) keeps its CS220 fixture for the demo.
-- [ ] **Atlas proposes mappings.** Skill → CLO mapping is all by hand today. The model proposes a mapping with a reason;
-      the lecturer confirms each one, the same way as quotations.
-- [ ] **Lens scan with a model.** `proposeMentions` uses a keyword list only. Add model-proposed quotations, still checked
-      word for word against the posting (`locateExcerpt`) before they can be confirmed.
+- [x] **Atlas proposes mappings** (`feat/atlas-lens-proposals`). "Suggest mappings" on Report → Map sends the quoted skills
+      with no mapping (count and one quotation each) and the outcomes by label; Atlas proposes the outcomes each belongs
+      to, or says it fits none (a gap). Applying records the mapping with stage and target unknown: those stay the
+      lecturer's (`src/lib/proposals.ts`).
+- [x] **Lens scan with a model** (`feat/atlas-lens-proposals`). "Find with Lens" on Report → Quote sends the 10
+      least-quoted postings, three to a call in parallel, with the skills already quoted from each. A proposal is kept only
+      if `locateExcerpt` finds it in its posting; the rest join the scan's list and are confirmed the same way. The
+      keyword scan stays.
 - [ ] **Prism drafts quiz items.** `src/lib/items.ts` uses templates. The model drafts stem, key and distractors per CLO
       and Bloom level; the existing lint and the lecturer's review stay the gate. Keep templates as the no-model fallback.
 - [ ] **Prism drafts slide content.** The slides use only saved text. The model drafts each session's slides from its

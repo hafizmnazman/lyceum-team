@@ -16,6 +16,8 @@ import { SOURCE_POLICIES, filterPostings } from "../lib/collect.ts";
 import { interpretLocally } from "./intakeLocal.ts";
 import type { OutlineProposal } from "../lib/outline.ts";
 import type { RevisionRequest, RevisionSuggestion } from "../lib/revision.ts";
+import type { MappingRequest, MappingSuggestion, QuoteRequest } from "../lib/proposals.ts";
+import type { MentionProposal } from "../lib/evidence.ts";
 
 const PARSE_TIMEOUT_MS = 20000;
 const AGENT_TIMEOUT_MS = 30000;
@@ -258,6 +260,21 @@ export async function fetchRevisionSuggestions(request: RevisionRequest): Promis
     return { ok: false, error: err instanceof Error && err.message === "timeout" ? "The model took too long. Try again." : "The local API is not reachable. Start it with npm run dev." };
   }
 }
+
+// ---------- Report: Lens's quotations and Atlas's mappings (src/lib/proposals.ts) ----------
+async function postProposals<T>(path: "quotes" | "mappings", request: unknown): Promise<{ ok: true; list: T[] } | { ok: false; error: string }> {
+  try {
+    const res = await withTimeout(fetch("/api/agent/" + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request) }), OUTLINE_TIMEOUT_MS);
+    const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    const list = body?.[path];
+    if (!res.ok || !Array.isArray(list)) return { ok: false, error: typeof body?.error === "string" ? body.error : "Nothing came back (HTTP " + res.status + ")." };
+    return { ok: true, list: list as T[] };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error && err.message === "timeout" ? "The model took too long. Try again." : "The local API is not reachable. Start it with npm run dev." };
+  }
+}
+export const fetchQuoteProposals = (request: QuoteRequest) => postProposals<MentionProposal>("quotes", request);
+export const fetchMappingSuggestions = (request: MappingRequest) => postProposals<MappingSuggestion>("mappings", request);
 
 // ---------- onboarding: read a course outline (server/outline.ts) ----------
 const OUTLINE_TIMEOUT_MS = 180000;

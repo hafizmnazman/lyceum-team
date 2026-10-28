@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PEOPLE_IDS } from "./data/seed.ts";
 import {
-  addEvidenceSource, addSkillMention, adoptCurriculumRevision, checkCurriculumRevision, createCourseWorkspace, currentGaps, currentSignal, evidenceReportForCourse,
+  addEvidenceSource, addProposals, addSkillMention, confirmProposals, adoptCurriculumRevision, checkCurriculumRevision, createCourseWorkspace, currentGaps, currentSignal, evidenceReportForCourse,
   exportWorkspaceBackup, getState, login, previewWorkspaceBackup, removeEvidenceSource, removeSkillMention, resetDemoState,
   restoreWorkspaceBackup, saveCurriculumRevision, setEvidenceSourceReviewed, setSkillMapping,
 } from "./app/store.ts";
@@ -10,7 +10,8 @@ import { evidenceMarkdown, evidenceReport, locateExcerpt, textFingerprint, wilso
 import { signalFromEvidence } from "./agents/signal.ts";
 import { runCurriculum } from "./agents/curriculum.ts";
 import { applySuggestion, readSuggestions, revisionRequest } from "./lib/revision.ts";
-import { suggestRevision } from "../server/llm.ts";
+import { proposeMappings, proposeQuotes, suggestRevision } from "../server/llm.ts";
+import { mappingRequest, quoteRequest, readMappings } from "./lib/proposals.ts";
 import { settingsFromEnv } from "./lib/agentSettings.ts";
 import { validateCourseDefinition } from "./lib/curriculum.ts";
 import type { CLO, CourseDefinition, CoverageStage, EvidenceSource, SkillMapping, SkillMention } from "./types.ts";
@@ -322,4 +323,62 @@ test("Quill: the revision request carries the gaps with a receipt; suggestions a
   assert.equal(validateCourseDefinition(next, "BUS205").filter((i) => i.severity === "error").every((i) => /hour|contact/i.test(i.message)), true,
     "the applied revision is checked by the course's own rules; only the hours budget can object");
   assert.equal(def.outcomes.find((c) => c.label === "CLO1")?.text, "Prepare and justify a cash-flow plan for a small business.", "the source definition is untouched");
+});
+
+test("Lens: a model quotation counts only if it is word for word in its posting; it joins the list to be confirmed", async () => {
+  prepareCourse();
+  const a = posting("Analyst A", "Firm A", POSTING), b = posting("Analyst B", "Firm B", "Graduate analyst. Strong SQL is essential. Python is a plus.");
+  quote(a, "Excel", "maintain Excel models");
+  const st = getState();
+  const request = quoteRequest(st.evidenceSources.filter((x) => x.subjectId === "BUS205"), st.skillMentions, ["SQL|structured query language"]);
+  assert.deepEqual(request.postings.map((p) => [p.id, p.quoted]), [[b, []], [a, ["Excel"]]], "least quoted first, with what is already quoted");
+  assert.deepEqual(request.skills, ["SQL"]);
+  const proposals = await proposeQuotes(settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "m" }), request, async (m) => {
+    assert.match(m[0].content ?? "", /You are Lens/);
+    return { content: JSON.stringify({ quotes: [
+      { posting: b, skill: "SQL", excerpt: "Strong SQL is essential.", requirement: "Required" },
+      { posting: b, skill: "Python", excerpt: "Python is a plus.", requirement: "preferred" },
+      { posting: b, skill: "SQL", excerpt: "Strong SQL is essential.", requirement: "required" },
+      { posting: b, skill: "Tableau", excerpt: "Tableau experience is essential.", requirement: "required" },
+      { posting: "nope", skill: "Go", excerpt: "Strong SQL is essential.", requirement: "required" },
+      { posting: a, skill: "excel", excerpt: "maintain Excel models", requirement: "required" },
+    ] }) };
+  });
+  assert.deepEqual(proposals.map((p) => [p.skill, p.requirement]), [["SQL", "required"], ["Python", "preferred"]],
+    "a paraphrase, a posting that was not sent, a repeat and a skill already quoted are dropped; levels normalised");
+  const many = { skills: [], postings: ["p1", "p2", "p3", "p4"].map((id) => ({ id, title: id, text: "SQL is required.", quoted: [] })) };
+  let calls = 0;
+  const batched = await proposeQuotes(settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "m" }), many, async (m) => {
+    calls++;
+    const ids = (JSON.parse(m[1].content!) as typeof many).postings.map((p) => p.id);
+    if (ids.includes("p4")) throw new Error("slow batch");
+    return { content: JSON.stringify({ quotes: ids.map((id) => ({ posting: id, skill: "SQL", excerpt: "SQL is required.", requirement: "required" })) }) };
+  });
+  assert.deepEqual([calls, batched.map((p) => p.sourceId)], [2, ["p1", "p2", "p3"]], "postings go three to a call; a failed batch is skipped");
+  assert.equal(addProposals("BUS205", proposals), 2);
+  assert.equal(addProposals("BUS205", proposals), 0, "already waiting");
+  assert.deepEqual(confirmProposals("BUS205", getState().scanProposals), { added: 2, skipped: 0 }, "confirmed through the same path as the scan");
+  assert.deepEqual(getState().skillMentions.filter((m) => m.sourceId === b).map((m) => m.excerpt), ["Strong SQL is essential.", "Python is a plus."], "recorded as quotations");
+});
+
+test("Atlas: mappings are proposed by outcome label for unmapped skills only; applying leaves the stage to the lecturer", async () => {
+  prepareCourse();
+  const a = posting();
+  quote(a, "Cash-flow forecasting", "prepare cash-flow forecasts for small business clients");
+  quote(a, "Power BI", "Experience with Power BI is preferred", "preferred");
+  setEvidenceSourceReviewed(a, true);
+  setSkillMapping("BUS205", { skill: "Power BI", cloIds: [], stage: "unknown", target: "unknown", evidence: "" });
+  const st = getState(), outcomes = st.clos.filter((c) => c.subjectId === "BUS205");
+  const request = mappingRequest("BUS205", evidenceReportForCourse("BUS205"), st.skillMentions, outcomes);
+  assert.deepEqual(request.skills.map((x) => x.skill), ["Cash-flow forecasting"], "a mapped skill is not sent");
+  assert.deepEqual(request.outcomes.map((o) => o.label), ["CLO1", "CLO2"]);
+  const out = await proposeMappings(settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "m" }), request, async () => ({ content: JSON.stringify({ mappings: [
+    { skill: "cash-flow forecasting", outcomes: ["CLO1", "CLO9", "CLO1"], reason: "CLO1 asks for a cash-flow plan." },
+    { skill: "Kubernetes", outcomes: ["CLO2"], reason: "never sent" },
+  ] }) }));
+  assert.deepEqual(out, [{ skill: "Cash-flow forecasting", outcomes: ["CLO1"], reason: "CLO1 asks for a cash-flow plan." }], "unknown skill and outcome dropped, names matched");
+  assert.deepEqual(readMappings({ mappings: [{ skill: "Cash-flow forecasting", outcomes: [], reason: "Fits no outcome." }] }, request)[0].outcomes, [], "fits nothing: said so");
+  assert.equal(setSkillMapping("BUS205", { skill: out[0].skill, cloIds: ["BUS205-outcome-1"], stage: "unknown", target: "unknown", evidence: "" }).ok, true);
+  const row = evidenceReportForCourse("BUS205").rows.find((r) => r.skill === "Cash-flow forecasting")!;
+  assert.deepEqual([row.mapping?.cloIds, row.stage, row.shortfall], [["BUS205-outcome-1"], "unknown", null], "mapped, not yet judged");
 });

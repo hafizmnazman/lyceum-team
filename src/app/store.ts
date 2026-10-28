@@ -2631,6 +2631,14 @@ export function scanForRequirements(subjectId: SubjectId): SaveResult & { count?
   set({ scanProposals: proposals, toast: proposals.length ? proposals.length + " quotations proposed. Confirm the ones you accept." : "No new sentence names those terms." });
   return { ok: true, count: proposals.length };
 }
+/** Lens's quotations, already checked against their postings, join the scan's list to be confirmed like any other. */
+export function addProposals(subjectId: SubjectId, proposals: MentionProposal[]): number {
+  const ours = new Set(state.evidenceSources.filter((s) => s.subjectId === subjectId).map((s) => s.id));
+  const have = new Set([...state.scanProposals, ...state.skillMentions].map((p) => p.sourceId + "\n" + skillKey(p.skill)));
+  const fresh = proposals.filter((p) => ours.has(p.sourceId) && !have.has(p.sourceId + "\n" + skillKey(p.skill)));
+  set((s) => ({ scanProposals: [...s.scanProposals, ...fresh] }));
+  return fresh.length;
+}
 export function confirmProposals(subjectId: SubjectId, proposals: MentionProposal[]): { added: number; skipped: number } {
   let added = 0, skipped = 0;
   const handled = new Set<string>();

@@ -10,14 +10,14 @@ import { currentPerson, openStep, selectReportTab, useStore } from "../../app/st
 import { Disclosure, EmptyState } from "../primitives/index.tsx";
 import { Handoff, SubRail } from "../primitives/loop.tsx";
 import { DenominatorReview, MeetingBriefPanel, QuoteProposals } from "./EvidenceResearch.tsx";
-import { ConfirmedQuotations, CountTable, CoverageLadder, DuplicateList, EvidenceExport, OutcomeGaps, QuoteByHand, ReviewList, SkillCards, courseReport } from "./EvidenceWorkspace.tsx";
+import { ConfirmedQuotations, CountTable, CoverageLadder, AtlasSuggestions, DuplicateList, EvidenceExport, OutcomeGaps, QuoteByHand, ReviewList, SkillCards, courseReport } from "./EvidenceWorkspace.tsx";
 import { StepFrame, courseContext, type StepHelper } from "./StepFrame.tsx";
 
 const HELPERS: Record<ReportTab, StepHelper> = {
-  quote: { who: "atlas", line: "Proposes the sentence that names each skill; you confirm every quotation against its source." },
+  quote: { who: "lens", line: "Proposes the sentence that names each skill, word for word from the posting; you confirm every quotation against its source." },
   review: { who: "lens", line: "Counts a posting only after you vouch that its extraction is complete." },
   count: { who: "lens", line: "Shows each count over the reviewed postings with its interval. It never scores." },
-  map: { who: "atlas", line: "Holds the thread between a skill and an outcome: what the course does today, and what it should reach." },
+  map: { who: "atlas", line: "Proposes which outcome each skill belongs to; you judge what the course does today, and what it should reach." },
   brief: { who: "steward", line: "Prepares the brief with every receipt and sends it to the people who decide." },
 };
 
@@ -63,6 +63,7 @@ export function ReportScreen() {
       {tab === "map" ? <section className="workspace-panel" aria-labelledby="coverage-ladder">
         <h3 id="coverage-ladder">What the course does about each skill</h3>
         <p className="muted">Your judgement of the course today and the target it should reach, with its evidence cited. Not a measured outcome.</p>
+        {mayEdit ? <AtlasSuggestions state={state} subject={subject} /> : null}
         <CoverageLadder {...props} focusSkill={focusSkill} />
         <div className="curriculum-object"><h4>The gap on each outcome</h4><OutcomeGaps state={state} subject={subject} /></div>
       </section> : null}

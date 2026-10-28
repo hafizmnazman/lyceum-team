@@ -14,10 +14,11 @@ import { serve, type HttpBindings } from "@hono/node-server";
 import { parseSheet } from "./parse/sheet.ts";
 import { parsePdf } from "./parse/pdf.ts";
 import { parseDocx, parsePptx } from "./parse/office.ts";
-import { agentModel, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
+import { agentModel, proposeMappings, proposeQuotes, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
 import { CollectError, collectBoard } from "./collect.ts";
 import { filterPostings } from "../src/lib/collect.ts";
-import { missingSettings, publicSettings } from "../src/lib/agentSettings.ts";
+import { missingSettings, publicSettings, type AgentSettings } from "../src/lib/agentSettings.ts";
+import type { MappingRequest, QuoteRequest } from "../src/lib/proposals.ts";
 import { ENV_PATH, liveDeps, loadAgentSettings, openAiChat, runAgentSearch, TOOLS } from "./agentSearch.ts";
 import { searchWeb } from "./webTools.ts";
 import { readOutline, MAX_OUTLINE_CHARS } from "./outline.ts";
@@ -157,6 +158,25 @@ app.post("/api/agent/revision", async (c) => {
     return c.json({ error: "The model could not suggest changes: " + (err instanceof Error ? err.message : String(err)).slice(0, 300) }, 502);
   }
 });
+
+// Lens's quotations and Atlas's mappings on Report (src/lib/proposals.ts): checked proposals out, nothing recorded.
+function proposalRoute<B>(path: string, valid: (body: B) => boolean, run: (s: AgentSettings, body: B) => Promise<unknown>) {
+  app.post("/api/agent/" + path, async (c) => {
+    let body: B;
+    try { body = await c.req.json(); } catch { return c.json({ error: "Send the request as JSON." }, 400); }
+    if (!valid(body)) return c.json({ error: "That request is missing what the agent reads." }, 400);
+    const { s, missing } = await agentModel();
+    if (missing.length) return c.json({ error: "This needs the model set up: add " + missing.join(", ") + " to .env (see Settings)." }, 400);
+    try {
+      return c.json({ [path]: await run(s, body) });
+    } catch (err) {
+      console.error(path + " proposals failed:", err);
+      return c.json({ error: "The model could not propose " + path + ": " + (err instanceof Error ? err.message : String(err)).slice(0, 300) }, 502);
+    }
+  });
+}
+proposalRoute<QuoteRequest>("quotes", (b) => Array.isArray(b?.postings), proposeQuotes);
+proposalRoute<MappingRequest>("mappings", (b) => Array.isArray(b?.skills) && Array.isArray(b?.outcomes), proposeMappings);
 
 // One agent run, streamed as lines of JSON: {type:"log"} as it works, then {type:"done"} with the postings or {type:"error"}.
 const AGENT_RUN_MS = 6 * 60 * 1000;
