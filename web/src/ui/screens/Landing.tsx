@@ -5,7 +5,8 @@
 // docs/claims.md; no synthetic figure appears, and the illustrative research
 // sandbox stays behind sign-in, labelled there.
 
-import { ArrowRight, BookOpen, CheckCircle2, Footprints, GraduationCap, Globe, MessagesSquare, Monitor, Play, Plug, Puzzle, ShieldCheck, Users } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { ArrowRight, BookOpen, CheckCircle2, Footprints, GraduationCap, Globe, MessagesSquare, Monitor, Play, Plug, Puzzle, Scale, ShieldCheck, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ACCREDITOR_MAPPING } from "../../../../shared/data/accreditors.ts";
 import { PAIN_STATS } from "../../../../shared/data/painStats.ts";
@@ -14,8 +15,8 @@ import { tourMinutes } from "../../demo/script.ts";
 import { navigate } from "../../app/store.ts";
 import { Button, Tag } from "../primitives/index.tsx";
 import { Mark } from "../mascots/mark.tsx";
-import { HOST_NAME } from "../mascots/index.tsx";
-import { LoopGraphic } from "./LoopGraphic.tsx";
+import { CAST, HOST_NAME, Mascot } from "../mascots/index.tsx";
+import { LoopGraphic, STATIONS } from "./LoopGraphic.tsx";
 
 /** The doors (plan Section 11.2): where a lecturer reaches the same core. The web workspace is built; the MCP
  *  server runs locally over an exported workspace (docs/doors.md); the skill folder is written; the rest are planned. */
@@ -29,15 +30,44 @@ export const DOORS: Array<{ name: string; how: string; icon: LucideIcon; status:
   { name: "The learning platform", how: "launched from the course page through LTI 1.3", icon: GraduationCap, status: "Planned" },
 ];
 
+/** What rises into place as it scrolls into view; a section's parts come in one after another. */
+const REVEAL = ".landing-section-head, .landing-section > h2, .stat-tile, .landing-note, .accreditor-list > li, .doors-strip > li, .proof-list > li, .who-grid > div, .landing-ways .button-row";
+
+/** A step's side of its card: the helpers who stand at that step on the hero's loop, so the faces match, then the step. */
+function AccreditorStep({ step, what }: { step: string; what: string }) {
+  const at = STATIONS.filter((s) => s.step === step);
+  const names = at.flatMap((s) => s.who === "people" ? [] : [CAST.find((c) => c.who === s.who)!.name]);
+  return <div className="accreditor-step">
+    <span className="accreditor-helper-figures" aria-hidden>{at.map((s) => s.who === "people"
+      ? <span key="people" className="loop-station-people"><Scale size={24} strokeWidth={1.75} /></span>
+      : <Mascot key={s.who} who={s.who} mood="resting" size={56} still />)}</span>
+    <strong>{step}</strong>
+    <span className="accreditor-what">{what}</span>
+    <span className="accreditor-helper-names">{names.length ? "with " + names.join(", ").replace(/, ([^,]+)$/, " and $1") : "decided by people"}</span>
+  </div>;
+}
+
 export function LandingScreen() {
-  return <div className="landing dot-grid">
+  const ref = useRef<HTMLDivElement>(null);
+  // Hidden only once this runs, so without script (or with reduced motion) everything is simply there
+  useEffect(() => {
+    const root = ref.current;
+    if (!root || matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
+    const items = [...root.querySelectorAll<HTMLElement>(REVEAL)];
+    for (const el of items) el.style.setProperty("--reveal-i", String(Math.min([...el.parentElement!.children].indexOf(el), 5)));
+    const io = new IntersectionObserver((entries) => { for (const e of entries) if (e.isIntersecting) { e.target.classList.add("is-in"); io.unobserve(e.target); } }, { rootMargin: "0px 0px -8% 0px" });
+    root.classList.add("is-revealing");
+    for (const el of items) io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return <div className="landing dot-grid" ref={ref}>
     <header className="landing-bar on-forest"><span className="wordmark"><Mark size={32} tone="white" leaf />Lyceum</span>
       <div className="button-row"><Button variant="ghost" data-demo-id="index-judge" onClick={() => navigate("judge")}><Footprints size={14} /> For judges: walk with {HOST_NAME}</Button><Button variant="ghost" onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={14} /> Watch the tour</Button><Button variant="lime" data-demo-id="index-signin" onClick={() => navigate("login")}>Try it as a lecturer <ArrowRight size={15} /></Button></div></header>
     <section className="landing-hero">
       <div className="landing-hero-card card-forest on-forest">
         <div>
           <p className="eyebrow">A lecturer's course workspace</p>
-          <h1>Course decisions, with receipts.</h1>
+          <h1><span>Course decisions,</span> <span>with receipts.</span></h1>
           <p className="landing-lead">Lyceum turns real job postings into a course decision with receipts, every semester. Watch what employers ask for, report it with every quotation, decide with a reason on record, update the course, teach it, and see what came back. Nothing changes a course without you.</p>
           <div className="button-row"><Button variant="lime" onClick={() => navigate("login")}>Try it as a lecturer <ArrowRight size={15} /></Button><Button variant="ghost" onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}><Play size={14} /> Watch the tour, about {tourMinutes()} minutes</Button>
             <Button variant="ghost" data-demo-id="index-judge-hero" onClick={() => navigate("judge")}><Footprints size={14} /> For judges: walk with {HOST_NAME}</Button></div>
@@ -47,8 +77,7 @@ export function LandingScreen() {
     </section>
 
     <section className="landing-section" aria-labelledby="pain-title">
-      <h2 id="pain-title">The evidence moves faster than the course</h2>
-      <p className="landing-lead">Employers expect skills to keep shifting through 2030, while a new degree programme can take a year or more to approve. The problem at three levels, one comparison each.</p>
+      <div className="landing-section-head"><h2 id="pain-title">The evidence moves faster than the course</h2><p className="landing-lead">Employers expect skills to keep shifting through 2030, while a new degree programme can take a year or more to approve. The problem at three levels, one comparison each.</p></div>
       <div className="stat-grid level-grid">{PAIN_STATS.map((s) => <div className="stat-tile level-tile" key={s.claim} data-demo-id={"level-" + s.scope.toLowerCase()}>
         <Tag>{s.scope}</Tag>
         <span className="stat-value">{s.value}</span>
@@ -59,10 +88,9 @@ export function LandingScreen() {
     </section>
 
     <section className="landing-section" aria-labelledby="accreditors-title">
-      <h2 id="accreditors-title">Each step answers what reviewers already look for</h2>
-      <p className="landing-lead">Accreditors and quality codes already ask for stakeholder evidence, documented decisions and programme review, and constructive alignment is the teaching principle behind Teach; the evidence is what is missing.</p>
+      <div className="landing-section-head"><h2 id="accreditors-title">Each step answers what reviewers already look for</h2><p className="landing-lead">Accreditors and quality codes already ask for stakeholder evidence, documented decisions and programme review, and constructive alignment is the teaching principle behind Teach; the evidence is what is missing.</p></div>
       <ol className="accreditor-list">{ACCREDITOR_MAPPING.map((m) => <li key={m.step}>
-        <div className="accreditor-step"><strong>{m.step}</strong><span className="muted">{m.what}</span></div>
+        <AccreditorStep step={m.step} what={m.what} />
         <div className="accreditor-clauses">{m.clauses.map((c) => <blockquote key={c.body} className="accreditor-clause">
           <p>{c.paraphrase ? c.quote : "“" + c.quote + "”"}</p>
           <footer><a href={c.url} target="_blank" rel="noreferrer">{c.body}</a>{c.paraphrase ? <span className="muted"> · paraphrased from a secondary source</span> : null}</footer>
@@ -71,8 +99,7 @@ export function LandingScreen() {
     </section>
 
     <section className="landing-section" aria-labelledby="doors-title">
-      <h2 id="doors-title">One core, many doors</h2>
-      <p className="landing-lead">The same deterministic core, reached from the tools lecturers already use. Today it is the web workspace and a local, read-only door for an assistant; the other doors are planned.</p>
+      <div className="landing-section-head"><h2 id="doors-title">One core, many doors</h2><p className="landing-lead">The same deterministic core, reached from the tools lecturers already use. Today it is the web workspace and a local, read-only door for an assistant; the other doors are planned.</p></div>
       <ul className="doors-strip">{DOORS.map((d) => { const Icon = d.icon; return <li key={d.name} className={d.status === "Planned" ? "" : "is-built"}>
         <Icon size={24} strokeWidth={1.75} aria-hidden />
         <strong>{d.name}</strong><span className="muted">{d.how}</span>

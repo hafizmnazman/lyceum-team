@@ -1328,7 +1328,10 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .stat-value { font-family: var(--font-display); font-size: 36px; line-height: 1.05; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 14px; color: var(--ink-2); line-height: 1.45; }
 .stat-source { font-size: 13px; }
-.landing { min-height: 100%; overflow-y: auto; }
+/* One frame for the whole landing page: every band pads in to the same column, up to --landing-max, so the margins
+   match at every width and wide screens get a wider page rather than wider gutters. */
+.landing { --landing-max: 1600px; --landing-gutter: clamp(16px, 4vw, 64px); --landing-pad: max(var(--landing-gutter), calc((100% - var(--landing-max)) / 2)); min-height: 100%; overflow-y: auto; scrollbar-width: none; }
+.landing::-webkit-scrollbar { display: none; } /* scrolls by wheel, touch and keys; no bar eating into the right margin */
 .landing > * {
   animation: popIn 420ms var(--ease-out) both;
 }
@@ -1337,24 +1340,34 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .landing > :nth-child(4) { animation-delay: 190ms; }
 .landing > :nth-child(5) { animation-delay: 250ms; }
 .landing > :nth-child(6) { animation-delay: 310ms; }
-.landing-bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px; background: var(--forest); }
+.landing-bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px var(--landing-pad); background: var(--forest); }
 .landing-bar .wordmark { font-size: 28px; }
-.landing-hero { max-width: var(--content-max); margin: 32px auto 0; padding: 0 24px; }
-.landing-hero-card { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: center; padding: 48px; }
-.landing-hero h1 { font-family: var(--font-display); font-size: clamp(36px, 5vw, 64px); line-height: var(--leading-display); margin: 0 0 16px; font-weight: 800; letter-spacing: -0.03em; color: var(--white); }
-.landing-lead { font-size: 16px; line-height: 1.6; color: var(--ink-2); max-width: 620px; margin: 0 0 18px; }
+.landing-hero { margin: clamp(24px, 3vw, 48px) 0 0; padding: 0 var(--landing-pad); }
+.landing-hero-card { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: clamp(32px, 4vw, 72px); align-items: center; padding: clamp(32px, 4.5vw, 80px); }
+.landing-hero h1 { font-family: var(--font-display); font-size: clamp(32px, 4.6vw, 96px); line-height: var(--leading-display); margin: 0 0 clamp(16px, 1.6vw, 28px); font-weight: 800; letter-spacing: -0.03em; color: var(--white); text-wrap: balance; }
+.landing-hero-loop .loop-graphic.is-compact { max-width: 560px; }
+.landing-lead { font-size: 17px; line-height: 1.6; color: var(--ink-2); max-width: 64ch; margin: 0 0 18px; text-wrap: pretty; }
 .on-forest .landing-lead { color: var(--on-forest); font-size: 18px; }
-.landing-section { max-width: var(--content-max); margin: 0 auto; padding: 40px 24px; }
-.landing-section + .landing-section { border-top: 1px solid var(--border); }
-.landing-section h2 { font-family: var(--font-display); font-size: 36px; font-weight: 600; margin: 0 0 12px; line-height: 1.15; letter-spacing: -0.02em; }
-.proof-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
-.proof-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.5; color: var(--ink); }
+.landing-section { padding: clamp(48px, 6vw, 112px) var(--landing-pad) 0; }
+.landing-section h2 { font-family: var(--font-display); font-size: clamp(28px, 1.6vw + 18px, 48px); font-weight: 600; margin: 0 0 12px; line-height: 1.1; letter-spacing: -0.02em; text-wrap: balance; }
+/* Wide, a section's heading and its lead sit side by side instead of the lead leaving the right half empty */
+@media (min-width: 1100px) {
+  .landing-section-head { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(32px, 4vw, 96px); align-items: end; margin-bottom: 28px; }
+  .landing-section-head h2, .landing-section-head .landing-lead { margin: 0; }
+  .landing-hero h1 span { white-space: nowrap; }
+  .accreditor-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accreditor-list > li:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .proof-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+}
+.proof-list { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; }
+.proof-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 16px; line-height: 1.5; color: var(--ink); }
 .proof-list li svg { flex-shrink: 0; margin-top: 3px; color: var(--emerald-text); }
 .proof-list li:last-child svg { color: var(--warn); }
 .who-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
 .who-grid div { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
-.who-grid p { margin: 6px 0 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
-.landing-footer { max-width: var(--content-max); margin: 0 auto; padding: 24px; border-top: 1px solid var(--border); font-size: 13px; color: var(--ink-2); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.who-grid p { margin: 6px 0 0; font-size: 16px; color: var(--ink-2); line-height: 1.5; }
+.landing .stat-label { font-size: 16px; }
+.landing-footer { margin: clamp(48px, 6vw, 112px) 0 0; padding: 24px var(--landing-pad); background: var(--tint-1); font-size: 13px; color: var(--ink-2); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .landing-note { font-size: 14px; color: var(--ink-2); max-width: 760px; line-height: 1.55; margin: 14px 0 0; }
 
 /* ---------- the sign-in screen: forest-deep backdrop, every line of text on a card ---------- */
@@ -1390,8 +1403,7 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 @media (max-width: 600px) {
   .bar-list-row { grid-template-columns: 1fr; gap: 4px; }
   .journey-steps li:not(:last-child)::after { width: 8px; }
-  .landing-bar { padding: 10px 16px; }
-  .landing-hero, .landing-section, .landing-footer { padding-left: 16px; padding-right: 16px; }
+  .landing-bar { padding-top: 10px; padding-bottom: 10px; }
   .landing-hero-card { padding: 24px 20px; }
   .signin { padding: 16px; }
   .signin-brand { padding: 24px; }
@@ -1624,14 +1636,28 @@ button.loop-station-button:hover { background: var(--tint-1); }
 .level-tile .stat-value { font-size: 48px; }
 .stat-sources { font-size: 13px; line-height: 1.5; }
 .accreditor-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
-.accreditor-list > li { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
-.accreditor-step { display: grid; gap: 2px; align-content: start; }
-.accreditor-step strong { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
-.accreditor-clauses { display: grid; gap: 10px; }
+.accreditor-list > li { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 24px; padding: 24px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
+.accreditor-step { display: grid; gap: 4px; align-content: start; justify-items: start; }
+.accreditor-step strong { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.accreditor-what { font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+.accreditor-helper-figures { display: flex; align-items: flex-end; gap: 4px; min-height: 56px; margin-bottom: 8px; }
+.accreditor-helper-figures .loop-station-people { width: 48px; height: 48px; margin: 4px; }
+.accreditor-helper-names { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--emerald-text); }
+/* The scroll reveal (Landing.tsx): parts rise in slowly, one after another, the first time they come into view. An
+   animation rather than a transition, with no fill after it ends, so the cards' own hover transition stays theirs. */
+.landing.is-revealing :is(.landing-section-head, .landing-section > h2, .stat-tile, .landing-note, .accreditor-list > li, .doors-strip > li, .proof-list > li, .who-grid > div, .landing-ways .button-row) { opacity: 0; }
+.landing.is-revealing :is(.landing-section-head, .landing-section > h2, .stat-tile, .landing-note, .accreditor-list > li, .doors-strip > li, .proof-list > li, .who-grid > div, .landing-ways .button-row).is-in { opacity: 1; animation: landingReveal 1100ms var(--ease-out) calc(var(--reveal-i, 0) * 110ms) backwards; }
+@keyframes landingReveal { from { opacity: 0; translate: 0 32px; } }
+/* The landing's cards lift a little under the pointer, their offset shadow deepening as they rise */
+.landing :is(.stat-tile, .accreditor-list > li, .who-grid > div, .doors-strip > li.is-built) { transition: translate 200ms var(--ease-out), box-shadow 200ms var(--ease-out); }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .landing :is(.stat-tile, .accreditor-list > li, .who-grid > div, .doors-strip > li.is-built):hover { translate: 0 -3px; box-shadow: 0 7px 0 var(--forest); }
+}
+.accreditor-clauses { display: grid; gap: 18px; align-content: start; } /* top-aligned: each bar is as tall as its quote */
 .accreditor-clause { margin: 0; padding: 2px 0 2px 14px; border-left: 3px solid var(--emerald); }
-.accreditor-clause p { margin: 0 0 4px; font-size: 15px; line-height: 1.55; color: var(--ink); }
+.accreditor-clause p { margin: 0 0 6px; font-size: 16px; line-height: 1.55; color: var(--ink); }
 .accreditor-clause footer { font-size: 13px; }
-.doors-strip { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.doors-strip { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
 .doors-strip li { display: grid; gap: 4px; align-content: start; justify-items: start; padding: 14px; border: 1px dashed var(--next-dashed); border-radius: var(--radius-card); background: var(--white); color: var(--ink-2); }
 .doors-strip li strong { color: var(--ink); font-size: 14px; }
 .doors-strip li span { font-size: 13px; line-height: 1.4; }
