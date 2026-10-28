@@ -31,7 +31,7 @@ const INTAKE_TOOL: ToolSpec = { type: "function", function: {
           properties: {
             cloId: { type: "string" },
             meanScore: { type: "number", description: "0..1; divide percentages by 100" },
-            sd: { type: "number" },
+            sd: { type: "number", description: "0..1, the same scale as meanScore; divide percentages by 100" },
             n: { type: "number" },
           },
           required: ["cloId", "meanScore", "sd", "n"],
@@ -58,7 +58,7 @@ export async function runIntakeLLM(s: AgentSettings, payload: {
     { role: "system", content:
       "You are the Intake agent of Lyceum, a university curriculum platform. A lecturer dropped a file; " +
       "you classify it and map its content onto the known curriculum. Be conservative: if the subject or " +
-      "term is not evident, leave the guess out and say so in notes. meanScore is always 0..1. " +
+      "term is not evident, leave the guess out and say so in notes. meanScore and sd are always 0..1, on the same scale. " +
       "Only use subject codes and CLO ids that appear in the provided curriculum." },
     { role: "user", content:
           `The curriculum:\nSubjects: ${JSON.stringify(payload.subjects)}\nCLOs: ${JSON.stringify(payload.clos)}\n\n` +
