@@ -3,16 +3,41 @@
 // numbered files in server/migrations/: each runs once, in order, in a transaction, recorded in schema_migrations, under
 // an advisory lock so two servers starting together do not run one twice. npm run db:migrate applies them by hand.
 
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 
-export const DATABASE_URL = process.env.DATABASE_URL || "postgres://lyceum:lyceum@localhost:5432/lyceum";
-export const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "migrations");
+export const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:postgres@127.0.0.1:54322/postgres"; // the Supabase CLI's local database
+/** Supabase's public CA certificate (Project Settings > Database > SSL Configuration > Download certificate), committed at
+ *  supabase/ca.crt so Node can verify the cloud database. Not a secret. */
+export const CA_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "supabase",
+  "ca.crt",
+);
+/** TLS for a database on another machine, verified against Supabase's certificate; none for one on this computer. */
+export function sslFor(url: string): pg.PoolConfig["ssl"] {
+  if (/@(127\.0\.0\.1|localhost|\[::1\])[:/]/.test(url)) return undefined;
+  if (!existsSync(CA_PATH))
+    throw new Error(
+      "DATABASE_URL points at a remote database but supabase/ca.crt is missing. Download it from Supabase: Project Settings, Database, SSL Configuration.",
+    );
+  return { ca: readFileSync(CA_PATH, "utf8") };
+}
+export const MIGRATIONS_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "migrations",
+);
 
 export interface Db {
-  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[]; count: number }>;
+  query<T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+  ): Promise<{ rows: T[]; count: number }>;
   /** Several statements at once, no parameters: a migration file. */
   exec(sql: string): Promise<void>;
   /** Run fn inside one transaction: committed when it returns, rolled back when it throws. Inside it, tx runs on the same one. */
@@ -20,8 +45,15 @@ export interface Db {
   close(): Promise<void>;
 }
 
-type Result = { rows: unknown[]; rowCount?: number | null; affectedRows?: number };
-type Queryable = { query: (sql: string, params?: unknown[]) => Promise<Result>; exec?: (sql: string) => Promise<unknown> };
+type Result = {
+  rows: unknown[];
+  rowCount?: number | null;
+  affectedRows?: number;
+};
+type Queryable = {
+  query: (sql: string, params?: unknown[]) => Promise<Result>;
+  exec?: (sql: string) => Promise<unknown>;
+};
 /** One connection (or a transaction on one) as a Db; within it a nested tx simply joins it. */
 function onConnection(q: Queryable): Db {
   const db: Db = {
@@ -30,7 +62,10 @@ function onConnection(q: Queryable): Db {
       return { rows: r.rows as T[], count: r.rowCount ?? r.affectedRows ?? 0 };
     },
     // pg runs a parameterless query as a simple query, which takes several statements; PGlite has exec for that.
-    async exec(sql) { if (q.exec) await q.exec(sql); else await q.query(sql); },
+    async exec(sql) {
+      if (q.exec) await q.exec(sql);
+      else await q.query(sql);
+    },
     tx: (fn) => fn(db),
     close: async () => undefined,
   };
@@ -39,7 +74,13 @@ function onConnection(q: Queryable): Db {
 
 /** A pool on a Postgres server. */
 export function postgresDb(url = DATABASE_URL): Db {
-  const pool = new pg.Pool({ connectionString: url, max: 10, connectionTimeoutMillis: 5000 });
+  // Five connections: plenty for one API process, and gentle on the free plan's pooler. Leave ?sslmode= out of the URL.
+  const pool = new pg.Pool({
+    connectionString: url,
+    max: 5,
+    connectionTimeoutMillis: 5000,
+    ssl: sslFor(url),
+  });
   pool.on("error", (err) => console.error("postgres pool:", err.message)); // an idle client dropped by the server
   const onPool = onConnection(pool);
   return {
@@ -70,25 +111,39 @@ export async function memoryDb(): Promise<Db> {
   const base = onConnection(lite as unknown as Queryable);
   return {
     ...base,
-    tx: (fn) => lite.transaction((t) => fn(onConnection(t as unknown as Queryable))),
+    tx: (fn) =>
+      lite.transaction((t) => fn(onConnection(t as unknown as Queryable))),
     close: () => lite.close(),
   };
 }
 
 /** Apply every migration not yet recorded, in file order. Returns the ones applied now. */
 export async function migrate(db: Db, dir = MIGRATIONS_DIR): Promise<string[]> {
-  await db.query("CREATE TABLE IF NOT EXISTS schema_migrations (id text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())");
-  const files = readdirSync(dir).filter((f) => /^\d{3}_[\w-]+\.sql$/.test(f)).sort();
+  await db.query(
+    "CREATE TABLE IF NOT EXISTS schema_migrations (id text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())",
+  );
+  const files = readdirSync(dir)
+    .filter((f) => /^\d{3}_[\w-]+\.sql$/.test(f))
+    .sort();
   const applied: string[] = [];
   for (const file of files) {
     const id = file.replace(/\.sql$/, "");
     await db.tx(async (t) => {
       await t.query("SELECT pg_advisory_xact_lock(7203913)"); // Lyceum's migrations, one runner at a time
-      if ((await t.query("SELECT 1 FROM schema_migrations WHERE id = $1", [id])).rows.length) return;
+      if (
+        (await t.query("SELECT 1 FROM schema_migrations WHERE id = $1", [id]))
+          .rows.length
+      )
+        return;
       try {
         await t.exec(readFileSync(join(dir, file), "utf8"));
       } catch (err) {
-        throw new Error("Migration " + file + " failed and was rolled back: " + (err instanceof Error ? err.message : String(err)));
+        throw new Error(
+          "Migration " +
+            file +
+            " failed and was rolled back: " +
+            (err instanceof Error ? err.message : String(err)),
+        );
       }
       await t.query("INSERT INTO schema_migrations (id) VALUES ($1)", [id]);
       applied.push(id);
