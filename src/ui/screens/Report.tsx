@@ -64,8 +64,7 @@ export function ReportScreen() {
         <h3 id="coverage-ladder">What the course does about each skill</h3>
         <p className="muted">Your judgement of the course today and the target it should reach, with its evidence cited. Not a measured outcome.</p>
         <CoverageLadder {...props} focusSkill={focusSkill} />
-        <h4>The gap on each outcome</h4>
-        <OutcomeGaps state={state} subject={subject} />
+        <div className="curriculum-object"><h4>The gap on each outcome</h4><OutcomeGaps state={state} subject={subject} /></div>
       </section> : null}
       {tab === "brief" ? <MeetingBriefPanel {...props} /> : null}
     </div>

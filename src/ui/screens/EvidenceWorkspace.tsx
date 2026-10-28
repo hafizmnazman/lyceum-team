@@ -252,7 +252,7 @@ export function OutcomeGaps({ state, subject }: { state: AppState; subject: Subj
       <thead><tr><th scope="col">Outcome</th><th scope="col">Most-asked skill</th><th scope="col">Demand</th><th scope="col">Coverage</th><th scope="col">Gap</th></tr></thead>
       <tbody>{outcomes.map((o) => <tr key={o.cloId}>
         <th scope="row">{label(o.cloId)}</th><td>{o.skill}</td>
-        <td className="tabular">{pct(o.demand)} · {o.postings} of {o.eligible}</td>
+        <td className="tabular" style={{ whiteSpace: "nowrap" }}>{pct(o.demand)} · {o.postings} of {o.eligible}</td>
         <td className="tabular">{o.coverage === null ? "Set a stage and target" : pct(o.coverage)}</td>
         <td className="tabular">{o.gap === null ? "Unknown" : o.gap.toFixed(2)}</td>
       </tr>)}</tbody>
