@@ -85,20 +85,28 @@ export function itemRequest(definition: CourseDefinition | null, session: Teachi
 const stemText = z.string().trim().min(10).max(2000);
 const ModelItem = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("multichoice"), outcome: z.string(), bloom: z.unknown(), stem: stemText,
-    options: z.array(z.object({ text: z.string().trim().min(1).max(500), correct: z.boolean(), feedback: z.string().max(500).catch("") })).min(3).max(4) }),
+    options: z.array(z.object({ text: z.string().trim().min(1).max(500), correct: z.boolean(), feedback: z.string().max(500).catch("") })).min(2).max(6) }), // the lint flags a count off three or four
   z.object({ kind: z.literal("shortanswer"), outcome: z.string(), bloom: z.unknown(), stem: stemText, answers: z.array(z.string().trim().min(1).max(100)).min(1).max(10) }),
   z.object({ kind: z.literal("essay"), outcome: z.string(), bloom: z.unknown(), stem: stemText, graderInfo: z.string().trim().min(10).max(4000) }),
 ]);
+/** "multiple_choice", "Multiple choice", "MCQ" and the like, as the kinds the reader knows; anything else as it was. */
+function itemKind(kind: unknown): unknown {
+  if (typeof kind !== "string") return kind;
+  const k = kind.toLowerCase().replace(/[^a-z]/g, "");
+  return k === "multichoice" || k === "multiplechoice" || k === "mcq" ? "multichoice" : k === "shortanswer" ? "shortanswer" : k === "essay" ? "essay" : kind;
+}
 const MARKS: Record<DraftItem["kind"], number> = { multichoice: 1, shortanswer: 1, essay: 5 };
 /** Check what the model returned: an item for an outcome it was not given, a multiple-choice item without exactly one key,
  *  or anything malformed is dropped. Every item comes back unreviewed and still goes through the lint and a person's review. */
 export function readModelItems(raw: unknown, request: ItemRequest, nextId: () => string): DraftItem[] {
   const list = raw && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items) ? (raw as { items: unknown[] }).items : [];
-  const byLabel = new Map(request.outcomes.map((o) => [o.label, o.id]));
+  // Models name an outcome by its label or its id, and a kind in their own spelling; both are read, nothing else is guessed.
+  const key = (v: string) => v.trim().toLowerCase();
+  const outcome = new Map(request.outcomes.flatMap((o) => [[key(o.label), o.id], [key(o.id), o.id]]));
   const out: DraftItem[] = [];
   for (const entry of list.slice(0, 12)) {
-    const item = ModelItem.safeParse(entry);
-    const cloId = item.success ? byLabel.get(item.data.outcome) : undefined;
+    const item = ModelItem.safeParse(entry && typeof entry === "object" ? { ...entry, kind: itemKind((entry as { kind?: unknown }).kind) } : entry);
+    const cloId = item.success ? outcome.get(key(item.data.outcome)) : undefined;
     if (!item.success || !cloId) continue;
     const base = { id: nextId(), cloId, bloomLevel: bloomOf(item.data.bloom), stem: item.data.stem, marks: MARKS[item.data.kind], source: "model" as const, reviewedBy: null, reviewedAt: null };
     if (item.data.kind === "multichoice") {

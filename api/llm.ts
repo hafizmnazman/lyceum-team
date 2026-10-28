@@ -187,7 +187,15 @@ export async function draftModelItems(s: AgentSettings, request: ItemRequest, ch
   const ask = (content: string) => chat([{ role: "system", content: ITEM_PROMPT }, { role: "user", content: content.slice(0, 24000) }], []);
   let n = 0;
   const nextId = () => "MODEL-" + ++n;
-  const items = readModelItems(jsonFromReply((await ask(JSON.stringify(request))).content ?? ""), request, nextId);
+  // A reply with no item the reader can use (no JSON, the wrong shape, every item malformed) is asked for once more; a second
+  // such reply is an error the lecturer sees, never an empty list that looks like "nothing to suggest".
+  const draft = async () => {
+    const reply = (await ask(JSON.stringify(request))).content ?? ""; // a timeout or a refused call is its own error, not retried here
+    try { return readModelItems(jsonFromReply(reply), request, nextId); } catch { return []; }
+  };
+  let items = await draft();
+  if (!items.length) items = await draft();
+  if (!items.length) throw new Error("its answer had no quiz item Lyceum could read, twice. Try again, or a model that follows JSON instructions more closely");
   const failing = items.map((item) => ({ item, broken: lintItem(item, request.misconceptions).filter((c) => !c.ok) })).filter((f) => f.broken.length);
   if (!failing.length) return items;
   const label = new Map(request.outcomes.map((o) => [o.id, o.label]));

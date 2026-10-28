@@ -264,9 +264,12 @@ export async function fetchRevisionSuggestions(request: RevisionRequest): Promis
 }
 
 // ---------- Report: Lens's quotations and Atlas's mappings (shared/lib/proposals.ts) ----------
+const OUTLINE_TIMEOUT_MS = 180000;
+// Prism's items can take three model calls (a draft, one more if it was unreadable, a repair), each allowed two minutes.
+const PROPOSAL_TIMEOUT_MS = { quotes: OUTLINE_TIMEOUT_MS, mappings: OUTLINE_TIMEOUT_MS, items: 3 * 120000 + 30000, slides: OUTLINE_TIMEOUT_MS };
 async function postProposals<T>(path: "quotes" | "mappings" | "items" | "slides", request: unknown): Promise<{ ok: true; list: T[] } | { ok: false; error: string }> {
   try {
-    const res = await withTimeout(fetch("/api/agent/" + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request) }), OUTLINE_TIMEOUT_MS);
+    const res = await withTimeout(fetch("/api/agent/" + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request) }), PROPOSAL_TIMEOUT_MS[path]);
     const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
     const list = body?.[path];
     if (!res.ok || !Array.isArray(list)) return { ok: false, error: typeof body?.error === "string" ? body.error : "Nothing came back (HTTP " + res.status + ")." };
@@ -287,7 +290,6 @@ export type WatchAnswer = { schedule?: WatchSchedule | null; runs?: WatchRun[]; 
 // The calls themselves are in web/src/app/watch.ts: they carry the browser's Supabase token.
 
 // ---------- onboarding: read a course outline (api/outline.ts) ----------
-const OUTLINE_TIMEOUT_MS = 180000;
 /** Parse the lecturer's outline on the local API, then ask the model in .env what it states. The proposal is reviewed before anything saves. */
 export async function readOutlineFile(file: File): Promise<{ ok: true; outline: OutlineProposal; truncated: boolean } | { ok: false; error: string }> {
   const parsed = await parseFile(file);

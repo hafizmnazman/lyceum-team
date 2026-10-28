@@ -221,3 +221,27 @@ test("Prism repairs once: an item the lint fails goes back with its broken rules
   await draftModelItems(s, request, async () => { calls++; return { content: JSON.stringify({ items: [essay] }) }; });
   assert.equal(calls, 1, "nothing failing, no repair call");
 });
+
+test("Prism reads what models really send, and an unreadable answer is an error, never an empty list", async () => {
+  const request = { topic: "Classifiers", outcomes: [{ id: "CS310-CLO2", label: "CLO2", text: "Evaluate classifiers", bloom: "Evaluate" as const }], misconceptions: [] };
+  const s = settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "m" });
+  const options = (n: number) => Array.from({ length: n }, (_, i) => ({ text: "Option " + (i + 1), correct: i === 0 }));
+  const good = { items: [
+    { kind: "Multiple choice", outcome: "cs310-clo2", bloom: "Evaluate", stem: "Which metric suits a heavily imbalanced test set?", options: options(5) },
+    { kind: "short_answer", outcome: " clo2 ", bloom: "Remember", stem: "Name a metric for imbalanced classes.", answers: ["F1"] },
+    { kind: "MCQ", outcome: "CLO9", bloom: "Apply", stem: "An outcome the session does not teach at all.", options: options(4) },
+  ] };
+  let calls = 0;
+  const read = await draftModelItems(s, request, async () => (++calls === 1 ? { content: "Here are your items: " + JSON.stringify(good) } : { content: JSON.stringify({ items: [] }) }));
+  assert.deepEqual(read.map((i) => [i.kind, i.cloId]), [["multichoice", "CS310-CLO2"], ["shortanswer", "CS310-CLO2"]], "an outcome by id or label, any case; a kind in another spelling; an unknown outcome still dropped");
+  assert.equal(failing(read[0]).includes(RULES.options), true, "five options are kept for the lint to flag, not silently dropped");
+  calls = 0;
+  const second = await draftModelItems(s, request, async () => (++calls === 1 ? { content: "Sorry, I cannot help." } : { content: JSON.stringify({ items: [good.items[1]] }) }));
+  assert.deepEqual([calls, second.length], [2, 1], "an unreadable first answer is asked for once more");
+  calls = 0;
+  await assert.rejects(draftModelItems(s, request, async () => { calls++; return { content: JSON.stringify({ items: [{ kind: "quiz" }] }) }; }), /no quiz item Lyceum could read/);
+  assert.equal(calls, 2, "two unreadable answers are an error");
+  calls = 0;
+  await assert.rejects(draftModelItems(s, request, async () => { calls++; throw new Error("timeout"); }), /timeout/);
+  assert.equal(calls, 1, "a call that failed is not retried as if it were unreadable");
+});

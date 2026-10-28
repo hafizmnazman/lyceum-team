@@ -20,5 +20,5 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["web", "api", "shared", "mcp", "tests"]
+  "include": ["web", "api", "shared", "mcp", "tests", "scripts"]
 }
