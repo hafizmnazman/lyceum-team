@@ -8,6 +8,7 @@
 // { fallback: true } or an error status and the client falls back to its
 // deterministic local path.
 
+import "./env.ts"; // first: loads api/.env before any other module reads its settings
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve, type HttpBindings } from "@hono/node-server";
@@ -25,17 +26,10 @@ import type { SlideRequest } from "../shared/lib/slides.ts";
 import { ENV_PATH, liveDeps, loadAgentSettings, openAiChat, runAgentSearch, TOOLS } from "./agentSearch.ts";
 import { searchWeb } from "./webTools.ts";
 import { readOutline, MAX_OUTLINE_CHARS } from "./outline.ts";
-import { AuthStore, authRoutes } from "./auth.ts";
+import { AccountStore, accountRoutes, requireUser, supabaseDeps } from "./account.ts";
 import { DATABASE_URL, postgresDb } from "./db.ts";
 import { createHash } from "node:crypto";
 import { networkInterfaces } from "node:os";
-
-// Load api/.env when present (Node 21.7+). Absent file is fine.
-try {
-  process.loadEnvFile?.(ENV_PATH);
-} catch {
-  // no .env: fixture mode
-}
 
 const app = new Hono();
 
@@ -52,19 +46,24 @@ app.use("/api/*", async (c, next) => {
 });
 app.use("/api/*", cors());
 
-// Accounts (email and password, and Google when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set), sessions and each
-// account's workspace (api/auth.ts), in PostgreSQL at DATABASE_URL (api/db.ts; npm run db:up starts one). The store
-// opens on first use; while the database is down the account routes answer 503 and everything else still works.
-const database = postgresDb(DATABASE_URL); // one pool; it connects when first asked and again after Postgres restarts
-let opening: Promise<AuthStore> | null = null;
-const getStore = () => (opening ??= AuthStore.open(database).catch((err) => { opening = null; throw err; }));
+// Accounts: Supabase Auth signs people in (email and password, or Google) and issues the token each request carries;
+// api/account.ts checks it and keeps each account's profile and workspace in the Supabase database at DATABASE_URL.
+const database = postgresDb(DATABASE_URL); // one pool; it connects when first asked and again after the database restarts
+const authDeps = supabaseDeps();
+const accounts = new AccountStore(database, authDeps);
+accountRoutes(app, accounts, authDeps);
+// Online, the model, search, settings and parse routes spend money or CPU, so LYCEUM_REQUIRE_SIGN_IN=1 limits them to
+// signed-in people. Off by default: on a laptop the loopback guard above already protects them, and the demo's people
+// (who have no Supabase account) still use them. Registered before those routes, as Hono runs handlers in order.
+if (process.env.LYCEUM_REQUIRE_SIGN_IN === "1")
+  for (const path of ["/api/agent/*", "/api/agent-search", "/api/agent-settings", "/api/agent-settings/*", "/api/parse"]) app.use(path, requireUser(authDeps));
+// Sign-ups left unfinished for a day are deleted, at start and then hourly.
+const purgePending = () => accounts.purgePending().catch((err) => console.error("purging unfinished sign-ups failed:", err instanceof Error ? err.message : err));
+void purgePending();
+setInterval(purgePending, 60 * 60 * 1000).unref();
 // Watching on a schedule (api/watch.ts): each signed-in account's courses, checked every 15 minutes.
-watchRoutes(app, getStore, database);
+watchRoutes(app, authDeps, database);
 if (process.env.LYCEUM_WATCH !== "off") startWatching(database);
-authRoutes(app, getStore, {
-  appUrl: process.env.APP_URL || "http://localhost:5173",
-  google: { clientId: process.env.GOOGLE_CLIENT_ID ?? "", clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "" },
-});
 
 app.get("/api/health", async (c) => {
   const { s, missing } = await agentModel();

@@ -7,7 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { navAllows, subjectsForPerson } from "./app/roles.ts";
 import { stepDef } from "./app/loop.ts";
 import { hashFor, parseRoute, type CourseRoute } from "./app/routes.ts";
-import { currentPerson, getState, navigate, openRecap, restoreAccountSession, useStore } from "./app/store.ts";
+import { accountSignedOut, currentPerson, getState, navigate, openRecap, restoreAccountSession, useStore } from "./app/store.ts";
+import { onAuthChange } from "./app/account.ts";
 import { Shell } from "./ui/shell/Shell.tsx";
 import { SCREENS } from "./ui/screens/index.ts";
 import { DemoOverlay } from "./demo/DemoOverlay.tsx";
@@ -78,8 +79,13 @@ export default function App() {
     };
   }, []);
 
-  // A session cookie from an earlier visit opens that account's workspace again (api/auth.ts).
-  useEffect(() => { void restoreAccountSession(); }, []);
+  // A Supabase session from an earlier visit, or one Google's redirect just finished, opens that account's workspace
+  // again. A session that ends elsewhere (another tab signed out, or it expired) returns this window to sign in. The
+  // callback stays synchronous, as Supabase asks: it calls no Supabase method itself.
+  useEffect(() => {
+    void restoreAccountSession();
+    return onAuthChange((event) => { if (event === "SIGNED_OUT") accountSignedOut(); });
+  }, []);
 
   // The student's survey page renders on its own, outside the workspace and without the tour or the walk.
   const [hash, setHash] = useState(() => window.location.hash);

@@ -4,9 +4,8 @@
 // lecturer opens one and imports what it wants, exactly as after a run by hand. Tables: api/migrations/002_watch.sql.
 
 import type { Context, Hono } from "hono";
-import { getCookie } from "hono/cookie";
 import type { Db } from "./db.ts";
-import { type AuthStore, originGuard, SESSION_COOKIE } from "./auth.ts";
+import { type AuthDeps, signedInAs } from "./account.ts";
 import { collectBoard } from "./collect.ts";
 import { liveDeps, loadAgentSettings, runAgentSearch } from "./agentSearch.ts";
 import { BOARD_TOKEN, filterPostings } from "../shared/lib/collect.ts";
@@ -116,12 +115,11 @@ export function startWatching(db: Db, collect: Collector = liveCollector, everyM
 }
 
 /** The signed-in account's schedules and runs. A demo person has no account, so watching needs a sign in. */
-export function watchRoutes(app: Hono, getStore: () => Promise<AuthStore>, db: Db, collect: Collector = liveCollector) {
-  app.use("/api/watch/*", originGuard);
+export function watchRoutes(app: Hono, deps: AuthDeps, db: Db, collect: Collector = liveCollector) {
   const course = (c: Context) => c.req.param("subjectId") ?? "";
   const route = (fn: (c: Context, userId: string) => Promise<Response>) => async (c: Context) => {
     try {
-      const user = await (await getStore()).userForSession(getCookie(c, SESSION_COOKIE));
+      const user = await signedInAs(c, deps); // a bearer token, so no cookie for another site to ride on
       if (!user) return c.json({ error: "Sign in to an account to watch on a schedule." }, 401);
       return await fn(c, user.id);
     } catch (err) {

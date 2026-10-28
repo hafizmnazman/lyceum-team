@@ -14,7 +14,7 @@ async function setup() {
   const db = await memoryDb();
   await migrate(db);
   for (const id of ["00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"])
-    await db.query("INSERT INTO users (id, email, name, created_at, onboarded_at) VALUES ($1, $2, 'L', now(), now())", [id, id + "@x.edu"]);
+    await db.query("INSERT INTO auth.users (id, email) VALUES ($1, $2)", [id, id + "@x.edu"]); // the sign-up trigger adds the profile
   return { db, a: "00000000-0000-0000-0000-000000000001", b: "00000000-0000-0000-0000-000000000002" };
 }
 const day = (n: number) => new Date(Date.UTC(2026, 9, 28 + n));

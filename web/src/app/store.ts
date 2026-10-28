@@ -116,7 +116,7 @@ import { listedStudents, obeReport } from "../../../shared/lib/attainment.ts";
 import { itemRequest, templateItems, type ItemRequest } from "../../../shared/lib/items.ts";
 import { PRIOR_SURVEYS, PRIOR_SURVEY_RESPONSES } from "../../../shared/data/sample-course/surveys.ts";
 import { outlineDefinition } from "../../../shared/lib/outline.ts";
-import { loadWorkspace, markOnboarded, saveWorkspace, signOut, updateProfile, whoAmI, type AccountUser } from "./account.ts";
+import { cancelSignUp, hasSession, loadWorkspace, markOnboarded, saveWorkspace, signOut, updateProfile, whoAmI, type AccountUser } from "./account.ts";
 import {
   CANONICAL_PROPOSAL,
   CLOS,
@@ -787,11 +787,31 @@ export async function enterAccount(user: AccountUser): Promise<SaveResult> {
   if (!saved.ok) return saved;
   return openAccountWorkspace(user, saved.workspace);
 }
-/** On page load: a session cookie from an earlier visit opens that account again; without one the demo stays as it was. */
+/** On page load: a Supabase session from an earlier visit, or one just finished by Google's redirect back, opens that
+ *  account again; without one the demo stays as it was. */
 export async function restoreAccountSession(): Promise<void> {
   if (typeof window === "undefined") return;
+  accountRestoreError = null;
   const me = await whoAmI();
-  if (me.ok && me.user && !state.account) await enterAccount(me.user);
+  if (me.ok && me.user) {
+    if (state.account) return;
+    const opened = await enterAccount(me.user);
+    if (!opened.ok) reportRestore("You are signed in, but your workspace could not be opened: " + opened.error);
+    return;
+  }
+  // No account opened. Silent when nobody is signed in (the demo); said out loud when Supabase holds a session, since
+  // otherwise a Google sign-in that fails here just lands back on the login page with no reason given.
+  if (!(await hasSession())) return;
+  reportRestore(me.ok
+    ? "You are signed in with Supabase, but the Lyceum API did not accept the sign-in. Check that SUPABASE_URL and SUPABASE_SECRET_KEY in api/.env belong to the same project as VITE_SUPABASE_URL in web/.env, then restart npm run dev."
+    : "You are signed in with Supabase, but the Lyceum API answered: " + me.error);
+}
+/** Why the last sign-in could not open an account, shown on the login screen; null when nothing went wrong. */
+export let accountRestoreError: string | null = null;
+function reportRestore(message: string) {
+  accountRestoreError = message;
+  console.error("[lyceum] " + message);
+  for (const l of listeners) l();
 }
 /** Back to the demo workspace kept in this browser, signed out. */
 function closeAccountWorkspace() {
@@ -803,9 +823,16 @@ function closeAccountWorkspace() {
 }
 export async function signOutAccount() {
   flushPersistence();
-  await accountSync;
+  // Wait for every save, including one queued while another was running, before the session ends.
+  while (accountSync) await accountSync;
+  // Signing out of a sign-up that never finished onboarding deletes it, as before (api/account.ts).
+  if (state.account && !state.account.user.onboarded) await cancelSignUp();
   await signOut();
   closeAccountWorkspace();
+}
+/** Supabase ended the session elsewhere (signed out in another tab, or the session expired): back to sign in. */
+export function accountSignedOut() {
+  if (state.account) closeAccountWorkspace();
 }
 let accountSync: Promise<void> | null = null, accountDirty = false;
 /** Save the open account's workspace over the version it was loaded at. One save at a time; edits made meanwhile go in

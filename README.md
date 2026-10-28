@@ -22,15 +22,17 @@ Node.js 24 or newer (the scripts run TypeScript directly), and Chrome or Edge fo
 
 ```bash
 npm install                            # once, at the root: installs for web/ and api/ together
-cp api/.env.example api/.env           # the API's settings: the model, search, the database, Google sign in
-cp web/.env.example web/.env           # optional: only the API's port for the dev proxy
-cp .env.example .env                   # optional: Postgres and SearXNG for Docker
+cp api/.env.example api/.env           # the API's settings: the model, search, Supabase's secret key and database
+cp web/.env.example web/.env           # the browser's settings: Supabase's URL and publishable key, the API's port
+cp .env.example .env                   # optional: SearXNG's secret for Docker
 
-npm start          # Docker (Postgres, SearXNG), then the web app on http://localhost:5173 and the API on :8787
+npm start          # SearXNG in Docker, then the web app on http://localhost:5173 and the API on :8787
 npm run dev        # the same without Docker
 ```
 
-Each side also runs on its own from its folder: `cd web && npm run dev` for the frontend, `cd api && npm run dev` for the backend (`npm run db:migrate` there too). The web app forwards `/api` to the API, so start both for anything that signs in, saves to the server or calls a model.
+Accounts and the database are Supabase. Point both `.env` files at the cloud project, or run one locally with `npm run db:up` (the Supabase CLI, Docker needed; `npx supabase status` prints the values). The schema is `supabase/migrations/`: `npm run db:reset` applies it locally, `npm run db:push` to the linked cloud project (`npx supabase link` once).
+
+Each side also runs on its own from its folder: `cd web && npm run dev` for the frontend, `cd api && npm run dev` for the backend. The web app forwards `/api` to the API, so start both for anything that signs in, saves to the server or calls a model.
 
 Choose **Dr Sobri** on the sign-in screen for the whole lecturer workflow, or **Play demo** for the self-driving tour (about 7 minutes). The demo personas save in the browser and need no AI key and no account. Live board collection (Greenhouse and Lever) and document parsing go through the API; the dated saved sample works without it. Never commit a `.env`.
 

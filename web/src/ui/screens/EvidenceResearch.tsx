@@ -16,7 +16,8 @@ import type { BriefRecommendation, CollectionProvider, MentionRequirement, Perso
 import { Button, Disclosure, Field, Input, Select, Tag, Textarea } from "../primitives/index.tsx";
 import { Meter, SourcePane } from "../primitives/loop.tsx";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
-import { fetchQuoteProposals, watchApi, type WatchRun, type WatchSchedule } from "../../../../shared/agents/client.ts";
+import { fetchQuoteProposals, type WatchRun, type WatchSchedule } from "../../../../shared/agents/client.ts";
+import { watchApi } from "../../app/watch.ts";
 import { quoteRequest } from "../../../../shared/lib/proposals.ts";
 
 type Props = { state: AppState; person: Person; subject: Subject; mayEdit: boolean };
