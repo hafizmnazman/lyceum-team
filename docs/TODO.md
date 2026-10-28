@@ -22,9 +22,9 @@ has real data; the demo runs on the fixtures.
 - [x] **Signal from real evidence** (`feat/signal-from-evidence`). `signalFromEvidence` (`src/agents/signal.ts`) gives each
       outcome its demand (share of reviewed postings for its most-asked mapped skill), coverage (the coverage index per
       outcome) and gap, and flags the course when demand's 95% lower bound beats coverage by 0.5. Shown on Report → Map;
-      `currentSignal()` feeds Programme and `routeDrift` with it for every course that has reviewed evidence, the fixture
-      for the rest. Still open: Trends and its reveal read the fixture only (`marketGapByCLO`), and `runCurriculum` lists
-      only the demo programme's subjects, so a lecturer's own course shows its gap on Report but not on Programme.
+      `currentSignal()` feeds Programme (which now lists the lecturer's own courses), `routeDrift`, and `currentGaps()`
+      feeds Trends, for every course that has reviewed evidence; the fixture covers the rest. The Trends reveal animation
+      still plays the fixture's story (see "Signal reveal driven by the run").
 - [ ] **Signal reveal driven by the run.** `src/app/signalSim.ts` animates a fixed answer. Show the real run's steps (the
       postings read, the skills found, the CLOs mapped) as they happen; the scripted reveal stays for the demo.
 - [ ] **Market sources from real runs.** Replace `MARKET_SOURCES` (`src/data/market.ts`, the made-up JobStreet and

@@ -57,8 +57,8 @@ export interface SubjectAnnotation {
 
 /** Programme + Signal -> per-subject annotation. Prereq conflicts take
  *  precedence (they break the sequence); otherwise the Signal drift flag decides. */
-export function runCurriculum(programmeId: string, signal: SignalResult): SubjectAnnotation[] {
-  const subjects = SUBJECTS.filter((s) => s.programmeId === programmeId);
+export function runCurriculum(programmeId: string, signal: SignalResult, all: Subject[] = SUBJECTS): SubjectAnnotation[] {
+  const subjects = all.filter((s) => s.programmeId === programmeId);
   const conflicts = detectPrerequisiteConflicts(subjects);
   const conflictBySubject = new Map(conflicts.map((c) => [c.subjectId, c]));
   const driftBySubject = new Map(signal.subjectDrift.map((d) => [d.subjectId, d]));
@@ -66,7 +66,7 @@ export function runCurriculum(programmeId: string, signal: SignalResult): Subjec
   return subjects.map((s) => {
     const conflict = conflictBySubject.get(s.id);
     if (conflict) {
-      const pre = SUBJECTS_BY_ID[conflict.missingPrereqId];
+      const pre = subjects.find((x) => x.id === conflict.missingPrereqId) ?? SUBJECTS_BY_ID[conflict.missingPrereqId];
       return {
         subjectId: s.id,
         annotation: "prereq-conflict",

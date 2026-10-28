@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PEOPLE_IDS } from "./data/seed.ts";
 import {
-  addEvidenceSource, addSkillMention, adoptCurriculumRevision, checkCurriculumRevision, createCourseWorkspace, evidenceReportForCourse,
+  addEvidenceSource, addSkillMention, adoptCurriculumRevision, checkCurriculumRevision, createCourseWorkspace, currentGaps, currentSignal, evidenceReportForCourse,
   exportWorkspaceBackup, getState, login, previewWorkspaceBackup, removeEvidenceSource, removeSkillMention, resetDemoState,
   restoreWorkspaceBackup, saveCurriculumRevision, setEvidenceSourceReviewed, setSkillMapping,
 } from "./app/store.ts";
 import { evidenceMarkdown, evidenceReport, locateExcerpt, textFingerprint, wilsonInterval } from "./lib/evidence.ts";
 import { signalFromEvidence } from "./agents/signal.ts";
+import { runCurriculum } from "./agents/curriculum.ts";
 import type { CLO, CourseDefinition, CoverageStage, EvidenceSource, SkillMapping, SkillMention } from "./types.ts";
 import { parseWorkspaceBackup, workspaceFingerprint } from "./lib/workspaceBackup.ts";
 
@@ -258,4 +259,23 @@ test("Signal from a course's own evidence: demand, coverage and gap per outcome,
   assert.equal(course(2, 2, "introduced", "assessed").drift?.flag, "fine", "2 of 2 is too few: demand's lower bound is under 0.5");
   assert.equal(course(9, 10, "assessed", "assessed").drift?.flag, "fine", "at target: covered");
   assert.equal(course(9, 10, "unknown", "assessed").drift, null, "no reviewed stage: not judged");
+});
+
+test("a lecturer's own course with reviewed evidence reaches Programme, routing and Trends; the demo keeps its fixture", () => {
+  prepareCourse();
+  for (let i = 0; i < 8; i++) {
+    const id = posting("Analyst " + i, "Firm " + i, POSTING + " Ref " + i + ".");
+    assert.equal(quote(id, "Cash-flow forecasting", "prepare cash-flow forecasts for small business clients").ok, true);
+    assert.equal(setEvidenceSourceReviewed(id, true).ok, true);
+  }
+  assert.equal(setSkillMapping("BUS205", { skill: "Cash-flow forecasting", cloIds: ["BUS205-outcome-1"], stage: "introduced", target: "assessed", evidence: "Week 1 lecture." }).ok, true);
+  const signal = currentSignal();
+  assert.equal(signal.subjectDrift.find((d) => d.subjectId === "BUS205")?.flag, "update", "8 of 8 asking, below target");
+  assert.equal(signal.subjectDrift.find((d) => d.subjectId === "CS220")?.flag, "update", "the demo programme keeps its fixture");
+  const s = getState();
+  assert.equal(runCurriculum(s.programme.id, signal, s.subjects).find((a) => a.subjectId === "BUS205")?.annotation, "needs-update", "listed on Programme");
+  const gap = currentGaps()["BUS205-outcome-1"];
+  assert.equal(gap.live?.postings, 8);
+  assert.equal(gap.gap, 1, "demand 1, coverage 0");
+  assert.ok(currentGaps().CLO4, "the fixture's outcomes are still there for the demo");
 });

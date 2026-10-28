@@ -89,7 +89,7 @@ import { streamAgent } from "../agents/client.ts";
 import { runIntake, type ParsedSheet } from "../agents/intake.ts";
 import { runAuthoring } from "../agents/authoring.ts";
 import { runAnalogy } from "../agents/analogy.ts";
-import { runSignal, signalFromEvidence, type SignalResult } from "../agents/signal.ts";
+import { marketGapByCLO, runSignal, signalFromEvidence, type OutcomeSignal, type SignalResult } from "../agents/signal.ts";
 import { computeRelevanceRatings } from "../data/market.ts";
 import { backupSummary, parseWorkspaceBackup, serializeWorkspaceBackup, workspaceFingerprint } from "../lib/workspaceBackup.ts";
 import { courseDefinition, curriculumChanges, curriculumImpact, draftStructureError, validateCourseDefinition, withDerivedFields } from "../lib/curriculum.ts";
@@ -994,6 +994,14 @@ export function currentSignal(): SignalResult {
   const live = new Map(state.subjects.flatMap((s) => { const d = courseSignal(s.id).drift; return d ? [[s.id, d] as const] : []; }));
   if (!live.size) return fixture;
   return { ...fixture, subjectDrift: [...fixture.subjectDrift.filter((d) => !live.has(d.subjectId)), ...live.values()] };
+}
+/** Demand, coverage and gap per outcome for Trends: the fixture's programme outcomes, plus each course's own outcomes
+ *  once judged on its evidence (those carry `live`). */
+export function currentGaps(): Record<string, { demand: number; coverage: number; gap: number; live?: OutcomeSignal }> {
+  const out: Record<string, { demand: number; coverage: number; gap: number; live?: OutcomeSignal }> = { ...marketGapByCLO() };
+  for (const s of state.subjects) for (const o of courseSignal(s.id).outcomes)
+    if (o.coverage !== null) out[o.cloId] = { demand: o.demand, coverage: o.coverage, gap: o.gap!, live: o };
+  return out;
 }
 export function routeDrift(subjectId: SubjectId) {
   const signal = currentSignal();

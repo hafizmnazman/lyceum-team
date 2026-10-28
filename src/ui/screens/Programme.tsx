@@ -40,7 +40,7 @@ export function ProgrammeScreen() {
   const state = useStore();
   const [showAll, setShowAll] = useState(false);
 
-  const annotations = runCurriculum(state.programme.id, currentSignal());
+  const annotations = runCurriculum(state.programme.id, currentSignal(), state.subjects);
   const annBySubject = new Map(annotations.map((a) => [a.subjectId, a]));
 
   const bandOf = (s: Subject): RelevanceBand | undefined => ratingFor(s.id)?.band;

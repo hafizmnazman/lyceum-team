@@ -6,7 +6,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
-import { marketGapByCLO } from "../../agents/signal.ts";
 import { hasSourceDisagreement, MARKET_SOURCES } from "../../data/market.ts";
 import { can } from "../../app/roles.ts";
 import type { SignalSimState } from "../../app/signalSim.ts";
@@ -14,6 +13,7 @@ import {
   currentPerson,
   getState,
   ratingFor,
+  currentGaps,
   routeDrift,
   runSignalReveal,
   useStore,
@@ -174,7 +174,7 @@ export function TrendsScreen() {
 
   if (!person) return null;
 
-  const gaps = marketGapByCLO();
+  const gaps = currentGaps();
   const widestCloId = Object.keys(gaps).sort((a, b) => gaps[b].gap - gaps[a].gap)[0];
   const info = widestCloId ? gaps[widestCloId] : undefined;
   const clo = state.clos.find((c) => c.id === widestCloId);
@@ -198,7 +198,9 @@ export function TrendsScreen() {
     <Page>
       <PageHead
         title="Trends"
-        context="Illustrative demand and coverage from synthetic fixtures. The displayed scores do not measure current employer demand."
+        context={info?.live
+          ? "The widest gap comes from a course's own reviewed postings; the programme's other outcomes are still illustrative fixtures."
+          : "Illustrative demand and coverage from synthetic fixtures. The displayed scores do not measure current employer demand."}
       />
       <AgentStrip
         agent="signal"
@@ -224,6 +226,11 @@ export function TrendsScreen() {
               </span>
               .
             </p>
+            {info.live ? (
+              <p className="muted" data-demo-id="trends-live">
+                {info.live.postings} of {info.live.eligible} reviewed postings ask for {info.live.skill}; from the course's own evidence.
+              </p>
+            ) : null}
 
             {rating && topSkill ? (
               <div style={{ marginTop: 18 }}>
