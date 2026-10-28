@@ -23,6 +23,8 @@
 
 import { useSyncExternalStore } from "react";
 import type {
+  SlideRound,
+  SlideSuggestion,
   SlideDraft,
   SurveyDefinition,
   SurveyResponse,
@@ -102,7 +104,7 @@ import {
 import { BOARD_TOKEN, SOURCE_POLICIES } from "../../../shared/lib/collect.ts";
 import { CURRENT_ID, buildSnapshot, compareSnapshots, comparisonMarkdown, snapshotLabelError, type SnapshotComparison } from "../../../shared/lib/snapshots.ts";
 import { fetchCollection, type CollectionOutcome, type CollectionRequest } from "../../../shared/agents/client.ts";
-import { downloadDeck, slideRequest, type DeckSpec, type SlideRequest } from "../../../shared/lib/slides.ts";
+import { downloadDeck, MAX_DECK_SLIDES, MAX_SLIDE_CHARS, SLIDES_TO_ADD, slideRequest, type DeckSpec, type SlideRequest, type SuggestionRequest } from "../../../shared/lib/slides.ts";
 import { DECISION_OUTCOMES, NOTE_MAX, OUTCOME_LABEL, briefDecisionState } from "../../../shared/lib/decisions.ts";
 import { courseVersionIds, stepDef, stepForTab, taughtVersionId, termWindow, type CourseStep, type ReportTab } from "./loop.ts";
 export { REPORT_TABS, type ReportTab } from "./loop.ts";
@@ -598,8 +600,40 @@ export function sessionSlideRequest(subjectId: SubjectId, sessionId: string): Sl
   const subject = subjectById(subjectId)!;
   return slideRequest(subject, session, state.clos.filter((c) => c.subjectId === subjectId), definitionForCourse(subjectId), evidenceReportForCourse(subjectId), state.skillMentions);
 }
-/** Prism's slides for one of the lecturer's own sessions, replacing any it drafted before; the pack then says on every slide
- *  that its text was drafted by the model. `null` discards them, and the pack goes back to being built from the records. */
+/** What Prism reads to suggest on one of the lecturer's own sessions: the session's records, and their deck (each slide's
+ *  text, in order) or null for a plan. */
+export function sessionSuggestionRequest(subjectId: SubjectId, sessionId: string, deck: string[] | null): SuggestionRequest | string {
+  const request = sessionSlideRequest(subjectId, sessionId);
+  return typeof request === "string" ? request : { ...request, deck, toAdd: SLIDES_TO_ADD };
+}
+/** A new round of Prism's suggestions on the session, after the earlier ones, which stay with their marks (the history). */
+export function addSlideRound(subjectId: SubjectId, sessionId: string, deck: { fileName: string; slides: string[] } | null,
+  suggestions: Array<Omit<SlideSuggestion, "id" | "status"> & { proposalId?: string }>): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  if (!suggestions.length) return { ok: false, error: "Prism had no suggestion. Try again." };
+  const round: SlideRound = { id: nextId("ROUND-" + subjectId), at: nowIso(), by: currentPerson()!.id,
+    deck: deck ? { fileName: deck.fileName.slice(0, 200), slides: deck.slides.slice(0, MAX_DECK_SLIDES).map((t) => t.slice(0, MAX_SLIDE_CHARS)) } : null,
+    suggestions: suggestions.map((x) => ({ ...x, id: nextId("SUG-" + subjectId), status: "open" as const })) };
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: plan.sessions.map((s) => (s.id === sessionId ? { ...s, slideRounds: [...(s.slideRounds ?? []), round] } : s)) }));
+  set({ toast: round.suggestions.length + (deck ? " suggestions from Prism on your slides." : " segments in Prism's plan for the session.") + " Mark each done or dismiss it." });
+  return { ok: true };
+}
+/** The lecturer marks one suggestion done (taken), dismissed (with an optional reason) or open again. Done and dismissed are
+ *  recorded as the proposal's verdict (api/record.ts); reopening sends nothing, and the next mark replaces the last. */
+export function markSlideSuggestion(subjectId: SubjectId, sessionId: string, roundId: string, suggestionId: string, status: SlideSuggestion["status"], reason?: string): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  const found = session.slideRounds?.find((r) => r.id === roundId)?.suggestions.find((x) => x.id === suggestionId);
+  if (!found) return { ok: false, error: "This suggestion no longer exists." };
+  const note = status === "dismissed" ? reason?.trim().slice(0, 500) || undefined : undefined;
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: plan.sessions.map((s) => s.id !== sessionId ? s : { ...s, slideRounds: s.slideRounds!.map((r) => r.id !== roundId ? r
+    : { ...r, suggestions: r.suggestions.map((x) => { if (x.id !== suggestionId) return x; const { reason: _r, ...rest } = x; return { ...rest, status, ...(note ? { reason: note } : {}) }; }) }) }) }));
+  if (status !== "open") void sendVerdict(found.proposalId, status === "done" ? "accepted" : "dismissed", note);
+  return { ok: true };
+}
+/** Discards slides Prism drafted before it suggested instead (the pack goes back to being built from the records). Slides the
+ *  lecturer saves are set the same way. */
 export function setSessionSlides(subjectId: SubjectId, sessionId: string, slides: SlideDraft[] | null): SaveResult {
   const session = ownSession(subjectId, sessionId);
   if (typeof session === "string") return { ok: false, error: session };

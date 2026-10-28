@@ -271,6 +271,7 @@ export interface TeachingSession {
   // Track C (depth plan Section 5.1), optional so older records load:
   slides?: SlideDraft[]; // the session's own slides; without them the pack is built from the records
   slidesBy?: "prism"; // the slides' text was drafted by the model (Prism), and every slide of the pack says so
+  slideRounds?: SlideRound[]; // Prism's suggestions on the lecturer's own slides (or a plan without them), oldest first
   labSheet?: string; // markdown
   projectBrief?: string; // markdown
   topicId?: string; // the course topic this session teaches
@@ -294,6 +295,17 @@ export interface DraftItem {
   proposalId?: string; // a model item: the id the API recorded Prism's proposal under (api/record.ts), for the lecturer's verdict
   edited?: boolean; // a model item the lecturer changed after Prism drafted it
 }
+/** One of Prism's suggestions. On a deck: where (slide N, or a new slide after N; 0 is before the first), what to do and why.
+ *  Without a deck: a segment of the session's plan, with its minutes and outcome. why cites a record (cites), except layout
+ *  and pacing advice, which may stand without one. The lecturer marks it done or dismissed. */
+export interface SlideSuggestion {
+  id: string; kind: "add" | "change" | "remove" | "reorder" | "layout" | "pacing" | "segment";
+  slide: number | null; after: boolean; minutes: number | null; outcome: string | null;
+  text: string; why: string; cites: "outcome" | "misconception" | "evidence" | "session" | null;
+  status: "open" | "done" | "dismissed"; reason?: string; proposalId?: string;
+}
+/** One round of suggestions: on the deck the lecturer uploaded (its slides' text), or a plan when there was none. */
+export interface SlideRound { id: string; at: string; by: PersonId; deck: { fileName: string; slides: string[] } | null; suggestions: SlideSuggestion[] }
 /** One slide a lecturer wrote: a title, bullets and speaker notes, with an optional second column or figure. */
 export interface SlideDraft {
   title: string;

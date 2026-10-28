@@ -16,13 +16,13 @@ import { parseSheet } from "./parse/sheet.ts";
 import { parsePdf } from "./parse/pdf.ts";
 import { parseDocx, parsePptx } from "./parse/office.ts";
 import { startWatching, watchRoutes } from "./watch.ts";
-import { agentModel, draftModelItems, draftSlides, proposeMappings, proposeQuotes, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
+import { agentModel, draftModelItems, proposeMappings, suggestSlides, proposeQuotes, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
 import { CollectError, collectBoard } from "./collect.ts";
 import { filterPostings } from "../shared/lib/collect.ts";
 import { missingSettings, publicSettings, type AgentSettings } from "../shared/lib/agentSettings.ts";
 import type { MappingRequest, QuoteRequest } from "../shared/lib/proposals.ts";
 import type { ItemRequest } from "../shared/lib/items.ts";
-import type { SlideRequest } from "../shared/lib/slides.ts";
+import type { SuggestionRequest } from "../shared/lib/slides.ts";
 import { ENV_PATH, liveDeps, loadAgentSettings, runAgentSearch, TOOLS, type Chat } from "./agentSearch.ts";
 import { searchWeb } from "./webTools.ts";
 import { readOutline, MAX_OUTLINE_CHARS } from "./outline.ts";
@@ -31,7 +31,7 @@ import { clearOldContent, newContext, recordedChat, describePosting, recordPropo
 import type { MentionProposal } from "../shared/lib/evidence.ts";
 import type { MappingSuggestion } from "../shared/lib/proposals.ts";
 import type { RevisionSuggestion } from "../shared/lib/revision.ts";
-import type { DraftItem, SlideDraft } from "../shared/types.ts";
+import type { DraftItem, SlideSuggestion } from "../shared/types.ts";
 import { DATABASE_URL, postgresDb } from "./db.ts";
 import { createHash } from "node:crypto";
 import { networkInterfaces } from "node:os";
@@ -224,7 +224,9 @@ proposalRoute<QuoteRequest, MentionProposal>("quotes", "lens", (b) => Array.isAr
   (q) => ({ kind: "quote", summary: q.skill + ": \"" + q.excerpt + "\"", payload: q }));
 proposalRoute<MappingRequest, MappingSuggestion>("mappings", "atlas", (b) => Array.isArray(b?.skills) && Array.isArray(b?.outcomes), proposeMappings,
   (m) => ({ kind: "mapping", summary: m.skill + " -> " + (m.outcomes.join(", ") || "no outcome (a gap)"), payload: m }));
-proposalRoute<SlideRequest, SlideDraft>("slides", "prism", (b) => typeof b?.topic === "string" && Array.isArray(b?.outcomes), draftSlides, null);
+proposalRoute<SuggestionRequest, Omit<SlideSuggestion, "id" | "status">>("slide-suggestions", "prism",
+  (b) => typeof b?.topic === "string" && Array.isArray(b?.outcomes) && (b.deck === null || (Array.isArray(b.deck) && b.deck.every((t) => typeof t === "string"))) && Array.isArray(b?.toAdd),
+  suggestSlides, (x) => ({ kind: "slide", summary: (x.slide === null ? (x.minutes ? x.minutes + " min" : "the session") : (x.after ? "after slide " : "slide ") + x.slide) + ": " + x.text, payload: x }));
 proposalRoute<ItemRequest, DraftItem>("items", "prism", (b) => Array.isArray(b?.outcomes) && b.outcomes.length > 0 && Array.isArray(b?.misconceptions), draftModelItems,
   (i) => ({ kind: "item", summary: i.kind + ": " + i.stem, payload: i }));
 

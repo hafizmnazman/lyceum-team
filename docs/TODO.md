@@ -54,7 +54,7 @@ has real data; the demo runs on the fixtures.
       item only if it passes. Items join the session unreviewed, tagged "Drafted by Prism"; the review and the
       lint-gated Moodle/QTI export are unchanged. The templates stay as the no-model path. Note: a recorded misconception
       worded with an absolute ("every") can never pass both the absolutes and the misconceptions rules; reword it.
-- [x] **Prism drafts slide content** (`feat/prism-slide-content`). "Draft slides with Prism" on the lecturer's own session sends
+- [x] ~~**Prism drafts slide content**~~ (`feat/prism-slide-content`), replaced by slide suggestions below. "Draft slides with Prism" on the lecturer's own session sends
       the session, its outcomes, its topic's activities, readings and misconceptions, and the evidence mapped to its
       outcomes; the model writes the teaching body (six to ten slides with speaker notes), checked by `readSlides`. The pack
       keeps its generated cover, outcomes, evidence, check, resources and closing around them, and the cover and every
@@ -75,17 +75,20 @@ has real data; the demo runs on the fixtures.
 - [ ] **An in-app metrics page** reading the same views, after the dashboard has shown which numbers matter.
 
 ### Prism: slide suggestions instead of slide drafts (designed 29 October 2026, by grilling)
-- [ ] **Suggestions on the lecturer's own slides.** On a session: upload the deck (`.pptx` or PDF; the text is kept, the
+- [x] **Suggestions on the lecturer's own slides** (`feat/live-agents`). On a session: upload the deck (`.pptx` or PDF; the text is kept, the
       original goes to R2 once that is built), then "Suggest with Prism": a checklist, each item with where (slide N, or a
       new slide after N), the kind (add, change, remove, reorder, pacing), what to do, and why, citing a record (an
       outcome, a recorded misconception, or employer evidence with its count and quotation); only layout and pacing advice
       may stand without one. Each item is marked done or dismissed, and recorded as a proposal.
-- [ ] **No deck: a session plan** of timed segments (minutes, what, which outcome, the cited record), the same checklist.
-- [ ] **Slides to add**, not a pack: the record-built slides (cover, outcomes, employer evidence, check, resources,
-      closing) as a set to copy into the lecturer's deck; suggestions can point at them.
-- [ ] **A revised deck is a new round**; earlier rounds stay under History with their marks. Checking whether an earlier
+- [x] **No deck: a session plan** of timed segments (minutes, what, which outcome, the cited record), the same checklist.
+- [x] **Slides to add**, not a pack: the record-built slides (outcomes, employer evidence, activity, check,
+      resources) as a set to copy into the lecturer's deck; suggestions can point at them.
+- [x] **A revised deck is a new round**; earlier rounds stay under History with their marks. Checking whether an earlier
       suggestion was addressed comes later, as its own check.
-- [ ] **Remove "Draft slides with Prism"** (the model writing the slides) once the above is in.
+- [x] **"Draft slides with Prism" removed** (the model no longer writes slides). Slides it drafted before still carry its
+      label on every slide and can be discarded. `readSlideSuggestions` checks each suggestion against the session's
+      records; `npm run prove:slides`.
+- [ ] **Check whether an earlier suggestion was addressed** in a revised deck, as its own check (see the round above).
 
 ### Scheduling and running in the background
 - [x] **Watch on a schedule** (`feat/scheduled-watch`). A signed-in lecturer saves the Watch form's source (Greenhouse or

@@ -11,7 +11,7 @@
 //  - streamAgent: SSE from /api/agent/:name for the free-text agents
 //    (authoring, evaluator, analogy explainer), yielding chunks.
 
-import type { CLO, CollectedPosting, CollectionProvider, DraftItem, IntakeInterpretation, SlideDraft, ParsedDoc, Subject, UploadedFileKind } from "../types.ts";
+import type { CLO, CollectedPosting, CollectionProvider, DraftItem, IntakeInterpretation, SlideSuggestion, ParsedDoc, Subject, UploadedFileKind } from "../types.ts";
 import { SOURCE_POLICIES, filterPostings } from "../lib/collect.ts";
 import { interpretLocally } from "./intakeLocal.ts";
 import type { OutlineProposal } from "../lib/outline.ts";
@@ -19,7 +19,7 @@ import type { RevisionRequest, RevisionSuggestion } from "../lib/revision.ts";
 import type { MappingRequest, MappingSuggestion, QuoteRequest } from "../lib/proposals.ts";
 import type { MentionProposal } from "../lib/evidence.ts";
 import type { ItemRequest } from "../lib/items.ts";
-import type { SlideRequest } from "../lib/slides.ts";
+import type { SuggestionRequest } from "../lib/slides.ts";
 
 const PARSE_TIMEOUT_MS = 20000;
 const AGENT_TIMEOUT_MS = 30000;
@@ -293,8 +293,8 @@ export async function sendVerdict(proposalId: string | undefined, verdict: Verdi
 // ---------- Report: Lens's quotations and Atlas's mappings (shared/lib/proposals.ts) ----------
 const OUTLINE_TIMEOUT_MS = 180000;
 // Prism's items can take three model calls (a draft, one more if it was unreadable, a repair), each allowed two minutes.
-const PROPOSAL_TIMEOUT_MS = { quotes: OUTLINE_TIMEOUT_MS, mappings: OUTLINE_TIMEOUT_MS, items: 3 * 120000 + 30000, slides: OUTLINE_TIMEOUT_MS };
-async function postProposals<T>(path: "quotes" | "mappings" | "items" | "slides", request: unknown, course?: string): Promise<{ ok: true; list: T[] } | { ok: false; error: string }> {
+const PROPOSAL_TIMEOUT_MS = { quotes: OUTLINE_TIMEOUT_MS, mappings: OUTLINE_TIMEOUT_MS, items: 3 * 120000 + 30000, "slide-suggestions": 2 * 120000 + 30000 };
+async function postProposals<T>(path: keyof typeof PROPOSAL_TIMEOUT_MS, request: unknown, course?: string): Promise<{ ok: true; list: T[] } | { ok: false; error: string }> {
   try {
     const res = await withTimeout(fetch("/api/agent/" + path, { method: "POST", headers: await agentHeaders(course), body: JSON.stringify(request) }), PROPOSAL_TIMEOUT_MS[path]);
     const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
@@ -308,7 +308,7 @@ async function postProposals<T>(path: "quotes" | "mappings" | "items" | "slides"
 export const fetchQuoteProposals = (request: QuoteRequest, course?: string) => postProposals<MentionProposal & Proposed>("quotes", request, course);
 export const fetchMappingSuggestions = (request: MappingRequest, course?: string) => postProposals<MappingSuggestion & Proposed>("mappings", request, course);
 export const fetchModelItems = (request: ItemRequest, course?: string) => postProposals<DraftItem & Proposed>("items", request, course);
-export const fetchModelSlides = (request: SlideRequest, course?: string) => postProposals<SlideDraft>("slides", request, course);
+export const fetchSlideSuggestions = (request: SuggestionRequest, course?: string) => postProposals<Omit<SlideSuggestion, "id" | "status"> & Proposed>("slide-suggestions", request, course);
 
 // ---------- Watch on a schedule (api/watch.ts): the signed-in account's schedule and runs for one course ----------
 export interface WatchSchedule { subjectId: string; provider: "greenhouse" | "lever" | "agent"; board: string; query: string; inText: boolean; everyDays: number; nextRunAt: string }

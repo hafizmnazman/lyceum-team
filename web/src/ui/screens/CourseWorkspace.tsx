@@ -1,29 +1,29 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ArrowRight, Download, Plus } from "lucide-react";
+import { ArrowRight, Download, FileUp, Plus } from "lucide-react";
 import { plural } from "../../app/loop.ts";
 import { can, navAllows } from "../../app/roles.ts";
 import {
   definitionForCourse, deleteTeachingSession, downloadPack, navigate, nowIso, saveTeachingPlanDetails, saveTeachingSession,
-  selectSubject, sessionSlideRequest, setSessionSlides, trackRequest, type AppState,
+  addSlideRound, markSlideSuggestion, selectSubject, sessionSuggestionRequest, setSessionSlides, trackRequest, type AppState,
 } from "../../app/store.ts";
 import { DEMO_LINE } from "../../../../shared/data/sample-course/index.ts";
 import { buildCourseFile, type CourseFilePack } from "../../../../shared/lib/courseFile.ts";
 import { downloadBytes } from "../../../../shared/lib/download.ts";
 import { AssessmentPanel, hasCourseRecord, MaterialsPanel, OutcomesPanel, ReferencesPanel, SchedulePanel, SynopsisPanel } from "./CourseRecord.tsx";
 import { evidenceReport } from "../../../../shared/lib/evidence.ts";
-import { brandFor, deckBytes, sessionDeck, type DeckSpec } from "../../../../shared/lib/slides.ts";
+import { brandFor, dayOf, deckBytes, sessionDeck, type DeckSpec } from "../../../../shared/lib/slides.ts";
 import { downloadText } from "../../../../shared/lib/download.ts";
 import { DeckFilmstrip, DeckThumb, useMarkData } from "../primitives/DeckPreview.tsx";
 import { SlideDiffList } from "../primitives/compare.tsx";
 import { deckDiff } from "../../../../shared/lib/diff.ts";
 import { packMaker, previousVersion } from "./packCompare.ts";
 import { planSummary, suggestedWeek, teachingPlanMarkdown, type SessionInput } from "../../../../shared/lib/teachingPlan.ts";
-import type { ChangeProposal, CourseDefinition, Person, Subject, TeachingPlan, TeachingSession } from "../../../../shared/types.ts";
+import type { ChangeProposal, CourseDefinition, Person, SlideRound, SlideSuggestion, Subject, TeachingPlan, TeachingSession } from "../../../../shared/types.ts";
 import { Button, Disclosure, Field, Input, Select, Tag, Textarea } from "../primitives/index.tsx";
 import { Meter } from "../primitives/loop.tsx";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
 import { SessionItems } from "./SessionItems.tsx";
-import { fetchModelSlides } from "../../../../shared/agents/client.ts";
+import { fetchSlideSuggestions, parseFile } from "../../../../shared/agents/client.ts";
 import { courseMisconceptions } from "../../../../shared/lib/items.ts";
 
 type CourseProps = { state: AppState; person: Person; subject: Subject };
@@ -284,11 +284,11 @@ function SessionCard({ session, subject, clos, mayEdit, editorOpen, deleting, de
     <Disclosure summary="Preview the pack" count={spec.slides.length + " slides"} data-demo-id={"session-preview-" + session.id}><DeckFilmstrip spec={spec} markSrc={markSrc} /></Disclosure>
     {prior && changes.length ? <Disclosure summary={"What changed in this pack since " + priorLabel} count={plural(changes.length, "slide", "slides")} data-demo-id={"session-changes-" + session.id}>
       <SlideDiffList before={prior} after={spec} beforeLabel={"Under " + priorLabel} afterLabel={"Under " + currentLabel} markSrc={markSrc} /></Disclosure> : null}
-    <div className="button-row"><Button data-demo-id={"session-slides-" + session.id} aria-label={"Download teaching pack for " + session.topic} onClick={() => void downloadPack(subject.id, spec)}><Download size={15} /> Teaching pack (.pptx)</Button>
+    <div className="button-row"><Button data-demo-id={"session-slides-" + session.id} aria-label={"Download teaching pack for " + session.topic} onClick={() => void downloadPack(subject.id, spec)}><Download size={15} /> {session.sample || session.slides?.length ? "Teaching pack (.pptx)" : "Slides to add (.pptx)"}</Button>
       {session.labSheet ? <Button data-demo-id={"session-lab-" + session.id} onClick={() => downloadText(file("lab-sheet"), session.labSheet!)}><Download size={15} /> Lab sheet (.md)</Button> : null}
       {session.projectBrief ? <Button data-demo-id={"session-brief-" + session.id} onClick={() => downloadText(file("project-brief"), session.projectBrief!)}><Download size={15} /> Project brief (.md)</Button> : null}
-      <span className="muted">{session.slides?.length && session.sample ? "Sample slides written for this prototype; every slide says so." : session.slidesBy === "prism" && session.slides?.length ? "Teaching slides drafted by Prism, the rest built from the session and the evidence; every slide says the text was drafted by the model." : session.sample ? "An outline pack from the course record; the lecturer's slides are not written yet." : "Editable slides built from this session, the course record and the evidence linked to its outcomes; the generator adds no text of its own."}</span></div>
-    {mayEdit && !session.sample ? <PrismSlides subject={subject} session={session} /> : null}
+      <span className="muted">{session.slides?.length && session.sample ? "Sample slides written for this prototype; every slide says so." : session.slidesBy === "prism" && session.slides?.length ? "Teaching slides drafted by Prism, the rest built from the session and the evidence; every slide says the text was drafted by the model." : session.sample ? "An outline pack from the course record; the lecturer's slides are not written yet." : "The outcomes, the employer evidence, the check and the resources as slides built from the record, to copy into your own deck; the generator adds no text of its own."}</span></div>
+    {mayEdit && !session.sample ? <PrismSuggestions subject={subject} session={session} /> : null}
     {mayEdit ? <div className="button-row session-actions">
       {session.sample ? null : <Button disabled={editorOpen} aria-label={"Edit " + session.topic} onClick={() => onEdit(session)}>Edit session</Button>}
       {deleting === session.id ? <><span>Remove this session?</span><Button variant="danger" onClick={() => onRemove(session.id)}>Confirm removal</Button><Button variant="quiet" onClick={() => onAskRemove(null)}>Keep session</Button></>
@@ -297,27 +297,71 @@ function SessionCard({ session, subject, clos, mayEdit, editorOpen, deleting, de
   </article></li>;
 }
 
-/** Prism drafts the session's teaching slides with the model in .env; the pack then carries them, and says on every slide that
- *  their text was drafted by the model. The lecturer edits the downloaded pack in PowerPoint, or discards the draft. */
-function PrismSlides({ subject, session }: { subject: Subject; session: TeachingSession }) {
-  const [busy, setBusy] = useState(false);
+/** Prism suggests on the lecturer's own slides, or plans the session without them; it never writes the slides. Each
+ *  suggestion cites the record it comes from (an outcome, a recorded misconception, the employer evidence or the session's
+ *  own activity), save layout and pacing advice. The lecturer marks each done or dismisses it, and both are recorded as the
+ *  proposal's verdict. A new upload is a new round; earlier rounds stay below with their marks. */
+function PrismSuggestions({ subject, session }: { subject: Subject; session: TeachingSession }) {
+  const [deck, setDeck] = useState<{ fileName: string; slides: string[] } | null>(null);
+  const [busy, setBusy] = useState<"read" | "ask" | null>(null);
   const [message, setMessage] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+  const rounds = session.slideRounds ?? [], latest = rounds.at(-1), earlier = rounds.slice(0, -1).reverse();
   const drafted = session.slidesBy === "prism" && Boolean(session.slides?.length);
-  async function draft() {
-    const request = sessionSlideRequest(subject.id, session.id);
-    if (typeof request === "string") { setMessage(request); return; }
-    setBusy(true); setMessage("");
-    const r = await fetchModelSlides(request);
-    setBusy(false);
-    if (!r.ok) { setMessage(r.error); return; }
-    const saved = setSessionSlides(subject.id, session.id, r.list);
-    if (!saved.ok) setMessage(saved.error);
+  async function read(file: File) {
+    setBusy("read"); setMessage("");
+    const r = await parseFile(file);
+    setBusy(null);
+    const slides = r.doc?.pages.map((p) => p.text.trim()) ?? [];
+    if (!r.doc || !slides.some(Boolean)) { setMessage(r.error ?? "No slide text was found in that file. A scanned PDF has none to read."); return; }
+    setDeck({ fileName: file.name, slides });
   }
-  return <div className="button-row" data-demo-id={"prism-slides-" + session.id}>
-    <Button loading={busy} onClick={() => void draft()} data-demo-id={"prism-slides-draft-" + session.id}>{drafted ? "Draft the slides again" : "Draft slides with Prism"}</Button>
-    {drafted ? <Button variant="quiet" onClick={() => setSessionSlides(subject.id, session.id, null)}>Discard Prism's slides</Button> : null}
-    <span className="muted">{drafted ? session.slides!.length + " teaching slides drafted by Prism; every slide of the pack says so. Check them in the preview, then edit the pack in PowerPoint." : "Prism writes the teaching slides between the outcomes and the check, from this session and the course record."}</span>
+  async function ask() {
+    const request = sessionSuggestionRequest(subject.id, session.id, deck?.slides ?? null);
+    if (typeof request === "string") { setMessage(request); return; }
+    setBusy("ask"); setMessage("");
+    const r = await fetchSlideSuggestions(request, subject.id);
+    setBusy(null);
+    if (!r.ok) { setMessage(r.error); return; }
+    const saved = addSlideRound(subject.id, session.id, deck, r.list);
+    if (saved.ok) setDeck(null); else setMessage(saved.error);
+  }
+  return <div className="prism-suggestions" data-demo-id={"prism-suggestions-" + session.id}>
+    <h4>Suggestions from Prism</h4>
+    <p className="muted">Upload your slides for this session and Prism suggests what to change, each with the record it comes from. Without slides it suggests a plan for the {session.minutes} minutes. You write the slides; the slides to add above are built from the record.</p>
+    <div className="button-row">
+      <input ref={fileInput} type="file" accept=".pptx,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void read(f); }} />
+      <Button loading={busy === "read"} onClick={() => fileInput.current?.click()}><FileUp size={15} /> {deck ? "Choose another file" : "Upload your slides"}</Button>
+      <Button variant="primary" loading={busy === "ask"} disabled={busy === "read"} data-demo-id={"prism-suggest-" + session.id} onClick={() => void ask()}>{deck ? "Suggest changes" : "Suggest a session plan"}</Button>
+      {deck ? <span className="muted">{deck.fileName}: {plural(deck.slides.length, "slide", "slides")} read</span> : null}
+      {drafted ? <Button variant="quiet" onClick={() => setSessionSlides(subject.id, session.id, null)}>Discard Prism's earlier slide draft</Button> : null}
+    </div>
     {message ? <p role="status" className="save-status">{message}</p> : null}
+    {latest ? <SuggestionList subject={subject} session={session} round={latest} /> : null}
+    {earlier.length ? <Disclosure summary="Earlier rounds" count={String(earlier.length)}>
+      {earlier.map((r) => <SuggestionList key={r.id} subject={subject} session={session} round={r} />)}</Disclosure> : null}
+  </div>;
+}
+
+const CITE_LABEL: Record<NonNullable<SlideSuggestion["cites"]>, string> = { outcome: "Outcome", misconception: "Misconception", evidence: "Employer evidence", session: "This session" };
+const where = (x: SlideSuggestion) => x.kind === "segment" ? (x.minutes ?? 0) + " min" + (x.outcome ? " · " + x.outcome : "")
+  : x.slide === null ? "Whole deck" : x.kind === "add" ? (x.slide === 0 ? "New slide first" : "New slide after " + x.slide) : "Slide " + x.slide;
+function SuggestionList({ subject, session, round }: { subject: Subject; session: TeachingSession; round: SlideRound }) {
+  const [dismissing, setDismissing] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const done = round.suggestions.filter((x) => x.status === "done").length, open = round.suggestions.filter((x) => x.status === "open").length;
+  const mark = (x: SlideSuggestion, status: SlideSuggestion["status"], why?: string) => { markSlideSuggestion(subject.id, session.id, round.id, x.id, status, why); setDismissing(null); setReason(""); };
+  return <div className="suggestion-round">
+    <p className="muted">{dayOf(round.at)} · {round.deck ? round.deck.fileName + ", " + plural(round.deck.slides.length, "slide", "slides") : "A plan, without slides"} · {done} done, {open} open</p>
+    <ol className="ladder-list">{round.suggestions.map((x) => <li key={x.id} className={"curriculum-object" + (x.status === "open" ? "" : " is-off")}>
+      <p><Tag>{where(x)}</Tag> {x.kind === "segment" ? null : <Tag tone="neutral">{x.kind}</Tag>} {x.status === "open" ? null : <Tag tone={x.status === "done" ? "ok" : "warn"}>{x.status === "done" ? "Done" : "Dismissed"}</Tag>} {x.text}</p>
+      <p className="muted">{x.cites ? CITE_LABEL[x.cites] + ": " : ""}{x.why}{x.reason ? " · Dismissed because: " + x.reason : ""}</p>
+      {dismissing === x.id ? <div className="button-row">
+        <Input aria-label="Why dismiss it (optional)" placeholder="Why not (optional)" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
+        <Button variant="quiet" onClick={() => mark(x, "dismissed", reason)}>Dismiss</Button><Button variant="quiet" onClick={() => setDismissing(null)}>Keep it</Button></div>
+      : <div className="button-row">{x.status === "open" ? <><Button onClick={() => mark(x, "done")}>Done</Button><Button variant="quiet" onClick={() => { setDismissing(x.id); setReason(""); }}>Dismiss</Button></>
+        : <Button variant="quiet" onClick={() => mark(x, "open")}>Reopen</Button>}</div>}
+    </li>)}</ol>
   </div>;
 }
 

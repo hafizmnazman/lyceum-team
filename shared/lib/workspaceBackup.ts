@@ -40,6 +40,10 @@ const item = shape({ id, text: str, targetCLO: id, bloomLevel: bloom, difficulty
 const draftItem = shape({ id, kind: one("multichoice", "shortanswer", "essay"), cloId: id, bloomLevel: bloom, stem: str, marks: nonnegative,
   options: opt(array(shape({ text: str, correct: boolean, feedback: opt(str) }), 10)), answers: opt(array(str, 20)), graderInfo: opt(str), responseLines: opt(integer), proposalId: opt(str), edited: opt(boolean),
   source: one("template", "sample", "model"), reviewedBy: x => x === null || id(x), reviewedAt: x => x === null || str(x) });
+const slideSuggestion = shape({ id, kind: one("add", "change", "remove", "reorder", "layout", "pacing", "segment"), slide: x => x === null || integer(x), after: boolean,
+  minutes: x => x === null || num(x), outcome: x => x === null || str(x), text: str, why: str, cites: x => x === null || one("outcome", "misconception", "evidence", "session")(x),
+  status: one("open", "done", "dismissed"), reason: opt(str), proposalId: opt(str) });
+const slideRound = shape({ id, at: str, by: id, deck: x => x === null || shape({ fileName: str, slides: array(str, 200) })(x), suggestions: array(slideSuggestion, 50) });
 const blueprint = shape({ subjectId: id, totalMarks: num, cloWeights: array(shape({ cloId: id, weight: num }), 1000), bloomMix: dict(num) });
 const predicates: Record<typeof WORKSPACE_DATA_KEYS[number], Check> = {
   programme: shape({ id, title: str, departmentOwnerId: id, subjectIds: strings, plos: opt(array(shape({ id, text: str, cluster: str }), 100)) }),
@@ -79,7 +83,7 @@ const predicates: Record<typeof WORKSPACE_DATA_KEYS[number], Check> = {
       needsReview: opt(boolean), courseVersionId: opt(id),
       slides: opt(array(shape({ title: str, bullets: array(str, 100), notes: str, right: opt(array(str, 100)), section: opt(boolean),
         figure: opt(x => record(x) && ((x.kind === "table" && array(str, 20)(x.header) && array(array(str, 20), 100)(x.rows) && str(x.alt)) || (x.kind === "placeholder" && str(x.label)))) }), 100)),
-      labSheet: opt(str), projectBrief: opt(str), topicId: opt(id), sample: opt(boolean), slidesBy: opt(one("prism")), items: opt(array(draftItem, 200)) })) })),
+      labSheet: opt(str), projectBrief: opt(str), topicId: opt(id), sample: opt(boolean), slidesBy: opt(one("prism")), slideRounds: opt(array(slideRound, 50)), items: opt(array(draftItem, 200)) })) })),
   courseDefinitions: dict(x => record(x)),
   rubrics: array(shape({ id, subjectId: id, componentId: id, title: str, sample: opt(boolean),
     criteria: array(shape({ name: str, marks: nonnegative, cloIds: strings, levels: x => Array.isArray(x) && x.length === 4 && x.every(str) }), 100) }), 1000),

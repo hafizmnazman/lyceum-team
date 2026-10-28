@@ -8,7 +8,7 @@
 // meeting brief keeps the plain renderer.
 
 import { z } from "zod";
-import type { CLO, CourseDefinition, EvidenceBrief, EvidenceSource, InstitutionProfile, Person, SkillMapping, SkillMention, SlideDraft, Subject, TeachingSession } from "../types.ts";
+import type { CLO, CourseDefinition, EvidenceBrief, EvidenceSource, InstitutionProfile, Person, SkillMapping, SkillMention, SlideSuggestion, Subject, TeachingSession } from "../types.ts";
 import { RECOMMENDATION_LABEL, STAGE_LABEL, evidenceReport, skillKey, type EvidenceReport } from "./evidence.ts";
 import { bareHex } from "../theme/tokens.ts";
 import { DEMO_LINE } from "../data/sample-course/index.ts";
@@ -31,15 +31,17 @@ export const OUTLINE_LABEL = "Outline pack: the lecturer's slides are not writte
 /** The line every slide of a pack carries when its slide text was drafted by the model, in place of DECK_FOOTER. */
 export const PRISM_FOOTER = "Slide text drafted by the model (Prism) for the lecturer to check; editable.";
 
-// ---------- Prism: a session's teaching slides drafted by the model ----------
+// ---------- Prism: suggestions on the lecturer's own slides, or a plan without them ----------
 /** What Prism reads: the session, its outcomes, the course topic it teaches with its activities, readings and misconceptions,
- *  and the employer evidence mapped to its outcomes with one quotation each. Prism writes the teaching body only; the cover,
- *  outcomes, evidence, check, resources and closing slides stay generated from the record. */
+ *  and the employer evidence mapped to its outcomes with one quotation each. Prism suggests; the lecturer writes the slides. */
 export interface SlideRequest {
   course: string; topic: string; minutes: number; activity: string; learningCheck: string;
   outcomes: Array<{ label: string; text: string }>; topicNotes: { activities: string; readings: string; misconceptions: string[] };
   evidence: Array<{ skill: string; postings: number; eligible: number; quote: string }>;
 }
+/** The request with the lecturer's deck (each slide's text, in order) or null for a plan, and the titles of the slides Lyceum
+ *  builds from the record, which a suggestion may tell the lecturer to add. */
+export interface SuggestionRequest extends SlideRequest { deck: string[] | null; toAdd: string[] }
 export function slideRequest(subject: Subject, session: TeachingSession, clos: CLO[], definition: CourseDefinition | null | undefined, report: EvidenceReport, mentions: SkillMention[]): SlideRequest {
   const topic = definition?.topics.find((t) => t.id === session.topicId) ?? definition?.topics.find((t) => t.week === session.week);
   return {
@@ -50,14 +52,50 @@ export function slideRequest(subject: Subject, session: TeachingSession, clos: C
       eligible: report.eligible, quote: mentions.find((m) => m.subjectId === subject.id && skillKey(m.skill) === r.key)?.excerpt ?? "" })),
   };
 }
-const ModelSlide = z.object({ title: z.string().trim().min(1).max(120), bullets: z.array(z.string().trim().min(1).max(200)).max(7).catch([]),
-  notes: z.string().trim().max(1500).catch(""), section: z.boolean().optional().catch(undefined) });
-/** Keep the slides that are well formed, at most fourteen; a section divider carries no bullets. */
-export function readSlides(raw: unknown): SlideDraft[] {
-  const list = raw && typeof raw === "object" && Array.isArray((raw as { slides?: unknown }).slides) ? (raw as { slides: unknown[] }).slides : [];
-  return list.map((s) => ModelSlide.safeParse(s)).filter((r) => r.success).slice(0, 14)
-    .map(({ data }) => (data.section ? { title: data.title, bullets: [], notes: data.notes, section: true } : { title: data.title, bullets: data.bullets, notes: data.notes }))
-    .filter((s) => s.section || s.bullets.length);
+/** The record-built slides of every pack, by title: the "slides to add" a suggestion may point at. */
+export const SLIDES_TO_ADD = ["Learning outcomes for this session", "Why this matters: what employers ask for", "Learning activity", "Check for understanding", "Resources and references"];
+// ponytail: 60 slides of 800 characters (about 12,000 tokens) is what Prism reads; a longer deck is cut, so split it if needed.
+export const MAX_DECK_SLIDES = 60, MAX_SLIDE_CHARS = 800;
+
+const ModelSuggestion = z.object({
+  kind: z.string().transform((k) => k.toLowerCase().trim()),
+  slide: z.number().int().nullable().catch(null), after: z.boolean().catch(false),
+  minutes: z.number().positive().nullable().catch(null), outcome: z.string().trim().nullable().catch(null),
+  text: z.string().trim().min(8).max(500), why: z.string().trim().min(4).max(600),
+  cites: z.string().nullable().catch(null).transform((c) => (c ? c.toLowerCase().trim() : null)),
+});
+type Suggested = Omit<SlideSuggestion, "id" | "status">;
+const DECK_KINDS = ["add", "change", "remove", "reorder", "layout", "pacing"], CITES = ["outcome", "misconception", "evidence", "session"];
+const has = (haystack: string, needle: string) => Boolean(needle.trim()) && haystack.toLowerCase().includes(needle.trim().toLowerCase());
+/** Keep the suggestions that hold up against the request, at most fifteen. On a deck: a known kind at a slide that exists
+ *  (a new slide goes after slide 0 to N). Without one: plan segments with minutes. Every suggestion but layout and pacing
+ *  advice cites a record, and the record must be in its reason: an outcome by label, a recorded misconception's words, or an
+ *  employer skill by name; "session" is the session's own activity or check. */
+export function readSlideSuggestions(raw: unknown, request: SuggestionRequest): Suggested[] {
+  const list = raw && typeof raw === "object" && Array.isArray((raw as { suggestions?: unknown }).suggestions) ? (raw as { suggestions: unknown[] }).suggestions : [];
+  const n = request.deck?.length ?? 0, labels = request.outcomes.map((o) => o.label);
+  const out: Suggested[] = [];
+  for (const entry of list) {
+    const parsed = ModelSuggestion.safeParse(entry);
+    if (!parsed.success) continue;
+    const d = parsed.data, kind = d.kind as SlideSuggestion["kind"];
+    const outcome = d.outcome ? labels.find((l) => l.toLowerCase() === d.outcome!.toLowerCase()) ?? null : null;
+    if (request.deck) {
+      if (!DECK_KINDS.includes(kind)) continue;
+      const where = d.slide;
+      if (kind === "add" ? where === null || where < 0 || where > n : kind === "change" || kind === "remove" || kind === "reorder" ? where === null || where < 1 || where > n : where !== null && (where < 1 || where > n)) continue;
+    } else if (kind !== "segment" || d.minutes === null || d.minutes > request.minutes) continue;
+    const cites = d.cites && CITES.includes(d.cites) ? (d.cites as SlideSuggestion["cites"]) : null;
+    const grounded = cites === "outcome" ? labels.some((l) => has(d.why, l)) || outcome !== null
+      : cites === "misconception" ? request.topicNotes.misconceptions.some((m) => has(d.why, m.slice(0, 40)))
+      : cites === "evidence" ? request.evidence.some((e) => has(d.why, e.skill))
+      : cites === "session" ? Boolean(request.activity.trim() || request.learningCheck.trim())
+      : kind === "layout" || kind === "pacing";
+    if (!grounded) continue;
+    out.push({ kind, slide: request.deck ? d.slide : null, after: kind === "add", minutes: request.deck ? null : d.minutes, outcome, text: d.text, why: d.why, cites });
+    if (out.length === 15) break;
+  }
+  return out;
 }
 
 const percent = (x: number | null) => (x === null ? "Unknown" : Math.round(x * 1000) / 10 + "%");
