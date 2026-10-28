@@ -54,8 +54,12 @@ has real data; the demo runs on the fixtures.
       item only if it passes. Items join the session unreviewed, tagged "Drafted by Prism"; the review and the
       lint-gated Moodle/QTI export are unchanged. The templates stay as the no-model path. Note: a recorded misconception
       worded with an absolute ("every") can never pass both the absolutes and the misconceptions rules; reword it.
-- [ ] **Prism drafts slide content.** The slides use only saved text. The model drafts each session's slides from its
-      CLOs, topics and evidence into the existing .pptx writer (`src/lib/slides.ts`).
+- [x] **Prism drafts slide content** (`feat/prism-slide-content`). "Draft slides with Prism" on the lecturer's own session sends
+      the session, its outcomes, its topic's activities, readings and misconceptions, and the evidence mapped to its
+      outcomes; the model writes the teaching body (six to ten slides with speaker notes), checked by `readSlides`. The pack
+      keeps its generated cover, outcomes, evidence, check, resources and closing around them, and the cover and every
+      slide's footer say the text was drafted by the model. Kept through a session edit; redraft or discard on the card;
+      the lecturer edits the downloaded .pptx in PowerPoint. Samples stay as written.
 - [ ] **Steward drafts the brief's prose.** The numbers stay computed; the model writes the summary and recommendation,
       citing only confirmed quotations.
 

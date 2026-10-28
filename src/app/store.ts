@@ -23,6 +23,7 @@
 
 import { useSyncExternalStore } from "react";
 import type {
+  SlideDraft,
   SurveyDefinition,
   SurveyResponse,
   CqiNote,
@@ -101,7 +102,7 @@ import {
 import { BOARD_TOKEN, SOURCE_POLICIES } from "../lib/collect.ts";
 import { CURRENT_ID, buildSnapshot, compareSnapshots, comparisonMarkdown, snapshotLabelError, type SnapshotComparison } from "../lib/snapshots.ts";
 import { fetchCollection, type CollectionOutcome, type CollectionRequest } from "../agents/client.ts";
-import { downloadDeck, type DeckSpec } from "../lib/slides.ts";
+import { downloadDeck, slideRequest, type DeckSpec, type SlideRequest } from "../lib/slides.ts";
 import { DECISION_OUTCOMES, NOTE_MAX, OUTCOME_LABEL, briefDecisionState } from "../lib/decisions.ts";
 import { courseVersionIds, stepDef, stepForTab, taughtVersionId, termWindow, type CourseStep, type ReportTab } from "./loop.ts";
 export { REPORT_TABS, type ReportTab } from "./loop.ts";
@@ -523,8 +524,9 @@ export function saveTeachingSession(subjectId: SubjectId, input: SessionInput): 
     learningCheck: input.learningCheck.trim(), resources: input.resources.trim(),
     updatedAt: nowIso(), updatedBy: state.currentPersonId!,
     courseVersionId: subjectById(subjectId)?.currentVersionId, needsReview: false,
-    // The session's items are kept as they are; they change only through the item actions below.
+    // The session's items, and slides Prism drafted, are kept as they are; they change only through their own actions below.
     ...(target?.items ? { items: target.items } : {}),
+    ...(target?.slides && target.slidesBy ? { slides: target.slides, slidesBy: target.slidesBy } : {}),
   };
   updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: [...plan.sessions.filter((s) => s.id !== session.id), session] }));
   return { ok: true };
@@ -586,6 +588,28 @@ export function addModelItems(subjectId: SubjectId, sessionId: string, items: Dr
   if (!added.length) return { ok: false, error: "Prism's draft had no usable item. Try again, or draft from the templates." };
   setSessionItems(subjectId, sessionId, [...(session.items ?? []), ...added]);
   set({ toast: added.length + " items drafted by Prism for your review. Check each key; the lint shows what is left." });
+  return { ok: true };
+}
+
+/** What Prism reads to draft one of the lecturer's own sessions' slides (lib/slides.ts slideRequest), or why it cannot yet. */
+export function sessionSlideRequest(subjectId: SubjectId, sessionId: string): SlideRequest | string {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return session;
+  const subject = subjectById(subjectId)!;
+  return slideRequest(subject, session, state.clos.filter((c) => c.subjectId === subjectId), definitionForCourse(subjectId), evidenceReportForCourse(subjectId), state.skillMentions);
+}
+/** Prism's slides for one of the lecturer's own sessions, replacing any it drafted before; the pack then says on every slide
+ *  that its text was drafted by the model. `null` discards them, and the pack goes back to being built from the records. */
+export function setSessionSlides(subjectId: SubjectId, sessionId: string, slides: SlideDraft[] | null): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  if (slides && !slides.length) return { ok: false, error: "Prism's draft had no usable slide. Try again." };
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: plan.sessions.map((s) => {
+    if (s.id !== sessionId) return s;
+    const { slides: _slides, slidesBy: _by, ...rest } = s;
+    return slides ? { ...rest, slides, slidesBy: "prism" as const } : rest;
+  }) }));
+  set({ toast: slides ? slides.length + " slides drafted by Prism. Preview the pack, download it and edit it in PowerPoint." : "Prism's slides discarded; the pack is built from the session again." });
   return { ok: true };
 }
 

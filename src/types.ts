@@ -270,6 +270,7 @@ export interface TeachingSession {
   updatedBy: PersonId;
   // Track C (depth plan Section 5.1), optional so older records load:
   slides?: SlideDraft[]; // the session's own slides; without them the pack is built from the records
+  slidesBy?: "prism"; // the slides' text was drafted by the model (Prism), and every slide of the pack says so
   labSheet?: string; // markdown
   projectBrief?: string; // markdown
   topicId?: string; // the course topic this session teaches

@@ -4,7 +4,7 @@ import { plural } from "../../app/loop.ts";
 import { can, navAllows } from "../../app/roles.ts";
 import {
   definitionForCourse, deleteTeachingSession, downloadPack, navigate, nowIso, saveTeachingPlanDetails, saveTeachingSession,
-  selectSubject, trackRequest, type AppState,
+  selectSubject, sessionSlideRequest, setSessionSlides, trackRequest, type AppState,
 } from "../../app/store.ts";
 import { DEMO_LINE } from "../../data/sample-course/index.ts";
 import { buildCourseFile, type CourseFilePack } from "../../lib/courseFile.ts";
@@ -23,6 +23,7 @@ import { Button, Disclosure, Field, Input, Select, Tag, Textarea } from "../prim
 import { Meter } from "../primitives/loop.tsx";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
 import { SessionItems } from "./SessionItems.tsx";
+import { fetchModelSlides } from "../../agents/client.ts";
 import { courseMisconceptions } from "../../lib/items.ts";
 
 type CourseProps = { state: AppState; person: Person; subject: Subject };
@@ -264,7 +265,7 @@ function SessionCard({ session, subject, clos, mayEdit, editorOpen, deleting, de
 }) {
   const spec = deckFor(session);
   const prior = priorPack(session), changes = prior ? deckDiff(prior, spec) : [];
-  const kind = session.slides?.length ? "Full slides" : session.sample ? "Outline pack" : null;
+  const kind = session.slidesBy === "prism" && session.slides?.length ? "Slides drafted by Prism" : session.slides?.length ? "Full slides" : session.sample ? "Outline pack" : null;
   const file = (suffix: string) => subject.id + "-week-" + session.week + "-" + suffix + ".md";
   return <li><article className={"session-card teaching-session" + (session.sample ? " is-sample" : "")} data-demo-id={"session-" + session.id}>
     <div className="session-card-head"><span className="session-week"><span className="eyebrow">Week</span><strong className="tabular">{session.week}</strong></span>
@@ -286,13 +287,38 @@ function SessionCard({ session, subject, clos, mayEdit, editorOpen, deleting, de
     <div className="button-row"><Button data-demo-id={"session-slides-" + session.id} aria-label={"Download teaching pack for " + session.topic} onClick={() => void downloadPack(subject.id, spec)}><Download size={15} /> Teaching pack (.pptx)</Button>
       {session.labSheet ? <Button data-demo-id={"session-lab-" + session.id} onClick={() => downloadText(file("lab-sheet"), session.labSheet!)}><Download size={15} /> Lab sheet (.md)</Button> : null}
       {session.projectBrief ? <Button data-demo-id={"session-brief-" + session.id} onClick={() => downloadText(file("project-brief"), session.projectBrief!)}><Download size={15} /> Project brief (.md)</Button> : null}
-      <span className="muted">{session.slides?.length && session.sample ? "Sample slides written for this prototype; every slide says so." : session.sample ? "An outline pack from the course record; the lecturer's slides are not written yet." : "Editable slides built from this session, the course record and the evidence linked to its outcomes; the generator adds no text of its own."}</span></div>
+      <span className="muted">{session.slides?.length && session.sample ? "Sample slides written for this prototype; every slide says so." : session.slidesBy === "prism" && session.slides?.length ? "Teaching slides drafted by Prism, the rest built from the session and the evidence; every slide says the text was drafted by the model." : session.sample ? "An outline pack from the course record; the lecturer's slides are not written yet." : "Editable slides built from this session, the course record and the evidence linked to its outcomes; the generator adds no text of its own."}</span></div>
+    {mayEdit && !session.sample ? <PrismSlides subject={subject} session={session} /> : null}
     {mayEdit ? <div className="button-row session-actions">
       {session.sample ? null : <Button disabled={editorOpen} aria-label={"Edit " + session.topic} onClick={() => onEdit(session)}>Edit session</Button>}
       {deleting === session.id ? <><span>Remove this session?</span><Button variant="danger" onClick={() => onRemove(session.id)}>Confirm removal</Button><Button variant="quiet" onClick={() => onAskRemove(null)}>Keep session</Button></>
         : <Button variant="quiet" disabled={editorOpen} aria-label={"Remove " + session.topic} onClick={() => onAskRemove(session.id)}>Remove</Button>}
     </div> : null}
   </article></li>;
+}
+
+/** Prism drafts the session's teaching slides with the model in .env; the pack then carries them, and says on every slide that
+ *  their text was drafted by the model. The lecturer edits the downloaded pack in PowerPoint, or discards the draft. */
+function PrismSlides({ subject, session }: { subject: Subject; session: TeachingSession }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const drafted = session.slidesBy === "prism" && Boolean(session.slides?.length);
+  async function draft() {
+    const request = sessionSlideRequest(subject.id, session.id);
+    if (typeof request === "string") { setMessage(request); return; }
+    setBusy(true); setMessage("");
+    const r = await fetchModelSlides(request);
+    setBusy(false);
+    if (!r.ok) { setMessage(r.error); return; }
+    const saved = setSessionSlides(subject.id, session.id, r.list);
+    if (!saved.ok) setMessage(saved.error);
+  }
+  return <div className="button-row" data-demo-id={"prism-slides-" + session.id}>
+    <Button loading={busy} onClick={() => void draft()} data-demo-id={"prism-slides-draft-" + session.id}>{drafted ? "Draft the slides again" : "Draft slides with Prism"}</Button>
+    {drafted ? <Button variant="quiet" onClick={() => setSessionSlides(subject.id, session.id, null)}>Discard Prism's slides</Button> : null}
+    <span className="muted">{drafted ? session.slides!.length + " teaching slides drafted by Prism; every slide of the pack says so. Check them in the preview, then edit the pack in PowerPoint." : "Prism writes the teaching slides between the outcomes and the check, from this session and the course record."}</span>
+    {message ? <p role="status" className="save-status">{message}</p> : null}
+  </div>;
 }
 
 /** The course file in one click (depth plan Section 4.4): the record, the rubrics, the decisions and versions and the packs of

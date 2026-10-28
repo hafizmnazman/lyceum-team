@@ -4,9 +4,13 @@ import JSZip from "jszip";
 import { PEOPLE_IDS } from "./data/seed.ts";
 import {
   confirmProposals, evidenceReportForCourse, getState, importCollectedPostings, login, prepareEvidenceBrief, resetDemoState, runCollection,
-  saveTeachingSession, scanForRequirements, setSkillLexicon, setSkillMapping, setSourcesReviewed, type CollectRun,
+  exportWorkspaceBackup, saveTeachingSession, scanForRequirements, sessionSlideRequest, setSessionSlides, setSkillLexicon, setSkillMapping, setSourcesReviewed, type CollectRun,
 } from "./app/store.ts";
-import { briefDeck, deckBuffer, sessionDeck } from "./lib/slides.ts";
+import { DECK_FOOTER, PRISM_FOOTER, briefDeck, deckBuffer, readSlides, sessionDeck } from "./lib/slides.ts";
+import { footerText } from "./lib/deckLayout.ts";
+import { draftSlides } from "../server/llm.ts";
+import { settingsFromEnv } from "./lib/agentSettings.ts";
+import { parseWorkspaceBackup } from "./lib/workspaceBackup.ts";
 import type { CollectedPosting } from "./types.ts";
 
 const RETRIEVED = "2026-10-09T03:00:00.000Z";
@@ -83,4 +87,43 @@ test("a session with no linked evidence says so instead of inventing content", a
   assert.deepEqual(spec.slides[1].bullets, ["No course outcome linked yet. Link one in the teaching plan."]);
   assert.match(spec.slides[2].bullets![0], /No evidence is linked/);
   assert.deepEqual(spec.slides[3].paragraphs, ["Add an activity students will take part in."]);
+});
+
+test("Prism's slides: checked, kept on the lecturer's own session, labelled on every slide, kept through an edit, discarded on request", async () => {
+  resetDemoState(); login(PEOPLE_IDS.sobri);
+  assert.equal(saveTeachingSession("CS310", { week: 6, topic: "Dashboard lab", minutes: 90, cloIds: ["CLO5"], activity: "Build a dashboard in pairs.", learningCheck: "Exit question.", resources: "", status: "ready" }).ok, true);
+  const own = () => getState().teachingPlans.find((p) => p.subjectId === "CS310")!.sessions.find((s) => !s.sample && s.week === 6)!;
+  const request = sessionSlideRequest("CS310", own().id);
+  assert.ok(typeof request !== "string");
+  assert.deepEqual([request.topic, request.minutes, request.outcomes.map((o) => o.label)], ["Dashboard lab", 90, ["CLO5"]]);
+  assert.ok(request.topicNotes.misconceptions.length > 0, "the topic's recorded misconceptions go to the model");
+  const slides = await draftSlides(settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "m" }), request, async (m) => {
+    assert.match(m[0].content ?? "", /You are Prism/);
+    return { content: JSON.stringify({ slides: [
+      { title: "Part 1: the question first", section: true, bullets: ["dropped on a divider"], notes: "Set up." },
+      { title: "Start from the stakeholder's question", bullets: ["Name the decision", "Then pick the chart"], notes: "Ask who reads it." },
+      { title: "", bullets: ["no title"], notes: "" },
+      { title: "A slide with nothing on it", bullets: [], notes: "" },
+    ] }) };
+  });
+  assert.deepEqual(slides.map((x) => [x.title, x.bullets.length, Boolean(x.section)]), [["Part 1: the question first", 0, true], ["Start from the stakeholder's question", 2, false]],
+    "untitled and empty slides dropped; a divider has no bullets");
+  assert.deepEqual(readSlides({ nope: 1 }), []);
+  assert.equal(setSessionSlides("CS310", own().id, []).ok, false);
+  assert.equal(setSessionSlides("CS310", own().id, slides).ok, true);
+  assert.equal(own().slidesBy, "prism");
+  const report = evidenceReportForCourse("CS310"), clos = getState().clos.filter((c) => c.subjectId === "CS310");
+  const deck = sessionDeck(getState().subjects.find((x) => x.id === "CS310")!, own(), clos, report, getState().skillMentions, getState().evidenceSources, getState().people, "2026-10-28T00:00:00Z");
+  assert.ok(deck.slides.some((x) => x.title === "Start from the stakeholder's question"), "the pack carries Prism's slides");
+  assert.equal(footerText(deck).endsWith(PRISM_FOOTER), true, "every slide says the text was drafted by the model");
+  assert.match(deck.slides[0].paragraphs!.join(" "), /drafted by the model \(Prism\)/, "and so does the cover");
+  assert.equal(saveTeachingSession("CS310", { ...own(), topic: "Dashboard lab, revised" }).ok, true);
+  assert.equal(own().slides?.length, 2, "editing the session keeps Prism's slides");
+  assert.ok(parseWorkspaceBackup(exportWorkspaceBackup(), getState().people.map((p) => p.id)).ok, "a backup with them validates");
+  const sample = getState().teachingPlans.find((p) => p.subjectId === "CS310")!.sessions.find((x) => x.sample)!;
+  assert.equal(setSessionSlides("CS310", sample.id, slides).ok, false, "samples stay as written");
+  assert.equal(setSessionSlides("CS310", own().id, null).ok, true);
+  assert.deepEqual([own().slides, own().slidesBy], [undefined, undefined], "discarded");
+  const plain = sessionDeck(getState().subjects.find((x) => x.id === "CS310")!, own(), clos, report, getState().skillMentions, getState().evidenceSources, getState().people, "2026-10-28T00:00:00Z");
+  assert.equal(footerText(plain).endsWith(DECK_FOOTER), true, "back to the generator's own line");
 });

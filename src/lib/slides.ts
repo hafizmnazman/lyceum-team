@@ -7,7 +7,8 @@
 // five slide masters with the institution's brand (depth plan Section 5.2); the
 // meeting brief keeps the plain renderer.
 
-import type { CLO, CourseDefinition, EvidenceBrief, EvidenceSource, InstitutionProfile, Person, SkillMapping, SkillMention, Subject, TeachingSession } from "../types.ts";
+import { z } from "zod";
+import type { CLO, CourseDefinition, EvidenceBrief, EvidenceSource, InstitutionProfile, Person, SkillMapping, SkillMention, SlideDraft, Subject, TeachingSession } from "../types.ts";
 import { RECOMMENDATION_LABEL, STAGE_LABEL, evidenceReport, skillKey, type EvidenceReport } from "./evidence.ts";
 import { bareHex } from "../theme/tokens.ts";
 import { DEMO_LINE } from "../data/sample-course/index.ts";
@@ -27,6 +28,37 @@ export interface DeckSlide {
 export interface Brand { institution: string; mark: { data: string; alt: string; aspect: number } | null; footer: string; lead: string; sample: boolean }
 export interface DeckSpec { fileName: string; title: string; author: string; generatedAt: string; footer: string; slides: DeckSlide[]; brand?: Brand }
 export const OUTLINE_LABEL = "Outline pack: the lecturer's slides are not written yet.";
+/** The line every slide of a pack carries when its slide text was drafted by the model, in place of DECK_FOOTER. */
+export const PRISM_FOOTER = "Slide text drafted by the model (Prism) for the lecturer to check; editable.";
+
+// ---------- Prism: a session's teaching slides drafted by the model ----------
+/** What Prism reads: the session, its outcomes, the course topic it teaches with its activities, readings and misconceptions,
+ *  and the employer evidence mapped to its outcomes with one quotation each. Prism writes the teaching body only; the cover,
+ *  outcomes, evidence, check, resources and closing slides stay generated from the record. */
+export interface SlideRequest {
+  course: string; topic: string; minutes: number; activity: string; learningCheck: string;
+  outcomes: Array<{ label: string; text: string }>; topicNotes: { activities: string; readings: string; misconceptions: string[] };
+  evidence: Array<{ skill: string; postings: number; eligible: number; quote: string }>;
+}
+export function slideRequest(subject: Subject, session: TeachingSession, clos: CLO[], definition: CourseDefinition | null | undefined, report: EvidenceReport, mentions: SkillMention[]): SlideRequest {
+  const topic = definition?.topics.find((t) => t.id === session.topicId) ?? definition?.topics.find((t) => t.week === session.week);
+  return {
+    course: subject.id + " " + subject.title, topic: session.topic, minutes: session.minutes, activity: session.activity, learningCheck: session.learningCheck,
+    outcomes: clos.filter((c) => session.cloIds.includes(c.id)).map((c) => ({ label: c.label ?? c.id, text: c.text })),
+    topicNotes: { activities: topic?.activities ?? "", readings: topic?.readings ?? "", misconceptions: topic?.misconceptions ?? [] },
+    evidence: report.rows.filter((r) => r.postings > 0 && r.mapping?.cloIds.some((id) => session.cloIds.includes(id))).slice(0, 5).map((r) => ({ skill: r.skill, postings: r.postings,
+      eligible: report.eligible, quote: mentions.find((m) => m.subjectId === subject.id && skillKey(m.skill) === r.key)?.excerpt ?? "" })),
+  };
+}
+const ModelSlide = z.object({ title: z.string().trim().min(1).max(120), bullets: z.array(z.string().trim().min(1).max(200)).max(7).catch([]),
+  notes: z.string().trim().max(1500).catch(""), section: z.boolean().optional().catch(undefined) });
+/** Keep the slides that are well formed, at most fourteen; a section divider carries no bullets. */
+export function readSlides(raw: unknown): SlideDraft[] {
+  const list = raw && typeof raw === "object" && Array.isArray((raw as { slides?: unknown }).slides) ? (raw as { slides: unknown[] }).slides : [];
+  return list.map((s) => ModelSlide.safeParse(s)).filter((r) => r.success).slice(0, 14)
+    .map(({ data }) => (data.section ? { title: data.title, bullets: [], notes: data.notes, section: true } : { title: data.title, bullets: data.bullets, notes: data.notes }))
+    .filter((s) => s.section || s.bullets.length);
+}
 
 const percent = (x: number | null) => (x === null ? "Unknown" : Math.round(x * 1000) / 10 + "%");
 const name = (people: Person[], id: string) => people.find((p) => p.id === id)?.name ?? id;
@@ -135,7 +167,10 @@ export function sessionDeck(subject: Subject, session: TeachingSession, clos: CL
     const source = mention && sources.find((s) => s.id === mention.sourceId);
     return mention && source ? "\"" + mention.excerpt.replace(/\s+/g, " ") + "\" (" + (source.organisation || source.title) + ")" : null;
   };
-  const brand = context.brand ?? { institution: "", mark: null, footer: DECK_FOOTER, lead: subject.id + " · week " + session.week, sample: false };
+  const byPrism = session.slidesBy === "prism" && Boolean(session.slides?.length);
+  const baseBrand = context.brand ?? { institution: "", mark: null, footer: DECK_FOOTER, lead: subject.id + " · week " + session.week, sample: false };
+  // On the sample course the demo line stays, and the model's line follows it.
+  const brand = byPrism ? { ...baseBrand, footer: baseBrand.sample ? baseBrand.footer + " " + PRISM_FOOTER : PRISM_FOOTER } : baseBrand;
   const topic = context.definition?.topics.find((t) => t.id === session.topicId) ?? context.definition?.topics.find((t) => t.week === session.week);
   const next = context.definition?.topics.filter((t) => t.week !== null && t.week > session.week).sort((a, b) => a.week! - b.week!)[0];
   const outcomes: DeckSlide = { title: "Learning outcomes for this session", bullets: linked.length ? linked.map((c) => label(c) + ": " + c.text) : ["No course outcome linked yet. Link one in the teaching plan."],
@@ -152,7 +187,8 @@ export function sessionDeck(subject: Subject, session: TeachingSession, clos: CL
   const cover: DeckSlide = { kind: "title", title: subject.id + " week " + session.week + ": " + session.topic, subtitle: session.minutes + " minutes. " + subject.title,
     // A sample session was written for the prototype, not by the person on its record, so its cover names no one.
     paragraphs: [session.sample ? "A sample session, generated on " + dayOf(generatedAt) + "." : "Prepared by " + name(people, session.updatedBy) + " on " + dayOf(generatedAt) + ".",
-      session.sample ? (session.slides?.length ? "Sample slides, written for this prototype and labelled synthetic." : "An outline pack built from the sample course record.") : "Editable teaching pack generated from the saved session and the course evidence."],
+      session.sample ? (session.slides?.length ? "Sample slides, written for this prototype and labelled synthetic." : "An outline pack built from the sample course record.")
+        : byPrism ? "The teaching slides were drafted by the model (Prism) from the session and the course record; check and edit them before teaching." : "Editable teaching pack generated from the saved session and the course evidence."],
     notes: session.sample ? "A sample session written for this prototype. Edit it, or write your own." : "Teaching pack for the session. Edit freely; it is yours." };
   let slides: DeckSlide[];
   if (session.slides?.length) {

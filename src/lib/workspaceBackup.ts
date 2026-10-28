@@ -79,7 +79,7 @@ const predicates: Record<typeof WORKSPACE_DATA_KEYS[number], Check> = {
       needsReview: opt(boolean), courseVersionId: opt(id),
       slides: opt(array(shape({ title: str, bullets: array(str, 100), notes: str, right: opt(array(str, 100)), section: opt(boolean),
         figure: opt(x => record(x) && ((x.kind === "table" && array(str, 20)(x.header) && array(array(str, 20), 100)(x.rows) && str(x.alt)) || (x.kind === "placeholder" && str(x.label)))) }), 100)),
-      labSheet: opt(str), projectBrief: opt(str), topicId: opt(id), sample: opt(boolean), items: opt(array(draftItem, 200)) })) })),
+      labSheet: opt(str), projectBrief: opt(str), topicId: opt(id), sample: opt(boolean), slidesBy: opt(one("prism")), items: opt(array(draftItem, 200)) })) })),
   courseDefinitions: dict(x => record(x)),
   rubrics: array(shape({ id, subjectId: id, componentId: id, title: str, sample: opt(boolean),
     criteria: array(shape({ name: str, marks: nonnegative, cloIds: strings, levels: x => Array.isArray(x) && x.length === 4 && x.every(str) }), 100) }), 1000),
