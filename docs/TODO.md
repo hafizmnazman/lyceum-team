@@ -19,15 +19,15 @@ has real data; the demo runs on the fixtures.
 - [x] **One model config for every agent** (`refactor/unify-agent-model`). Intake, authoring, evaluator, analogy and
       signal now call the `LYCEUM_AGENT_*` model through `openAiChat`, like agent web search and the outline reader;
       `ANTHROPIC_API_KEY`, `LYCEUM_MODEL` and the Anthropic SDK are gone. The fixtures still answer with no model set.
-- [x] **Signal from real evidence** (`feat/signal-from-evidence`). `signalFromEvidence` (`src/agents/signal.ts`) gives each
+- [x] **Signal from real evidence** (`feat/signal-from-evidence`). `signalFromEvidence` (`shared/agents/signal.ts`) gives each
       outcome its demand (share of reviewed postings for its most-asked mapped skill), coverage (the coverage index per
       outcome) and gap, and flags the course when demand's 95% lower bound beats coverage by 0.5. Shown on Report → Map;
       `currentSignal()` feeds Programme (which now lists the lecturer's own courses), `routeDrift`, and `currentGaps()`
       feeds Trends, for every course that has reviewed evidence; the fixture covers the rest. The Trends reveal animation
       still plays the fixture's story (see "Signal reveal driven by the run").
-- [ ] **Signal reveal driven by the run.** `src/app/signalSim.ts` animates a fixed answer. Show the real run's steps (the
+- [ ] **Signal reveal driven by the run.** `web/src/app/signalSim.ts` animates a fixed answer. Show the real run's steps (the
       postings read, the skills found, the CLOs mapped) as they happen; the scripted reveal stays for the demo.
-- [ ] **Market sources from real runs.** Replace `MARKET_SOURCES` (`src/data/market.ts`, the made-up JobStreet and
+- [ ] **Market sources from real runs.** Replace `MARKET_SOURCES` (`shared/data/market.ts`, the made-up JobStreet and
       LinkedIn counts) with the research runs actually done: board, date, postings kept, on real courses. The synthetic
       list stays, labelled, for the demo (Trends, DataRoom, Index).
 - [x] **Intake live** (already, since `refactor/unify-agent-model`). The Upload screen sends a real file to
@@ -36,13 +36,13 @@ has real data; the demo runs on the fixtures.
 - [x] **Authoring live: Quill on the Update step** (`feat/live-intake-authoring`). With a revision open, "Suggest changes"
       sends the outline and the quoted skills the course is below target on or has not mapped (with counts and a quotation)
       to the model, which suggests single changes: reword an outcome, add one, add a topic. Each is checked
-      (`src/lib/revision.ts`: unknown outcomes and kinds dropped, Bloom levels normalised) and the lecturer applies or
+      (`shared/lib/revision.ts`: unknown outcomes and kinds dropped, Bloom levels normalised) and the lecturer applies or
       dismisses it into the open revision; saving, checking and adopting are unchanged. The sandbox Proposal screen
       (`draftWithAgent`, `requestAgentReview`) keeps its CS220 fixture for the demo.
 - [x] **Atlas proposes mappings** (`feat/atlas-lens-proposals`). "Suggest mappings" on Report → Map sends the quoted skills
       with no mapping (count and one quotation each) and the outcomes by label; Atlas proposes the outcomes each belongs
       to, or says it fits none (a gap). Applying records the mapping with stage and target unknown: those stay the
-      lecturer's (`src/lib/proposals.ts`).
+      lecturer's (`shared/lib/proposals.ts`).
 - [x] **Lens scan with a model** (`feat/atlas-lens-proposals`). "Find with Lens" on Report → Quote sends the 10
       least-quoted postings, three to a call in parallel, with the skills already quoted from each. A proposal is kept only
       if `locateExcerpt` finds it in its posting; the rest join the scan's list and are confirmed the same way. The
@@ -66,7 +66,7 @@ has real data; the demo runs on the fixtures.
 ### Scheduling and running in the background
 - [x] **Watch on a schedule** (`feat/scheduled-watch`). A signed-in lecturer saves the Watch form's source (Greenhouse or
       Lever board, or an agent search brief) as a schedule every 1 to 90 days. The API checks every 15 minutes
-      (`server/watch.ts`, `LYCEUM_WATCH=off` to stop it), claims each due schedule so it runs once, and keeps each run,
+      (`api/watch.ts`, `LYCEUM_WATCH=off` to stop it), claims each due schedule so it runs once, and keeps each run,
       failures included, in `watch_runs` (last 10 per course; migration 002). Watch lists the runs and how many postings
       are not yet imported; Open loads a run into the usual results table to import. Run now runs it on request. Demo
       personas have no account, so the panel asks them to sign in. Email when a run finds something is still open (see
@@ -75,31 +75,31 @@ has real data; the demo runs on the fixtures.
       closed tab and can be audited; show it on the agent's card. Retries, a per-run token budget, a usage log.
 
 ### Decide and Learn: the mock cohort
-- [ ] **Cohort from the course's own data.** `src/data/synthetic-cohort.json` (200 made-up students) and the knobs in
-      `src/config.ts` feed the verdict. Build the cohort from the course's uploaded results and CLO surveys; keep the
+- [ ] **Cohort from the course's own data.** `shared/data/synthetic-cohort.json` (200 made-up students) and the knobs in
+      `shared/config.ts` feed the verdict. Build the cohort from the course's uploaded results and CLO surveys; keep the
       synthetic cohort for the demo.
 - [ ] **Lock predictions, then score them.** Freeze the cohort's predictions before a term starts, then score them against
       that term's results and CLO/SSRT survey on Learn. Until two terms are scored, keep "no learning gain is claimed".
-- [ ] **Backtest on uploaded history.** `src/data/historical-backtest.json` is a fixed v1 cohort; run the backtest on a
+- [ ] **Backtest on uploaded history.** `shared/data/historical-backtest.json` is a fixed v1 cohort; run the backtest on a
       past term the lecturer uploads.
-- [ ] **Staged reveal from the real run.** `src/app/sim.ts` replays a precomputed result over 16 s; show real progress on
+- [ ] **Staged reveal from the real run.** `web/src/app/sim.ts` replays a precomputed result over 16 s; show real progress on
       real courses, and keep the replay for the demo.
 
 ### People and sharing
 - [ ] **Shared programme workspaces and invitations** (see role-based onboarding below). Without it, "send the brief to a
       colleague" (`sendEvidenceBrief`, `store.ts:2653`) only reaches the seeded demo personas.
 - [ ] **Email notifications** for a sent brief, a decision needed, a finished scheduled run.
-- [ ] **Survey answers in the database.** The booth keeps responses in a `Map` in `server/index.ts`; a restart loses them.
+- [ ] **Survey answers in the database.** The booth keeps responses in a `Map` in `api/index.ts`; a restart loses them.
 
 ### Data out of the code and into the database
 - [ ] **Keep the fake numbers as demo data, not as tables.** The Signal constants, the market source counts and the canned
       intake and authoring fixtures stay in the code for the pitch; the work above computes the real ones. They are not
       copied into tables, since editing a made-up number does not make it real.
 - [ ] **Reference data as tables, editable from Settings.** Bloom verbs (`items.ts` `BLOOM_VERBS`), the skills lexicon,
-      accreditors (`src/data/accreditors.ts`), institution details (`src/data/institution.ts`), pass marks and KPI
-      targets, the model knobs (`src/config.ts`). One migration each, seeded with today's values, read through one
+      accreditors (`shared/data/accreditors.ts`), institution details (`shared/data/institution.ts`), pass marks and KPI
+      targets, the model knobs (`shared/config.ts`). One migration each, seeded with today's values, read through one
       endpoint. Per-institution rows where it differs by institution.
-- [ ] **The demo as one seed, not scattered constants.** Move `src/data/seed.ts`, `sample-course/` and the demo personas
+- [ ] **The demo as one seed, not scattered constants.** Move `shared/data/seed.ts`, `sample-course/` and the demo personas
       into a script that creates a demo account with that workspace in the database (`npm run db:seed-demo`). The browser
       no longer ships the seed.
 - [ ] **Split the workspace blob into tables, one entity at a time.** `workspaces.backup` is one `jsonb` per account,
@@ -108,7 +108,7 @@ has real data; the demo runs on the fixtures.
 - [ ] **Stay Supabase-ready.** Plain Postgres and SQL migrations only (Supabase is Postgres, so the move is a
       `DATABASE_URL` change plus `pg_dump`). Keep auth and permissions in the server, not in Supabase-only features,
       until the move; then decide whether Supabase Auth and row-level security replace ours. Files stay on R2 either way.
-- [ ] **Uploaded files in Cloudflare R2.** Outlines, results and slides are parsed and dropped (`server/index.ts` reads
+- [ ] **Uploaded files in Cloudflare R2.** Outlines, results and slides are parsed and dropped (`api/index.ts` reads
       the upload into a buffer and keeps only the text); keep the originals so a quotation or a figure can link back to its
       file, OCR and the outline reader can run again on old uploads, and OCR can become a background job.
       - R2 for dev and prod, no local storage container: two buckets (`lyceum-dev`, `lyceum-prod`), each with its own
@@ -118,7 +118,7 @@ has real data; the demo runs on the fixtures.
         file in R2 under a key, insert a row in `files` (key, owner, course, name, type, size, sha256, created; migration
         003). Reading: look up the row, fetch by key or hand out a short-lived signed URL. The move to Supabase changes
         only `DATABASE_URL`; R2 is untouched.
-      - `server/storage.ts`: `put(key, buf, type)` and `get(key)`, about 30 lines. No R2 keys set → skip storing, so the
+      - `api/storage.ts`: `put(key, buf, type)` and `get(key)`, about 30 lines. No R2 keys set → skip storing, so the
         proofs (PGlite, offline) stay offline.
       - First caller: the outline upload in onboarding stores the original before parsing. Then scanned outlines (OCR)
         read from the stored key.
@@ -127,8 +127,8 @@ has real data; the demo runs on the fixtures.
         Supabase Storage is S3-compatible too, so a switch would be an endpoint change; R2 stays the pick for no egress.
 
 ### Front end
-- [ ] **Move the styles to Tailwind.** `src/theme/global.css` is about 2,600 lines of hand-written CSS with tokens in
-      `src/theme/tokens.ts` and `gen:theme`. Map the tokens into the Tailwind theme first, then move one screen at a time,
+- [ ] **Move the styles to Tailwind.** `web/src/theme/global.css` is about 2,600 lines of hand-written CSS with tokens in
+      `shared/theme/tokens.ts` and `gen:theme`. Map the tokens into the Tailwind theme first, then move one screen at a time,
       deleting its CSS as it goes, and keep `check:contrast` passing.
 
 ## Next
@@ -142,7 +142,7 @@ has real data; the demo runs on the fixtures.
 - [ ] **Search like Odysseus, the rest.** Read several pages per fetch, with only the passages that match a query (Odysseus
       `web_fetch` with `urls` and `query`).
 - [ ] **Google logo on the consent screen.** Needs a real domain, a home page and privacy policy, publishing the app and
-      Google's brand verification (`public/brand/google-oauth-logo-120.png` is uploaded and waiting).
+      Google's brand verification (`web/public/brand/google-oauth-logo-120.png` is uploaded and waiting).
 - [ ] **Accounts:** email verification, password reset, changing a password.
 - [ ] **Browser checks.** The four headless smokes need a Chrome or Edge the scripts can find from WSL; the new screens
       (sign in, onboarding, Settings, Home) have not been checked in a browser by the tooling.

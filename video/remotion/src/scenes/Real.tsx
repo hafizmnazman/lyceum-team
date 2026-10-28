@@ -8,7 +8,7 @@ import { count, draw, fade, float, glide, pop } from "../anim";
 import { HELPER_NAMES, HelperBadge, HostFigure, isHelper } from "../components/Cast";
 import { C, F, alpha } from "../theme";
 import { loudness, timeline, type Scene } from "../timeline";
-import { Mark } from "../../../../src/ui/mascots/mark.tsx";
+import { Mark } from "../../../../web/src/ui/mascots/mark.tsx";
 
 const FIG = timeline.figures;
 const cueAt = (scene: Scene, name: string) => scene.cues[name]; // optional cues: an app scene may have none

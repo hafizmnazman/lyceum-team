@@ -1,7 +1,7 @@
 // The bundled faces, from public/fonts (copied there by scripts/sync.mjs from the
 // app's own files), loaded before the first frame: nothing is fetched at render time.
 import { continueRender, delayRender, staticFile } from "remotion";
-import { fontFiles } from "../../../src/theme/tokens.ts";
+import { fontFiles } from "../../../shared/theme/tokens.ts";
 
 const waiting = delayRender("Loading the bundled faces");
 Promise.all(fontFiles.map((f) => {

@@ -2,15 +2,15 @@
 // characters are the app's characters; and the lecturer figure, the film's
 // only extra: faceless but for two dot eyes and a mouth that opens with her voice.
 import React from "react";
-import { Atlas } from "../../../../src/ui/mascots/atlas.tsx";
-import { Folio } from "../../../../src/ui/mascots/folio.tsx";
-import { Host } from "../../../../src/ui/mascots/host.tsx";
-import { Lens } from "../../../../src/ui/mascots/lens.tsx";
-import type { HelperPose, HostPose } from "../../../../src/ui/mascots/parts.tsx";
-import { Prism } from "../../../../src/ui/mascots/prism.tsx";
-import { Quill } from "../../../../src/ui/mascots/quill.tsx";
-import { Scout } from "../../../../src/ui/mascots/scout.tsx";
-import { Steward } from "../../../../src/ui/mascots/steward.tsx";
+import { Atlas } from "../../../../web/src/ui/mascots/atlas.tsx";
+import { Folio } from "../../../../web/src/ui/mascots/folio.tsx";
+import { Host } from "../../../../web/src/ui/mascots/host.tsx";
+import { Lens } from "../../../../web/src/ui/mascots/lens.tsx";
+import type { HelperPose, HostPose } from "../../../../web/src/ui/mascots/parts.tsx";
+import { Prism } from "../../../../web/src/ui/mascots/prism.tsx";
+import { Quill } from "../../../../web/src/ui/mascots/quill.tsx";
+import { Scout } from "../../../../web/src/ui/mascots/scout.tsx";
+import { Steward } from "../../../../web/src/ui/mascots/steward.tsx";
 import { C } from "../theme";
 
 const HELPERS = { folio: Folio, scout: Scout, atlas: Atlas, lens: Lens, quill: Quill, prism: Prism, steward: Steward } as const;

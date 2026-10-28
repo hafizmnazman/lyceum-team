@@ -1,0 +1,11 @@
+{
+  "name": "@lyceum/api",
+  "private": true,
+  "type": "module",
+  "description": "Lyceum's backend: the Hono API, accounts, the database, the agents' model calls. Dependencies are installed once at the repo root.",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch index.ts",
+    "start": "node --env-file-if-exists=.env index.ts",
+    "db:migrate": "node --env-file-if-exists=.env db-migrate.ts"
+  }
+}

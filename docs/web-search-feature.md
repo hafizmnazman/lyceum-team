@@ -16,16 +16,16 @@ For the full engineering spec see [`specs/search.md`](../specs/search.md).
 |---|---|---|
 | Toggle button | `static/index.html:1177` (`#web-toggle-btn`), hidden checkbox `#web-toggle` at `:1255` | User clicks the globe icon |
 | Request form | `static/js/chat.js:2648-2655` | Chat mode sends `use_web=true`. Agent mode sends `allow_web_search=true/false` |
-| Gate | `src/tool_policy.py:45` `web_search_enabled_for_turn()` | Web is on only when the request explicitly enables it. An explicit `allow_web_search=false` always wins |
+| Gate | `web/src/tool_policy.py:45` `web_search_enabled_for_turn()` | Web is on only when the request explicitly enables it. An explicit `allow_web_search=false` always wins |
 | Route | `routes/chat_routes.py:2570` | Computes `_search_enabled` |
 | Intent auto-enable | `routes/chat_routes.py:~3340-3384` | If the message clearly asks for a lookup ("search…", "latest…", a follow-up on a link), web can turn on even with the toggle off, **unless** the user explicitly set it to false (`web_intent_may_enable_for_turn`, `tool_policy.py:58`) |
 | Disable | `routes/chat_routes.py:3385` | Otherwise `WEB_TOOL_NAMES` (`web_search`, `web_fetch`, `get_weather`) are added to `disabled_tools` |
 
-Global feature flags live in `src/settings.py:223` (`DEFAULT_FEATURES["web_search"]`, `["web_fetch"]`, both `True`).
+Global feature flags live in `web/src/settings.py:223` (`DEFAULT_FEATURES["web_search"]`, `["web_fetch"]`, both `True`).
 
 ## 2. Agent mode: the tools
 
-### Tool schemas (what the model sees): `src/tool_schemas.py:334`
+### Tool schemas (what the model sees): `web/src/tool_schemas.py:334`
 
 **`web_search`**
 ```json
@@ -44,15 +44,15 @@ Reads known URLs. It fetches up to 12 at once, 4 at a time. `query` returns only
 "web_search": WebSearchTool().execute,
 "web_fetch":  WebFetchTool().execute,
 ```
-`src/tool_parsing.py:317` maps aliases such as `search`, `google_search` and `fetch_url` to these names, so models with other tool vocabularies still work.
+`web/src/tool_parsing.py:317` maps aliases such as `search`, `google_search` and `fetch_url` to these names, so models with other tool vocabularies still work.
 
 ### `WebSearchTool`: `src/agent_tools/web_tools.py:304`
 1. Parses the input as JSON or plain text, then reads `query`, `time_filter` and `max_pages` (1–10, default 5).
-2. If there's no `time_filter`, it infers one from the query (`src/search_intent.py`).
+2. If there's no `time_filter`, it infers one from the query (`web/src/search_intent.py`).
 3. Scholarly or official-site metadata queries use `searxng_search_results` (links only). Everything else uses `comprehensive_web_search`, which searches, ranks and fetches the pages.
 4. **30 s timeout.** On timeout it falls back to metadata-only results (12 s) so the agent still gets links.
 5. If a weather query returns nothing, it falls back to the `get_weather` tool.
-6. Output is compacted by `bounded_search_observation` (`src/search_passages.py`), with `<!-- SOURCES:[...] -->` appended. The agent loop strips this marker and uses it for citations (`src/agent_loop.py:~33903`).
+6. Output is compacted by `bounded_search_observation` (`web/src/search_passages.py`), with `<!-- SOURCES:[...] -->` appended. The agent loop strips this marker and uses it for citations (`web/src/agent_loop.py:~33903`).
 
 ### `WebFetchTool`: `src/agent_tools/web_tools.py:442`
 - http/https only. A bare domain like `example.com` is fine.
@@ -61,7 +61,7 @@ Reads known URLs. It fetches up to 12 at once, 4 at a time. `query` returns only
 
 ## 3. Chat mode: pre-search
 
-`src/chat_processor.py:411`. When `use_web=True`:
+`web/src/chat_processor.py:411`. When `use_web=True`:
 1. The session model writes a short search query (≤50 tokens, 15 s). If that fails, the first line of the user message is used.
 2. The query is cleaned (`_clean_search_query`, max 150 chars).
 3. `comprehensive_web_search(query, return_sources=True)` runs.
@@ -69,7 +69,7 @@ Reads known URLs. It fetches up to 12 at once, 4 at a time. `query` returns only
 
 ## 4. Search pipeline (shared)
 
-Canonical code is in `services/search/`. `src/search/*` are compatibility shims that point to it.
+Canonical code is in `services/search/`. `web/src/search/*` are compatibility shims that point to it.
 
 | File | Owns |
 |---|---|
@@ -81,11 +81,11 @@ Canonical code is in `services/search/`. `src/search/*` are compatibility shims 
 | `cache.py`, `analytics.py` | Result cache and stats |
 | `service.py` | `SearchService`, an async facade |
 
-Outbound fetch safety is in `src/outbound_fetch.py`. It blocks private, localhost and metadata IPs, pins DNS per hop (anti-rebinding), re-checks every redirect, and caps download size (`WEB_FETCH_SOFT_MAX_BYTES` / `WEB_FETCH_HARD_MAX_BYTES`).
+Outbound fetch safety is in `web/src/outbound_fetch.py`. It blocks private, localhost and metadata IPs, pins DNS per hop (anti-rebinding), re-checks every redirect, and caps download size (`WEB_FETCH_SOFT_MAX_BYTES` / `WEB_FETCH_HARD_MAX_BYTES`).
 
 ## 5. Configuration
 
-Defaults in `src/settings.py:66`:
+Defaults in `web/src/settings.py:66`:
 
 | Setting | Default | Notes |
 |---|---|---|
@@ -120,6 +120,6 @@ Admin UI: `static/js/settings.js` and `static/js/settings/search.js`.
 
 ## 8. Related
 
-- **Deep research** (`src/deep_research.py`, `routes/research/`): a multi-step research job that uses the same providers.
+- **Deep research** (`web/src/deep_research.py`, `routes/research/`): a multi-step research job that uses the same providers.
 - **`private_browser`**, **`youtube_tool`**, **`pdf_extract`**: other web-access tools in `web_tools.py`.
 - Known gaps: see "Current Gaps" in `specs/search.md`.

@@ -1,5 +1,5 @@
 # Lyceum's local services, each bound to this computer only.
-#   postgres: accounts, sessions and workspaces (server/db.ts, docs/database.md).  npm run db:up
+#   postgres: accounts, sessions and workspaces (api/db.ts, docs/database.md).  npm run db:up
 #   searxng:  keyless web search for agent web search (Watch > Research run).       npm run search:up
 # Stop both: npm run services:down (the database's data stays in the lyceum-pgdata volume).
 services:

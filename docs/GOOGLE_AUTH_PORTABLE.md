@@ -128,9 +128,9 @@ CREATE INDEX auth_events_user ON auth_events (user_id, created_at DESC);
 ## 6. Backend (Node 24 + Express 5 + pg + zod, ESM TypeScript)
 
 Dependencies: `express pg zod` (+ dev: `typescript @types/express @types/node @types/pg`). Node 24 runs `.ts` directly
-(`node --env-file-if-exists=.env src/index.ts`); on older Node use `tsx`. If the project is plain JS, drop the types.
+(`node --env-file-if-exists=.env web/src/index.ts`); on older Node use `tsx`. If the project is plain JS, drop the types.
 
-### `src/env.ts`
+### `web/src/env.ts`
 
 ```ts
 import { z } from 'zod';
@@ -154,7 +154,7 @@ if (!parsed.success) {
 export const env = parsed.data;
 ```
 
-### `src/db.ts`
+### `web/src/db.ts`
 
 ```ts
 import pg from 'pg';
@@ -162,7 +162,7 @@ import pg from 'pg';
 export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 ```
 
-### `src/auth.ts` — sessions, cookies, audit, `requireUser`
+### `web/src/auth.ts` — sessions, cookies, audit, `requireUser`
 
 ```ts
 import { createHash, randomBytes } from 'node:crypto';
@@ -394,7 +394,7 @@ authRouter.get('/me', requireUser, (_req, res) => {
 });
 ```
 
-### Wire it up in `src/index.ts`
+### Wire it up in `web/src/index.ts`
 
 ```ts
 import express from 'express';

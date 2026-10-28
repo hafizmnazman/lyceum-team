@@ -20,5 +20,5 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "server", "mcp", "vite.config.ts"]
+  "include": ["web", "api", "shared", "mcp", "tests"]
 }

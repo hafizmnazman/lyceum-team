@@ -5,7 +5,7 @@
 // thread closes into the host's growth rings: every semester adds a ring.
 // Beat 2 carries the plan's three reasons (the latency, the accreditor's clause, the assistants already
 // on campus); the loop carries the clause each step answers; the proof carries the readiness ladder; the
-// wider world is the system architecture with its owners' marks (public/brand/partners/logos/, written
+// wider world is the system architecture with its owners' marks (web/public/brand/partners/logos/, written
 // by scripts/gen-partner-logos.mjs), each beside its full product name and its status, built, local and
 // read-only, or planned; the ask carries the pilot's measures and why a department pays (deck slides 10
 // and 11). The ownership line and the demo line sit in the footer, the UTP mark only there.
@@ -21,8 +21,8 @@ import puppeteer from "puppeteer-core";
 import { ROOT, fontFaceCss, fontsReady, rootVarsCss } from "./lib/theme-node.mjs";
 import { claimsRegister, figureProblems, readFigures } from "./lib/claims-node.mjs";
 import { OWNERSHIP } from "./gen-architecture.mjs";
-import { PROOF } from "../src/data/proof.ts";
-import { DEMO_LINE } from "../src/data/sample-course/index.ts";
+import { PROOF } from "../shared/data/proof.ts";
+import { DEMO_LINE } from "../shared/data/sample-course/index.ts";
 
 export const W = 594, H = 841; // A1 portrait, in mm
 const OUT = join(ROOT, "docs/presentation/poster-a1.pdf");
@@ -32,8 +32,8 @@ const ASK_H = 68; // the last chapter's height; its rings centre on its middle
 
 const dataUri = (file, type) => "data:" + type + ";base64," + readFileSync(isAbsolute(file) ? file : join(ROOT, file)).toString("base64");
 const svgUri = (file) => dataUri(file, "image/svg+xml");
-const mascot = (who, pose = "resting") => svgUri("public/brand/mascots/" + who + "-" + pose + ".svg");
-const logo = (file) => dataUri("public/brand/partners/logos/" + file, file.endsWith(".svg") ? "image/svg+xml" : "image/png");
+const mascot = (who, pose = "resting") => svgUri("web/public/brand/mascots/" + who + "-" + pose + ".svg");
+const logo = (file) => dataUri("web/public/brand/partners/logos/" + file, file.endsWith(".svg") ? "image/svg+xml" : "image/png");
 const proof = (claim) => PROOF.find((p) => p.claim === claim);
 const cells = (n, on, cls = "on") => Array.from({ length: n }, (_, i) => `<i class="${i < on ? cls : ""}"></i>`).join("");
 const ref = (s) => (/\d/.test(s) ? " data-ref" : ""); // a name or a clause with a number in it is a reference, not a figure
@@ -86,7 +86,7 @@ const desk = `<figure class="desk" aria-label="A browser window with eight tabs 
 
 // ---------- chapter 4: the loop ----------
 // The track is a stadium in the card's own millimetres; the six steps sit on it clockwise from the top left,
-// each with what it leaves behind outside the track and the clause it answers inside (src/data/accreditors.ts).
+// each with what it leaves behind outside the track and the clause it answers inside (shared/data/accreditors.ts).
 const LOOP = { w: 544, h: 147, x0: 66, x1: 478, y0: 65, y1: 115 };
 LOOP.r = (LOOP.y1 - LOOP.y0) / 2; LOOP.cy = LOOP.y0 + LOOP.r;
 const straight = (t) => LOOP.x0 + LOOP.r + (LOOP.x1 - LOOP.x0 - 2 * LOOP.r) * t;
@@ -131,7 +131,7 @@ const mark = (file, name) => `<span class="mk"><img src="${logo(file)}" alt="${n
 const PEOPLE = [["Lecturer", "runs the loop"], ["Coordinator", "decides, adopts"], ["Programme committee", "decides on briefs"], ["Students", "via results and surveys"], ["Quality office", "reads the pack, planned"]];
 // OpenAI's brand page refused an automated read, so ChatGPT Edu is named in text, never drawn (docs/brand-use.md).
 const DOORS = [
-  { name: "The web workspace", tech: "React, in the browser", status: "built", marks: `<span class="mk"><img src="${svgUri("public/brand/mark.svg")}" alt="Lyceum mark"><span>Lyceum</span></span>` },
+  { name: "The web workspace", tech: "React, in the browser", status: "built", marks: `<span class="mk"><img src="${svgUri("web/public/brand/mark.svg")}" alt="Lyceum mark"><span>Lyceum</span></span>` },
   { name: "Claude, through the local door", tech: "MCP over stdio, an exported workspace", status: "local", marks: mark("claude.svg", "Claude") + mark("modelcontextprotocol.svg", "Model Context Protocol") },
   { name: "ChatGPT Edu and Gemini Enterprise", tech: "MCP over HTTPS, OAuth", status: "planned", marks: `<span class="mk text-mark"><b>ChatGPT Edu</b></span>` + mark("googlegemini.svg", "Google Gemini") },
   { name: "Microsoft 365 Copilot and Teams", tech: "Agents Toolkit, Entra ID", status: "planned", marks: mark("microsoft-365.svg", "Microsoft 365") + mark("microsoft-teams.svg", "Microsoft Teams") },
@@ -418,7 +418,7 @@ h2 { font-family: var(--font-display); font-weight: 700; font-size: 30pt; line-h
 <main class="poster">
   <header class="mast dark">
     <div class="mast-text">
-      <div class="lockup"><img src="${svgUri("public/brand/mark-white.svg")}" alt="">Lyceum</div>
+      <div class="lockup"><img src="${svgUri("web/public/brand/mark-white.svg")}" alt="">Lyceum</div>
       <p class="mast-for">For lecturers and programme committees</p>
       ${chapter(1, "A question, after class")}
       <h1>She can suggest a change.<br><em>She cannot show why.</em></h1>
@@ -515,7 +515,7 @@ h2 { font-family: var(--font-display); font-weight: 700; font-size: 30pt; line-h
     <div class="flow">${"<i></i>".repeat(DOORS.length)}</div>
     <div class="core">
       <div class="core-name">
-        <div class="core-title"><img src="${svgUri("public/brand/mark-white.svg")}" alt=""><span>The Lyceum core<small>Deterministic engines; seven helpers prepare, people decide</small></span></div>
+        <div class="core-title"><img src="${svgUri("web/public/brand/mark-white.svg")}" alt=""><span>The Lyceum core<small>Deterministic engines; seven helpers prepare, people decide</small></span></div>
         <div class="stack"><span>Built with</span>${mark("typescript.svg", "TypeScript")}${mark("react.svg", "React")}${mark("nodedotjs.svg", "Node.js")}</div>
       </div>
       <div class="engines">${ENGINES.map(engine).join("")}</div>
@@ -559,7 +559,7 @@ h2 { font-family: var(--font-display); font-weight: 700; font-size: 30pt; line-h
   </section>
 
   <footer class="foot">
-    <img src="${dataUri("public/brand/partners/utp-wide.png", "image/png")}" alt="Universiti Teknologi PETRONAS mark, demo course">
+    <img src="${dataUri("web/public/brand/partners/utp-wide.png", "image/png")}" alt="Universiti Teknologi PETRONAS mark, demo course">
     <div><p data-ref>${DEMO_LINE} Dr Aisyah is fictional; the posting and the screens are real.</p><p>${OWNERSHIP}</p></div>
     <p class="note">Every figure here is in docs/claims.md, with its source.</p>
   </footer>

@@ -1,5 +1,5 @@
 // The integration marks for the poster (docs/brand-use.md, the owner's decision of 23 October 2026: every logo,
-// planned ones too, each with its status). They live in public/brand/partners/logos/, beside the UTP mark, because
+// planned ones too, each with its status). They live in web/public/brand/partners/logos/, beside the UTP mark, because
 // they keep their owners' colours, the one folder the contrast check leaves alone.
 //   Simple Icons paths, written here in each brand's own colour from the installed package (16.35.0).
 //   Official files, downloaded once from their owners' own pages on 23 October 2026 and committed byte for byte;
@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { ROOT } from "./lib/theme-node.mjs";
 
 const check = process.argv.includes("--check");
-const OUT = join(ROOT, "public/brand/partners/logos");
+const OUT = join(ROOT, "web/public/brand/partners/logos");
 const MANIFEST = join(OUT, "manifest.json");
 const req = createRequire(join(ROOT, "package.json"));
 const si = req("simple-icons");
@@ -93,4 +93,4 @@ if (drift.length) { console.error("Cannot write the manifest:\n  " + drift.join(
 mkdirSync(OUT, { recursive: true });
 for (const [slug] of SIMPLE) writeFileSync(join(OUT, slug + ".svg"), simpleSvg(slug).svg);
 writeFileSync(MANIFEST, manifest());
-console.log("Wrote public/brand/partners/logos/: " + SIMPLE.length + " Simple Icons marks and the manifest; " + OFFICIAL.length + " official files checked.");
+console.log("Wrote web/public/brand/partners/logos/: " + SIMPLE.length + " Simple Icons marks and the manifest; " + OFFICIAL.length + " official files checked.");
