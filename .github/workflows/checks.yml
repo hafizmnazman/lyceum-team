@@ -1,0 +1,26 @@
+# Typecheck and every prove suite, on every push and pull request. Needs no secrets: the suites run on fixtures.
+# Deploy web (Vercel) refuses a commit this workflow hasn't passed.
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Typecheck and prove
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run prove:all

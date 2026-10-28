@@ -2,7 +2,7 @@
 # Actions > "Deploy web (Vercel)" > Run workflow (branch: main). Pushes, pull requests and merges never trigger it.
 #
 # The run gates deployment in this order:
-#   1. Typecheck and every prove suite pass for this commit (run here; the repo has no separate checks workflow).
+#   1. The Checks workflow (checks.yml: typecheck and every prove suite) passed for this exact commit.
 #   2. The Database (Supabase) workflow migrated successfully for this exact commit (database.yml runs on every push to main).
 #   3. The production environment's approval, if one is set, then the deploy.
 #
@@ -27,17 +27,29 @@ permissions:
   actions: read
 
 jobs:
-  checks:
-    name: Typecheck and prove
+  verify-checks:
+    name: Verify checks
     runs-on: ubuntu-latest
     if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with: { node-version: 24, cache: npm }
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run prove:all
+      - name: Require successful checks for this commit
+        run: |
+          conclusion=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow checks.yml \
+            --commit "$GITHUB_SHA" \
+            --status completed \
+            --limit 1 \
+            --json conclusion \
+            --jq '.[0].conclusion // empty')
+          if [ "$conclusion" != "success" ]; then
+            echo "Checks have not passed for commit $GITHUB_SHA (result: ${conclusion:-not found})." >&2
+            echo "Push the commit to main, wait for Checks to finish, then run this workflow again." >&2
+            exit 1
+          fi
+          echo "Checks passed for commit $GITHUB_SHA."
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   verify-database:
     name: Verify database migration
@@ -66,7 +78,7 @@ jobs:
 
   deploy:
     name: Deploy to Vercel
-    needs: [checks, verify-database]
+    needs: [verify-checks, verify-database]
     runs-on: ubuntu-latest
     environment:
       name: production # holds the secrets; only main may use it
