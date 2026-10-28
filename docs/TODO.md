@@ -108,9 +108,23 @@ has real data; the demo runs on the fixtures.
 - [ ] **Stay Supabase-ready.** Plain Postgres and SQL migrations only (Supabase is Postgres, so the move is a
       `DATABASE_URL` change plus `pg_dump`). Keep auth and permissions in the server, not in Supabase-only features,
       until the move; then decide whether Supabase Auth and row-level security replace ours. Files stay on R2 either way.
-- [ ] **Uploaded files in Cloudflare R2.** Outlines, results and slides are parsed and dropped; keep the originals in R2
-      (free tier, S3-compatible, so the AWS S3 client works with R2's endpoint) so a quotation or a figure can link back
-      to its file. Keys in `.env`; a local folder when they are not set.
+- [ ] **Uploaded files in Cloudflare R2.** Outlines, results and slides are parsed and dropped (`server/index.ts` reads
+      the upload into a buffer and keeps only the text); keep the originals so a quotation or a figure can link back to its
+      file, OCR and the outline reader can run again on old uploads, and OCR can become a background job.
+      - R2 for dev and prod, no local storage container: two buckets (`lyceum-dev`, `lyceum-prod`), each with its own
+        API token. R2 is S3-compatible, so `@aws-sdk/client-s3` with R2's endpoint; only `.env` differs (`S3_ENDPOINT`,
+        keys, bucket). Free tier is 10 GB, no egress fees.
+      - R2 holds the bytes, Postgres holds the record. They never talk to each other; the API server does both: put the
+        file in R2 under a key, insert a row in `files` (key, owner, course, name, type, size, sha256, created; migration
+        003). Reading: look up the row, fetch by key or hand out a short-lived signed URL. The move to Supabase changes
+        only `DATABASE_URL`; R2 is untouched.
+      - `server/storage.ts`: `put(key, buf, type)` and `get(key)`, about 30 lines. No R2 keys set → skip storing, so the
+        proofs (PGlite, offline) stay offline.
+      - First caller: the outline upload in onboarding stores the original before parsing. Then scanned outlines (OCR)
+        read from the stored key.
+      - Later, not now: presigned browser uploads (when files get large), lifecycle rules, a local MinIO/Garage container
+        (only if offline dev or keyless CI needs it; MinIO's community edition stopped shipping images in late 2025).
+        Supabase Storage is S3-compatible too, so a switch would be an endpoint change; R2 stays the pick for no egress.
 
 ### Front end
 - [ ] **Move the styles to Tailwind.** `src/theme/global.css` is about 2,600 lines of hand-written CSS with tokens in
@@ -120,7 +134,7 @@ has real data; the demo runs on the fixtures.
 ## Next
 
 - [ ] **Scanned outlines.** A PDF that is only page images has no text to read; it needs OCR, or the model reading the
-      pages as images.
+      pages as images. Builds on the R2 file store: the job reads the original by its key.
 - [ ] **Import an outline later, not only at onboarding.** The same reader on Course or Update, proposing a revision.
 - [ ] **Role-based onboarding.** A programme leader or head of department sets up the programme, its PLOs and its courses
       and invites lecturers; a lecturer joins an existing programme. Needs shared programme workspaces and invitations on
