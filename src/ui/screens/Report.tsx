@@ -10,7 +10,7 @@ import { currentPerson, openStep, selectReportTab, useStore } from "../../app/st
 import { Disclosure, EmptyState } from "../primitives/index.tsx";
 import { Handoff, SubRail } from "../primitives/loop.tsx";
 import { DenominatorReview, MeetingBriefPanel, QuoteProposals } from "./EvidenceResearch.tsx";
-import { ConfirmedQuotations, CountTable, CoverageLadder, DuplicateList, EvidenceExport, QuoteByHand, ReviewList, SkillCards, courseReport } from "./EvidenceWorkspace.tsx";
+import { ConfirmedQuotations, CountTable, CoverageLadder, DuplicateList, EvidenceExport, OutcomeGaps, QuoteByHand, ReviewList, SkillCards, courseReport } from "./EvidenceWorkspace.tsx";
 import { StepFrame, courseContext, type StepHelper } from "./StepFrame.tsx";
 
 const HELPERS: Record<ReportTab, StepHelper> = {
@@ -64,6 +64,8 @@ export function ReportScreen() {
         <h3 id="coverage-ladder">What the course does about each skill</h3>
         <p className="muted">Your judgement of the course today and the target it should reach, with its evidence cited. Not a measured outcome.</p>
         <CoverageLadder {...props} focusSkill={focusSkill} />
+        <h4>The gap on each outcome</h4>
+        <OutcomeGaps state={state} subject={subject} />
       </section> : null}
       {tab === "brief" ? <MeetingBriefPanel {...props} /> : null}
     </div>

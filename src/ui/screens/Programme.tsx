@@ -5,8 +5,8 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { runCurriculum } from "../../agents/curriculum.ts";
-import { runSignal } from "../../agents/signal.ts";
 import {
+  currentSignal,
   navigate,
   personWithHat,
   ratingFor,
@@ -40,7 +40,7 @@ export function ProgrammeScreen() {
   const state = useStore();
   const [showAll, setShowAll] = useState(false);
 
-  const annotations = runCurriculum(state.programme.id, runSignal(state.programme.id));
+  const annotations = runCurriculum(state.programme.id, currentSignal());
   const annBySubject = new Map(annotations.map((a) => [a.subjectId, a]));
 
   const bandOf = (s: Subject): RelevanceBand | undefined => ratingFor(s.id)?.band;

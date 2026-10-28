@@ -19,10 +19,12 @@ has real data; the demo runs on the fixtures.
 - [x] **One model config for every agent** (`refactor/unify-agent-model`). Intake, authoring, evaluator, analogy and
       signal now call the `LYCEUM_AGENT_*` model through `openAiChat`, like agent web search and the outline reader;
       `ANTHROPIC_API_KEY`, `LYCEUM_MODEL` and the Anthropic SDK are gone. The fixtures still answer with no model set.
-- [ ] **Signal from real evidence.** `src/agents/signal.ts` hard-codes demand and coverage per CLO (CLO4 = 0.88 and so on)
-      and its live mode throws. Compute demand per CLO from Lens's confirmed quotations and mappings (`src/lib/evidence.ts`,
-      share and Wilson interval), coverage from the course's topics and hours, and the drift flag from those. Programme,
-      Trends and `routeDrift` (`src/app/store.ts:987`) read it. Keep `SIGNAL_FIXTURE` for the demo programme.
+- [x] **Signal from real evidence** (`feat/signal-from-evidence`). `signalFromEvidence` (`src/agents/signal.ts`) gives each
+      outcome its demand (share of reviewed postings for its most-asked mapped skill), coverage (the coverage index per
+      outcome) and gap, and flags the course when demand's 95% lower bound beats coverage by 0.5. Shown on Report → Map;
+      `currentSignal()` feeds Programme and `routeDrift` with it for every course that has reviewed evidence, the fixture
+      for the rest. Still open: Trends and its reveal read the fixture only (`marketGapByCLO`), and `runCurriculum` lists
+      only the demo programme's subjects, so a lecturer's own course shows its gap on Report but not on Programme.
 - [ ] **Signal reveal driven by the run.** `src/app/signalSim.ts` animates a fixed answer. Show the real run's steps (the
       postings read, the skills found, the CLOs mapped) as they happen; the scripted reveal stays for the demo.
 - [ ] **Market sources from real runs.** Replace `MARKET_SOURCES` (`src/data/market.ts`, the made-up JobStreet and

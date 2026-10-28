@@ -6,9 +6,10 @@ import {
   exportWorkspaceBackup, getState, login, previewWorkspaceBackup, removeEvidenceSource, removeSkillMention, resetDemoState,
   restoreWorkspaceBackup, saveCurriculumRevision, setEvidenceSourceReviewed, setSkillMapping,
 } from "./app/store.ts";
-import { evidenceMarkdown, locateExcerpt, textFingerprint, wilsonInterval } from "./lib/evidence.ts";
+import { evidenceMarkdown, evidenceReport, locateExcerpt, textFingerprint, wilsonInterval } from "./lib/evidence.ts";
+import { signalFromEvidence } from "./agents/signal.ts";
+import type { CLO, CourseDefinition, CoverageStage, EvidenceSource, SkillMapping, SkillMention } from "./types.ts";
 import { parseWorkspaceBackup, workspaceFingerprint } from "./lib/workspaceBackup.ts";
-import type { CourseDefinition } from "./types.ts";
 
 const POSTING = "Junior financial analyst. You will prepare cash-flow forecasts for small business clients, present scenario analysis to partners, and maintain Excel models. Experience with Power BI is preferred.";
 
@@ -237,4 +238,24 @@ test("the evidence report lists receipts and the sampling limitation", () => {
   assert.match(output, /1 of 1/); assert.match(output, /Below target/); assert.match(output, /convenience sample/); assert.match(output, /Trend unavailable/);
   assert.match(output, /Outcomes: CLO1/); assert.match(output, /Nothing was collected from the web/);
   assert.doesNotMatch(output, /employability score/);
+});
+
+test("Signal from a course's own evidence: demand, coverage and gap per outcome, flagged on demand's lower bound", () => {
+  const course = (asking: number, of: number, stage: CoverageStage, target: CoverageStage) => {
+    const sources: EvidenceSource[] = Array.from({ length: of }, (_, i) => ({ id: "S" + i, subjectId: "X1", kind: "job-posting", title: "P" + i,
+      organisation: "Org" + i, url: "", sourceDate: "", text: "Python required.", textHash: "h" + i, duplicateOf: null, provenance: "lecturer-supplied",
+      reviewed: true, addedBy: "p", addedAt: "2026-10-28T00:00:00Z" }));
+    const mentions: SkillMention[] = sources.slice(0, asking).map((src, i) => ({ id: "M" + i, sourceId: src.id, subjectId: "X1", skill: "Python",
+      excerpt: "Python required.", requirement: "required", addedBy: "p", addedAt: "2026-10-28T00:00:00Z" }));
+    const mappings: SkillMapping[] = [{ subjectId: "X1", skill: "Python", cloIds: ["X1-CLO1"], stage, target, evidence: "", updatedBy: "p", updatedAt: "" }];
+    const outcomes = [{ id: "X1-CLO1", subjectId: "X1", text: "Apply Python" }, { id: "X1-CLO2", subjectId: "X1", text: "Unmapped" }] as CLO[];
+    return signalFromEvidence("X1", evidenceReport("X1", sources, mentions, mappings, outcomes), outcomes.map((c) => c.id));
+  };
+  const behind = course(9, 10, "introduced", "assessed");
+  assert.equal(behind.outcomes.length, 1, "an outcome with no mapped skill has no signal");
+  assert.deepEqual([behind.outcomes[0].demand, behind.outcomes[0].coverage, behind.outcomes[0].gap], [0.9, 0, 0.9]);
+  assert.deepEqual(behind.drift, { subjectId: "X1", gap: 0.9, flag: "update" }, "9 of 10 asking, below target: due an update");
+  assert.equal(course(2, 2, "introduced", "assessed").drift?.flag, "fine", "2 of 2 is too few: demand's lower bound is under 0.5");
+  assert.equal(course(9, 10, "assessed", "assessed").drift?.flag, "fine", "at target: covered");
+  assert.equal(course(9, 10, "unknown", "assessed").drift, null, "no reviewed stage: not judged");
 });

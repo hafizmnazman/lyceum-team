@@ -89,7 +89,7 @@ import { streamAgent } from "../agents/client.ts";
 import { runIntake, type ParsedSheet } from "../agents/intake.ts";
 import { runAuthoring } from "../agents/authoring.ts";
 import { runAnalogy } from "../agents/analogy.ts";
-import { runSignal } from "../agents/signal.ts";
+import { runSignal, signalFromEvidence, type SignalResult } from "../agents/signal.ts";
 import { computeRelevanceRatings } from "../data/market.ts";
 import { backupSummary, parseWorkspaceBackup, serializeWorkspaceBackup, workspaceFingerprint } from "../lib/workspaceBackup.ts";
 import { courseDefinition, curriculumChanges, curriculumImpact, draftStructureError, validateCourseDefinition, withDerivedFields } from "../lib/curriculum.ts";
@@ -984,8 +984,19 @@ function authorIsCoordinator(p: ChangeProposal): boolean {
 }
 
 // ---------- Trends -> routing (spec Section 7) ----------
+/** The course's signal from its own evidence (signalFromEvidence), once it has a reviewed demand and coverage. */
+export function courseSignal(subjectId: SubjectId) {
+  return signalFromEvidence(subjectId, evidenceReportForCourse(subjectId), state.clos.filter((c) => c.subjectId === subjectId).map((c) => c.id));
+}
+/** The programme's signal: the fixture, with each course that has its own reviewed evidence judged on that instead. */
+export function currentSignal(): SignalResult {
+  const fixture = runSignal(state.programme.id);
+  const live = new Map(state.subjects.flatMap((s) => { const d = courseSignal(s.id).drift; return d ? [[s.id, d] as const] : []; }));
+  if (!live.size) return fixture;
+  return { ...fixture, subjectDrift: [...fixture.subjectDrift.filter((d) => !live.has(d.subjectId)), ...live.values()] };
+}
 export function routeDrift(subjectId: SubjectId) {
-  const signal = runSignal(state.programme.id);
+  const signal = currentSignal();
   setAgent("signal", "done");
   setAgent("curriculum", "done");
   const drift = signal.subjectDrift.find((d) => d.subjectId === subjectId);
@@ -993,10 +1004,14 @@ export function routeDrift(subjectId: SubjectId) {
   const sources = rating
     ? new Set(rating.evidence.map((e) => e.sourceId)).size
     : 0;
-  const findings =
-    `Demand on this subject's outcomes is outpacing coverage (gap ${(drift?.gap ?? 0).toFixed(2)}` +
-    (sources > 0 ? `, corroborated across ${sources} market sources` : "") +
-    `). Sampled from the skills signal over the programme.`;
+  const own = courseSignal(subjectId);
+  const top = own.drift ? own.outcomes.filter((o) => o.gap !== null).sort((a, b) => b.gap! - a.gap!)[0] : undefined;
+  const findings = top
+    ? `Demand on this subject's outcomes is outpacing coverage (gap ${top.gap!.toFixed(2)} on ${top.cloId}): ` +
+      `${top.postings} of ${top.eligible} reviewed postings ask for ${top.skill}. From the course's own evidence.`
+    : `Demand on this subject's outcomes is outpacing coverage (gap ${(drift?.gap ?? 0).toFixed(2)}` +
+      (sources > 0 ? `, corroborated across ${sources} market sources` : "") +
+      `). Sampled from the skills signal over the programme.`;
   if (drift?.flag === "new-subject") {
     notify({
       toPersonId: state.programme.departmentOwnerId,

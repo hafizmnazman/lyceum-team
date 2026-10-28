@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { plural } from "../../app/loop.ts";
 import {
-  addEvidenceSource, addSkillMention, evidenceTrendNote, nowIso, removeEvidenceSource, removeSkillMention, setEvidenceSourceReviewed, setSkillMapping, type AppState,
+  addEvidenceSource, addSkillMention, courseSignal, evidenceTrendNote, nowIso, removeEvidenceSource, removeSkillMention, setEvidenceSourceReviewed, setSkillMapping, type AppState,
 } from "../../app/store.ts";
 import {
   COVERAGE_STAGES, EVIDENCE_KINDS, KIND_LABEL, REQUIREMENT_LEVELS, STAGE_LABEL, evidenceMarkdown, evidenceReport, locateExcerpt,
@@ -240,6 +240,28 @@ export function CountTable({ state, subject }: { state: AppState; subject: Subje
 }
 
 // ---------- Report: Map ----------
+
+/** Signal from this course's own evidence: per outcome, the most-asked mapped skill against the coverage of its skills. */
+export function OutcomeGaps({ state, subject }: { state: AppState; subject: Subject }) {
+  const { outcomes, drift } = courseSignal(subject.id);
+  if (!outcomes.length) return <p className="muted">Map a quoted skill to an outcome to see the gap on that outcome.</p>;
+  const label = (id: string) => state.clos.find((c) => c.id === id)?.text ?? id;
+  return <div>
+    <div className="table-scroll"><table className="evidence-table">
+      <caption className="muted">Demand is the share of reviewed postings asking for the outcome's most-asked mapped skill. Coverage is the demand-weighted share of its mapped skills at or above their target. Gap is demand minus coverage.</caption>
+      <thead><tr><th scope="col">Outcome</th><th scope="col">Most-asked skill</th><th scope="col">Demand</th><th scope="col">Coverage</th><th scope="col">Gap</th></tr></thead>
+      <tbody>{outcomes.map((o) => <tr key={o.cloId}>
+        <th scope="row">{label(o.cloId)}</th><td>{o.skill}</td>
+        <td className="tabular">{pct(o.demand)} · {o.postings} of {o.eligible}</td>
+        <td className="tabular">{o.coverage === null ? "Set a stage and target" : pct(o.coverage)}</td>
+        <td className="tabular">{o.gap === null ? "Unknown" : o.gap.toFixed(2)}</td>
+      </tr>)}</tbody>
+    </table></div>
+    <p className="muted" data-demo-id="course-signal">{drift
+      ? drift.flag === "update" ? "Due an update: on at least one outcome, demand's 95% lower bound outpaces coverage by 0.5 or more." : "No outcome is far enough behind demand to flag the course; the flag uses demand's 95% lower bound."
+      : "No outcome has a reviewed stage and target yet, so the course is not judged."}</p>
+  </div>;
+}
 
 const LADDER: CoverageStage[] = ["absent", "introduced", "practised", "assessed"];
 
