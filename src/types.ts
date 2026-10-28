@@ -288,7 +288,7 @@ export interface DraftItem {
   answers?: string[]; // shortanswer: the accepted answers
   graderInfo?: string; // essay: what the marker looks for
   responseLines?: number; // essay: the answer box's height
-  source: "template" | "sample"; // drafted by Lyceum's templates, or a sample written for this prototype
+  source: "template" | "sample" | "model"; // drafted by Lyceum's templates, a sample written for this prototype, or drafted by the model (Prism)
   reviewedBy: PersonId | null; reviewedAt: string | null;
 }
 /** One slide a lecturer wrote: a title, bullets and speaker notes, with an optional second column or figure. */

@@ -9,13 +9,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as XLSX from "xlsx";
-import { draftSessionItems, exportWorkspaceBackup, getState, login, markItemsReviewed, resetDemoState, saveSessionItem, saveTeachingSession } from "./app/store.ts";
+import { addModelItems, draftSessionItems, exportWorkspaceBackup, sessionItemRequest, getState, login, markItemsReviewed, resetDemoState, saveSessionItem, saveTeachingSession } from "./app/store.ts";
 import { CS310_BEFORE, CS310_RUBRICS } from "./data/sample-course/cs310.ts";
 import { DEMO_LINE } from "./data/sample-course/index.ts";
 import { WEEK_7_QUIZ } from "./data/sample-course/quiz.ts";
 import { PEOPLE, PEOPLE_IDS } from "./data/seed.ts";
 import { BLOOM_VERBS, LINT_LIMIT, MOODLE_LABEL, QTI_LABEL, RULES, courseMisconceptions, lintItem, lintSet, moodleXml, passes, qtiPackage, rubricRows, templateItems, type ItemContext } from "./lib/items.ts";
 import { parseWorkspaceBackup } from "./lib/workspaceBackup.ts";
+import { draftModelItems } from "../server/llm.ts";
+import { settingsFromEnv } from "./lib/agentSettings.ts";
 import { wellFormed } from "./lib/xmlCheck.ts";
 import type { DraftItem, TeachingSession } from "./types.ts";
 
@@ -162,4 +164,60 @@ test("backups carry the items; an unknown reviewer and a repeated item id are re
   assert.equal(parseWorkspaceBackup(JSON.stringify(stranger), people).ok, false, "an unknown reviewer");
   const twice = JSON.parse(raw); sessionsOf(twice).items![1].id = sessionsOf(twice).items![0].id;
   assert.equal(parseWorkspaceBackup(JSON.stringify(twice), people).ok, false, "a repeated item id");
+});
+
+test("Prism: model items are checked, added unreviewed with their own ids, linted like any other, and survive a backup", async () => {
+  resetDemoState(); login(PEOPLE_IDS.sobri);
+  assert.equal(saveTeachingSession("CS310", { week: 6, topic: "Dashboard lab", minutes: 90, cloIds: ["CLO5"], activity: "Build a dashboard in pairs.", learningCheck: "Exit question.", resources: "", status: "ready" }).ok, true);
+  const own = () => getState().teachingPlans.find((p) => p.subjectId === "CS310")!.sessions.find((s) => !s.sample && s.week === 6)!;
+  const request = sessionItemRequest("CS310", own().id);
+  assert.ok(typeof request !== "string");
+  assert.deepEqual(request.outcomes.map((o) => o.label), ["CLO5"]);
+  assert.ok(request.misconceptions.length >= 3, "the recorded misconceptions go to the model as distractors");
+  const [m1, m2, m3] = request.misconceptions;
+  const reply = { items: [
+    { kind: "multichoice", outcome: "CLO5", bloom: "apply", stem: "Which design choice best lets a stakeholder compare two series?", options: [
+      { text: "Plot both series against one shared y-axis", correct: true, feedback: "" }, { text: m1, correct: false }, { text: m2, correct: false }, { text: m3, correct: false }] },
+    { kind: "shortanswer", outcome: "CLO5", bloom: "Remember", stem: "Name the chart type that best shows change over time.", answers: ["line chart", "line"] },
+    { kind: "essay", outcome: "CLO5", bloom: "Evaluate", stem: "Justify the chart choices in a dashboard you would build for a sales manager.", graderInfo: "Names the question, matches chart to data type, removes clutter." },
+    { kind: "multichoice", outcome: "CLO5", bloom: "Apply", stem: "Which of these has two keys and should be dropped?", options: [{ text: "a", correct: true }, { text: "b", correct: true }, { text: "c", correct: false }] },
+    { kind: "essay", outcome: "CLO9", bloom: "Apply", stem: "An outcome the session does not teach.", graderInfo: "dropped for its outcome" },
+  ] };
+  const drafted = await draftModelItems(settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "m" }), request, async (m) => {
+    assert.match(m[0].content ?? "", /You are Prism/); assert.ok((m[1].content ?? "").includes(m1));
+    return { content: "```json\n" + JSON.stringify(reply) + "\n```" };
+  });
+  assert.deepEqual(drafted.map((i) => i.kind), ["multichoice", "shortanswer", "essay"], "two keys and an outcome it was not given are dropped");
+  assert.equal(drafted[0].bloomLevel, "Apply");
+  assert.equal(addModelItems("CS310", own().id, drafted).ok, true);
+  const items = own().items!;
+  assert.ok(items.every((i) => i.source === "model" && i.reviewedBy === null && i.id.startsWith("ITEM-CS310")), "unreviewed, with workspace ids");
+  assert.deepEqual(items.map((i) => failing(i)), [[], [], []], "keys, answers and the marker's guidance are written, and the distractors are recorded misconceptions");
+  const sample = getState().teachingPlans.find((p) => p.subjectId === "CS310")!.sessions.find((s) => s.week === 7 && s.sample)!;
+  assert.equal(addModelItems("CS310", sample.id, drafted).ok, false, "samples stay as written");
+  assert.equal(addModelItems("CS310", own().id, []).ok, false);
+  assert.ok(parseWorkspaceBackup(exportWorkspaceBackup(), getState().people.map((p) => p.id)).ok, "a backup with model items validates");
+});
+
+test("Prism repairs once: an item the lint fails goes back with its broken rules; a fix replaces it only if it passes", async () => {
+  const request = { topic: "Dashboards", outcomes: [{ id: "CLO5", label: "CLO5", text: "Use charts", bloom: "Apply" as const }], misconceptions: ["Pie charts suit any comparison", "More colour is clearer", "Axes can start anywhere"] };
+  const mcq = (stem: string, key: string) => ({ kind: "multichoice", outcome: "CLO5", bloom: "Apply", stem, options: [{ text: key, correct: true },
+    ...request.misconceptions.map((text) => ({ text, correct: false }))] });
+  const essay = { kind: "essay", outcome: "CLO5", bloom: "Evaluate", stem: "Justify each chart in a dashboard you would build.", graderInfo: "Matches chart to question and data." };
+  const s = settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "m" });
+  const sent: string[] = [];
+  const out = await draftModelItems(s, request, async (m) => {
+    sent.push(m[1].content!);
+    return { content: JSON.stringify({ items: sent.length === 1 ? [mcq("Which option is right?", "A shared axis"), essay] : [mcq("Which choice lets a reader compare two series fairly?", "A shared axis")] }) };
+  });
+  assert.equal(sent.length, 2, "one repair call");
+  assert.match(sent[1], /under six words/, "the broken rule is named to the model");
+  assert.doesNotMatch(sent[1], /Justify each chart/, "only failing items go back");
+  assert.deepEqual(out.map((i) => i.stem), ["Which choice lets a reader compare two series fairly?", essay.stem], "the passing fix replaced its item; the rest kept");
+  let calls = 0;
+  const kept = await draftModelItems(s, request, async () => (++calls === 1 ? { content: JSON.stringify({ items: [mcq("Which option is right?", "A shared axis")] }) } : { content: "not json" }));
+  assert.deepEqual([calls, kept[0].stem], [2, "Which option is right?"], "a failed repair keeps the first draft");
+  calls = 0;
+  await draftModelItems(s, request, async () => { calls++; return { content: JSON.stringify({ items: [essay] }) }; });
+  assert.equal(calls, 1, "nothing failing, no repair call");
 });

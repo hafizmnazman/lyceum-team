@@ -5,7 +5,8 @@
 
 import { useState } from "react";
 import { Check, Download, X } from "lucide-react";
-import { draftSessionItems, markItemsReviewed, removeSessionItem, saveSessionItem } from "../../app/store.ts";
+import { addModelItems, draftSessionItems, markItemsReviewed, removeSessionItem, saveSessionItem, sessionItemRequest } from "../../app/store.ts";
+import { fetchModelItems } from "../../agents/client.ts";
 import { downloadBytes, downloadText } from "../../lib/download.ts";
 import { KIND_LABEL, LEVEL_NOTE, LINT_LIMIT, MOODLE_LABEL, QTI_LABEL, lintItem, lintSet, moodleXml, passes, qtiPackage, reviewLine, type ItemContext, type LintCheck } from "../../lib/items.ts";
 import type { DraftItem, Person, Subject, TeachingSession } from "../../types.ts";
@@ -17,6 +18,7 @@ export function SessionItems({ subject, session, labels, misconceptions, mayEdit
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [drafting, setDrafting] = useState(false);
   const items = session.items ?? [];
   const own = !session.sample;
   if (!items.length && !(mayEdit && own)) return null;
@@ -34,6 +36,15 @@ export function SessionItems({ subject, session, labels, misconceptions, mayEdit
     downloadBytes(file("qti21.zip"), await zip.generateAsync({ type: "uint8array" }));
   }
   const reviewed = items.length > 0 && items.every((i) => i.reviewedBy);
+  // Prism drafts with the model in .env; the items join the session unreviewed, and the lint and review still decide.
+  async function draftWithPrism() {
+    const request = sessionItemRequest(subject.id, session.id);
+    if (typeof request === "string") { setMessage(request); return; }
+    setDrafting(true); setMessage("");
+    const r = await fetchModelItems(request);
+    setDrafting(false);
+    if (r.ok) done(addModelItems(subject.id, session.id, r.list)); else setMessage(r.error);
+  }
   return <div className="session-items" data-demo-id={"session-items-" + session.id}>
     <div className="session-items-head"><h4>Items for the check</h4>
       {items.length ? <Tag>{items.length} drafted</Tag> : null}
@@ -49,8 +60,9 @@ export function SessionItems({ subject, session, labels, misconceptions, mayEdit
       </li>)}</ol>
       <p className="muted">{LEVEL_NOTE} {LINT_LIMIT}</p>
       {!positions.ok ? <p className="limitation">{positions.rule}: {positions.note}.</p> : null}
-    </Disclosure> : <p className="muted">No items yet. The templates draft a multiple-choice item, a short answer and an essay for each linked outcome, from the outcome's words and the course's recorded misconceptions; you write each key and accepted answer.</p>}
+    </Disclosure> : <p className="muted">No items yet. Prism drafts a multiple-choice item, a short answer and an essay for each linked outcome, with keys and answers for you to check, using the course's recorded misconceptions as distractors. The templates draft the same three without a model; you write each key and accepted answer.</p>}
     <div className="button-row">
+      {mayEdit && own ? <Button variant="primary" loading={drafting} onClick={() => void draftWithPrism()} data-demo-id={"items-prism-" + session.id}>Draft with Prism</Button> : null}
       {mayEdit && own ? <Button onClick={() => done(draftSessionItems(subject.id, session.id))} data-demo-id={"items-draft-" + session.id}>Draft items from the templates</Button> : null}
       {mayEdit && items.length ? <Button onClick={() => done(markItemsReviewed(subject.id, session.id))} data-demo-id={"items-review-" + session.id}>Mark these items reviewed</Button> : null}
       {items.length ? <Button disabled={!clean.length} onClick={() => downloadText(file("xml"), moodleXml(clean, ctx), "application/xml;charset=utf-8")} data-demo-id={"items-moodle-" + session.id}><Download size={15} /> Export for Moodle (.xml)</Button> : null}
@@ -64,7 +76,7 @@ export function SessionItems({ subject, session, labels, misconceptions, mayEdit
 function ItemView({ item, n, label, checks, people, onEdit }: { item: DraftItem; n: number; label: string; checks: LintCheck[]; people: Person[]; onEdit: (() => void) | null }) {
   const reviewer = item.reviewedBy ? people.find((p) => p.id === item.reviewedBy)?.name ?? item.reviewedBy : null;
   return <article className="item-card">
-    <div className="item-head"><strong>Q{n + 1}</strong><Tag>{KIND_LABEL[item.kind]}</Tag><Tag tone="accent">{label}</Tag><Tag>{item.bloomLevel}</Tag>
+    <div className="item-head"><strong>Q{n + 1}</strong><Tag>{KIND_LABEL[item.kind]}</Tag>{item.source === "model" ? <Tag tone="warn">Drafted by Prism</Tag> : null}<Tag tone="accent">{label}</Tag><Tag>{item.bloomLevel}</Tag>
       <span className="muted">{item.marks} {item.marks === 1 ? "mark" : "marks"}{reviewer ? " · reviewed by " + reviewer : ""}</span></div>
     <p className="item-stem">{item.stem}</p>
     {item.options ? <ol className="item-options" type="a">{item.options.map((o, i) => <li key={i} className={o.correct ? "is-key" : undefined}>

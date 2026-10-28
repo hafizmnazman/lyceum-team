@@ -15,11 +15,12 @@ import { parseSheet } from "./parse/sheet.ts";
 import { parsePdf } from "./parse/pdf.ts";
 import { parseDocx, parsePptx } from "./parse/office.ts";
 import { startWatching, watchRoutes } from "./watch.ts";
-import { agentModel, proposeMappings, proposeQuotes, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
+import { agentModel, draftModelItems, proposeMappings, proposeQuotes, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
 import { CollectError, collectBoard } from "./collect.ts";
 import { filterPostings } from "../src/lib/collect.ts";
 import { missingSettings, publicSettings, type AgentSettings } from "../src/lib/agentSettings.ts";
 import type { MappingRequest, QuoteRequest } from "../src/lib/proposals.ts";
+import type { ItemRequest } from "../src/lib/items.ts";
 import { ENV_PATH, liveDeps, loadAgentSettings, openAiChat, runAgentSearch, TOOLS } from "./agentSearch.ts";
 import { searchWeb } from "./webTools.ts";
 import { readOutline, MAX_OUTLINE_CHARS } from "./outline.ts";
@@ -181,6 +182,7 @@ function proposalRoute<B>(path: string, valid: (body: B) => boolean, run: (s: Ag
 }
 proposalRoute<QuoteRequest>("quotes", (b) => Array.isArray(b?.postings), proposeQuotes);
 proposalRoute<MappingRequest>("mappings", (b) => Array.isArray(b?.skills) && Array.isArray(b?.outcomes), proposeMappings);
+proposalRoute<ItemRequest>("items", (b) => Array.isArray(b?.outcomes) && b.outcomes.length > 0 && Array.isArray(b?.misconceptions), draftModelItems);
 
 // One agent run, streamed as lines of JSON: {type:"log"} as it works, then {type:"done"} with the postings or {type:"error"}.
 const AGENT_RUN_MS = 6 * 60 * 1000;

@@ -112,7 +112,7 @@ import { institutionError } from "../lib/institution.ts";
 import { boothAnswers, courseOutcomeSurvey, formTokenFor, gradesReleased, importResponseRows, newReaderSecret, readPasteCodes, ssrtSurvey, studentForm, type ImportResult, type PasteResult } from "../lib/surveys.ts";
 import { DEMO_LINE } from "../data/sample-course/index.ts";
 import { listedStudents, obeReport } from "../lib/attainment.ts";
-import { templateItems } from "../lib/items.ts";
+import { itemRequest, templateItems, type ItemRequest } from "../lib/items.ts";
 import { PRIOR_SURVEYS, PRIOR_SURVEY_RESPONSES } from "../data/sample-course/surveys.ts";
 import { outlineDefinition } from "../lib/outline.ts";
 import { loadWorkspace, markOnboarded, saveWorkspace, signOut, updateProfile, whoAmI, type AccountUser } from "./account.ts";
@@ -565,6 +565,27 @@ export function draftSessionItems(subjectId: SubjectId, sessionId: string): Save
   const drafted = templateItems(definition, session, outcomes, () => nextId("ITEM-" + subjectId));
   setSessionItems(subjectId, sessionId, [...(session.items ?? []), ...drafted]);
   set({ toast: drafted.length + " items drafted for your review. Write each key and accepted answer; the lint shows what is left." });
+  return { ok: true };
+}
+
+/** What Prism reads for one of the lecturer's own sessions (lib/items.ts itemRequest), or why it cannot draft yet. */
+export function sessionItemRequest(subjectId: SubjectId, sessionId: string): ItemRequest | string {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return session;
+  const definition = definitionForCourse(subjectId);
+  const request = itemRequest(definition, session, definition?.outcomes ?? []);
+  return request.outcomes.length ? request : "Link the session to an outcome first; Prism writes from it.";
+}
+/** Add Prism's items to a session, each with its own id and unreviewed: the lint and a person's review still decide. */
+export function addModelItems(subjectId: SubjectId, sessionId: string, items: DraftItem[]): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  const outcomeIds = new Set(session.cloIds);
+  const added = items.filter((i) => outcomeIds.has(i.cloId) && !itemError(i))
+    .map((i) => ({ ...i, id: nextId("ITEM-" + subjectId), source: "model" as const, reviewedBy: null, reviewedAt: null }));
+  if (!added.length) return { ok: false, error: "Prism's draft had no usable item. Try again, or draft from the templates." };
+  setSessionItems(subjectId, sessionId, [...(session.items ?? []), ...added]);
+  set({ toast: added.length + " items drafted by Prism for your review. Check each key; the lint shows what is left." });
   return { ok: true };
 }
 

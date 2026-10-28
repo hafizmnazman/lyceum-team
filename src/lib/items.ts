@@ -5,7 +5,9 @@
 // not on this machine) and the rubric grid as spreadsheet rows. An item is drafted for the lecturer's review; the app never
 // marks one approved, and a template never writes the key: a deterministic generator cannot know what is true.
 
+import { z } from "zod";
 import type { BloomLevel, CourseDefinition, CourseOutcome, DraftItem, Person, Rubric, TeachingSession } from "../types.ts";
+import { bloomOf } from "./outline.ts";
 
 /** The University of Arkansas verb list (26 July 2022), by level. */
 export const BLOOM_VERBS: Record<BloomLevel, string[]> = {
@@ -68,6 +70,44 @@ export function templateItems(definition: CourseDefinition | null, session: Teac
         graderInfo: "Marked against " + o.label + ": " + trimEnd(o.text) + "." },
     ];
   });
+}
+
+// ---------- Prism: items drafted by the model ----------
+
+/** What Prism reads: the session's topic, its linked outcomes (two at most, as the templates take) and the misconceptions
+ *  recorded for it, which it is asked to use as distractors. */
+export interface ItemRequest { topic: string; outcomes: Array<{ id: string; label: string; text: string; bloom: BloomLevel }>; misconceptions: string[] }
+export function itemRequest(definition: CourseDefinition | null, session: TeachingSession, outcomes: CourseOutcome[]): ItemRequest {
+  return { topic: trimEnd(session.topic), misconceptions: recordedMisconceptions(definition, session),
+    outcomes: session.cloIds.map((id) => outcomes.find((o) => o.id === id)).filter((o): o is CourseOutcome => Boolean(o)).slice(0, 2)
+      .map((o) => ({ id: o.id, label: o.label, text: o.text, bloom: o.bloomLevel })) };
+}
+const stemText = z.string().trim().min(10).max(2000);
+const ModelItem = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("multichoice"), outcome: z.string(), bloom: z.unknown(), stem: stemText,
+    options: z.array(z.object({ text: z.string().trim().min(1).max(500), correct: z.boolean(), feedback: z.string().max(500).catch("") })).min(3).max(4) }),
+  z.object({ kind: z.literal("shortanswer"), outcome: z.string(), bloom: z.unknown(), stem: stemText, answers: z.array(z.string().trim().min(1).max(100)).min(1).max(10) }),
+  z.object({ kind: z.literal("essay"), outcome: z.string(), bloom: z.unknown(), stem: stemText, graderInfo: z.string().trim().min(10).max(4000) }),
+]);
+const MARKS: Record<DraftItem["kind"], number> = { multichoice: 1, shortanswer: 1, essay: 5 };
+/** Check what the model returned: an item for an outcome it was not given, a multiple-choice item without exactly one key,
+ *  or anything malformed is dropped. Every item comes back unreviewed and still goes through the lint and a person's review. */
+export function readModelItems(raw: unknown, request: ItemRequest, nextId: () => string): DraftItem[] {
+  const list = raw && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items) ? (raw as { items: unknown[] }).items : [];
+  const byLabel = new Map(request.outcomes.map((o) => [o.label, o.id]));
+  const out: DraftItem[] = [];
+  for (const entry of list.slice(0, 12)) {
+    const item = ModelItem.safeParse(entry);
+    const cloId = item.success ? byLabel.get(item.data.outcome) : undefined;
+    if (!item.success || !cloId) continue;
+    const base = { id: nextId(), cloId, bloomLevel: bloomOf(item.data.bloom), stem: item.data.stem, marks: MARKS[item.data.kind], source: "model" as const, reviewedBy: null, reviewedAt: null };
+    if (item.data.kind === "multichoice") {
+      if (item.data.options.filter((o) => o.correct).length !== 1) continue;
+      out.push({ ...base, kind: "multichoice", options: item.data.options });
+    } else if (item.data.kind === "shortanswer") out.push({ ...base, kind: "shortanswer", answers: item.data.answers });
+    else out.push({ ...base, kind: "essay", graderInfo: item.data.graderInfo, responseLines: 12 });
+  }
+  return out;
 }
 
 // ---------- the lint ----------

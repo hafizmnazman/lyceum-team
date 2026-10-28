@@ -47,8 +47,13 @@ has real data; the demo runs on the fixtures.
       least-quoted postings, three to a call in parallel, with the skills already quoted from each. A proposal is kept only
       if `locateExcerpt` finds it in its posting; the rest join the scan's list and are confirmed the same way. The
       keyword scan stays.
-- [ ] **Prism drafts quiz items.** `src/lib/items.ts` uses templates. The model drafts stem, key and distractors per CLO
-      and Bloom level; the existing lint and the lecturer's review stay the gate. Keep templates as the no-model fallback.
+- [x] **Prism drafts quiz items** (`feat/prism-quiz-items`). "Draft with Prism" on a session's items sends its topic, linked
+      outcomes (two at most) and recorded misconceptions to the model, which writes a multiple-choice item, a short answer
+      and an essay per outcome with keys, accepted answers and marker guidance. Each is checked (`readModelItems`: one key,
+      known outcome), then the lint runs and the items it fails go back once with their broken rules; a fix replaces its
+      item only if it passes. Items join the session unreviewed, tagged "Drafted by Prism"; the review and the
+      lint-gated Moodle/QTI export are unchanged. The templates stay as the no-model path. Note: a recorded misconception
+      worded with an absolute ("every") can never pass both the absolutes and the misconceptions rules; reword it.
 - [ ] **Prism drafts slide content.** The slides use only saved text. The model drafts each session's slides from its
       CLOs, topics and evidence into the existing .pptx writer (`src/lib/slides.ts`).
 - [ ] **Steward drafts the brief's prose.** The numbers stay computed; the model writes the summary and recommendation,
