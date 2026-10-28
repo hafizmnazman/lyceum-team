@@ -268,7 +268,7 @@ function seedState(): AppState {
     institution: structuredClone(DEMO_INSTITUTION),
 
     currentPersonId: null,
-    screen: "login",
+    screen: "index", // signed out, the index is the public landing page
     selectedSubjectId: null,
     selectedProposalId: CANONICAL_PROPOSAL.id,
     studioTab: "overview",
@@ -374,7 +374,8 @@ function loadPersisted(): Partial<AppState> | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<AppState>;
     // A running sim or a mid-demo screen must not resurrect into a fresh page.
-    if (parsed.screen === "login" || parsed.screen === undefined) parsed.currentPersonId = null;
+    // Signed out, a fresh visit opens on the landing page, not the sign-in screen it was left on.
+    if (parsed.screen === "login" || parsed.screen === undefined) { parsed.currentPersonId = null; parsed.screen = "index"; }
     return parsed;
   } catch {
     return null;

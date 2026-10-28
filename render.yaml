@@ -1,0 +1,48 @@
+# Render Blueprint: the API (api/) as one always-on web service. Render > New > Blueprint > this repository.
+# Free plan: it sleeps after 15 idle minutes and takes about a minute to wake. While asleep the 15-minute Watch ticks
+# (api/watch.ts) don't run, and a sleep drops the surveys' answers kept in memory (api/index.ts). plan: starter ends both.
+# Deploys come only from the Deploy backend (Render) workflow, through the service's deploy hook.
+# Singapore sits beside the Supabase project (ap-southeast-1).
+# Values marked sync: false are asked for once when the Blueprint is created; fill them from api/.env.
+# The web app on Vercel forwards /api here (vercel.json): keep the service name, or change the rewrite to match.
+services:
+  - type: web
+    name: lyceum-api
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    autoDeployTrigger: "off" # .github/workflows/deploy-api.yml deploys, after checks and the migration
+    buildCommand: npm ci
+    startCommand: npm start -w api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24" # the API runs its .ts files directly
+      - key: LYCEUM_REQUIRE_SIGN_IN
+        value: "1" # online, the model, search, settings and parse routes answer signed-in people only
+      - key: LYCEUM_WATCH
+        value: "on"
+      - key: APP_URL
+        sync: false # the Vercel address, e.g. https://lyceum.vercel.app
+      # Supabase: the same project as VITE_SUPABASE_URL on Vercel
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false # the Session pooler string, without ?sslmode=
+      # The model
+      - key: LYCEUM_AGENT_PROVIDER
+        sync: false
+      - key: LYCEUM_AGENT_MODEL
+        sync: false
+      - key: LYCEUM_AGENT_API_KEY
+        sync: false
+      # Web search: no SearXNG here. Tavily when its key is set, else DuckDuckGo (a keyed provider without its key is skipped)
+      - key: LYCEUM_SEARCH_PROVIDER
+        value: tavily
+      - key: LYCEUM_SEARCH_FALLBACK
+        value: duckduckgo
+      - key: TAVILY_API_KEY
+        sync: false

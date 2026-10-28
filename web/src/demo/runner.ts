@@ -4,7 +4,7 @@
 // cursor eases between target rects, pauses to read, then dispatches the REAL
 // UI event so the genuine app responds. `wait` polls real store state.
 
-import { getState } from "../app/store.ts";
+import { getState, navigate } from "../app/store.ts";
 import { SCRIPT, type DemoStep } from "./script.ts";
 import type { WalkStop } from "./walk.ts";
 import { PRE_ACT_MS, SWITCH_PAD_MS, TWEEN_MS, TYPE_CHAR_MS, isSampleTour, scaleMs } from "./timing.ts";
@@ -199,6 +199,7 @@ async function waitFor(key: string, ctx: DemoCtx, timeout = 90000) {
  *  account menu when signed in. */
 async function switchPerson(personId: string, ctx: DemoCtx) {
   if (!getState().currentPersonId) {
+    if (getState().screen !== "login") navigate("login"); // signed out, the app opens on the landing page
     const el = await waitForSelector(sel(`login-${personId}`));
     if (!el) return;
     await moveToEl(el, ctx);

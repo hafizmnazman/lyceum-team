@@ -1,0 +1,101 @@
+# Deploys the API (api/) to Render, only when an allowed account starts it by hand:
+# Actions > "Deploy backend (Render)" > Run workflow (branch: main), by hafizmnazman or No0bmazt3r.
+#
+# The run gates deployment in this order:
+#   1. The Checks workflow (checks.yml: typecheck and every prove suite) passed for this exact commit.
+#   2. The Database (Supabase) workflow migrated successfully for this exact commit.
+#   3. Render's deploy hook builds and starts this commit (render.yaml; its own auto-deploy is off).
+#
+# Setup, once: Render > lyceum-api > Settings > Deploy Hook, copied into the GitHub secret RENDER_DEPLOY_HOOK_URL.
+# The hook URL is the only credential: anyone holding it can trigger a deploy, so keep it a secret.
+name: Deploy backend (Render)
+
+on:
+  workflow_dispatch:
+
+run-name: Deploy backend for ${{ github.sha }}
+
+# One deployment at a time; a second click waits for the first to finish
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify-checks:
+    name: Verify checks
+    runs-on: ubuntu-latest
+    if: contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.actor) && contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.triggering_actor) && github.ref == 'refs/heads/main'
+    steps:
+      - name: Require successful checks for this commit
+        run: |
+          conclusion=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow checks.yml \
+            --commit "$GITHUB_SHA" \
+            --status completed \
+            --limit 1 \
+            --json conclusion \
+            --jq '.[0].conclusion // empty')
+          if [ "$conclusion" != "success" ]; then
+            echo "Checks have not passed for commit $GITHUB_SHA (result: ${conclusion:-not found})." >&2
+            echo "Push the commit to main, wait for Checks to finish, then run this workflow again." >&2
+            exit 1
+          fi
+          echo "Checks passed for commit $GITHUB_SHA."
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  verify-database:
+    name: Verify database migration
+    runs-on: ubuntu-latest
+    if: contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.actor) && contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.triggering_actor) && github.ref == 'refs/heads/main'
+    steps:
+      - name: Require a successful migration for this commit
+        run: |
+          # database.yml names its runs "Database <action> for <sha>"; a push to main runs "migrate"
+          conclusion=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow database.yml \
+            --commit "$GITHUB_SHA" \
+            --status completed \
+            --limit 20 \
+            --json conclusion,displayTitle \
+            --jq '[.[] | select(.displayTitle | startswith("Database migrate")) | .conclusion] | .[0] // empty')
+          if [ "$conclusion" != "success" ]; then
+            echo "A successful database migration for commit $GITHUB_SHA was not found (result: ${conclusion:-not found})." >&2
+            echo "Run Database (Supabase) with action=migrate, wait for it to pass, then run this workflow again." >&2
+            exit 1
+          fi
+          echo "Database migration passed for commit $GITHUB_SHA."
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  deploy:
+    name: Deploy to Render
+    needs: [verify-checks, verify-database]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy for this commit
+        run: |
+          case "$RENDER_DEPLOY_HOOK_URL" in
+            https://api.render.com/deploy/*) ;;
+            *)
+              echo "RENDER_DEPLOY_HOOK_URL must be the deploy hook URL from Render > lyceum-api > Settings." >&2
+              echo "It should start with https://api.render.com/deploy/." >&2
+              exit 1
+              ;;
+          esac
+          separator='?'
+          case "$RENDER_DEPLOY_HOOK_URL" in
+            *\?*) separator='&' ;;
+          esac
+          curl --fail-with-body --silent --show-error --request POST \
+            "${RENDER_DEPLOY_HOOK_URL}${separator}ref=${GITHUB_SHA}"
+          echo "Render deploy started for $GITHUB_SHA: watch it in Render > lyceum-api > Events." >> "$GITHUB_STEP_SUMMARY"
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
