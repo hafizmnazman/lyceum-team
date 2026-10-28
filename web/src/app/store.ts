@@ -326,6 +326,7 @@ function seedState(): AppState {
 
 // ---------- persistence (spec: "State persists") ----------
 const STORAGE_KEY = "lyceum-v3-state@1";
+const DEMO_TAB_KEY = "lyceum-demo-tab";
 
 // The slice of state worth keeping across refreshes: the mutable world and the
 // session. Transient UI (sims, drills, toasts, agent runs) always starts clean.
@@ -373,9 +374,13 @@ function loadPersisted(): Partial<AppState> | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<AppState>;
+    // The demo person signed in belongs to this tab, as kiosk mode does: a reload keeps them, a new tab or visit
+    // signs them out. The demo's workspace itself stays in localStorage.
+    let sameTab = false;
+    try { sameTab = sessionStorage.getItem(DEMO_TAB_KEY) === "on"; sessionStorage.setItem(DEMO_TAB_KEY, "on"); } catch { /* no storage: sign out */ }
     // A running sim or a mid-demo screen must not resurrect into a fresh page.
     // Signed out, a fresh visit opens on the landing page, not the sign-in screen it was left on.
-    if (parsed.screen === "login" || parsed.screen === undefined) { parsed.currentPersonId = null; parsed.screen = "index"; }
+    if (!sameTab || parsed.screen === "login" || parsed.screen === undefined) { parsed.currentPersonId = null; parsed.screen = "index"; }
     return parsed;
   } catch {
     return null;

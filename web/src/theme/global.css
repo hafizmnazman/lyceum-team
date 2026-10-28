@@ -2467,21 +2467,21 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
 .onboarding-title { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
 .onboarding-card form > p { margin: -8px 0 0; }
 .onboarding-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
-.onboarding-progress { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
-.onboarding-step-marker { position: relative; min-width: 0; }
-.onboarding-step-button { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 0 6px 8px 0; border: 0; border-radius: 6px; background: var(--white); color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 700; text-align: left; }
+.onboarding-progress { display: flex; align-items: center; margin: 0 0 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.onboarding-step-marker { display: flex; flex: 1 1 0; align-items: center; min-width: 0; }
+.onboarding-step-marker:last-child { flex: 0 0 auto; }
+.onboarding-step-button { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 10px; min-width: 0; padding: 4px 6px 4px 4px; border: 0; border-radius: 999px; background: none; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; text-align: left; white-space: nowrap; transition: color 200ms var(--ease-out), background-color 200ms var(--ease-out); }
+.onboarding-step-button > span:last-child { overflow: hidden; text-overflow: ellipsis; }
 button.onboarding-step-button { cursor: pointer; }
-button.onboarding-step-button:hover { color: var(--ink); }
-.onboarding-step-node { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; width: 28px; height: 28px; border: 2px solid var(--border); border-radius: 50%; background: var(--white); color: var(--ink-2); font-family: var(--font-mono); font-size: 12px; transition: background-color 240ms var(--ease-out), border-color 240ms var(--ease-out), color 240ms var(--ease-out), scale 240ms var(--ease-out); }
-.onboarding-step-marker.is-current .onboarding-step-node { border-color: var(--emerald); background: var(--emerald); color: var(--white); scale: 1.12; }
-.onboarding-step-marker.is-current .onboarding-step-button,
+button.onboarding-step-button:hover { background: var(--tint-1); color: var(--ink); }
+button.onboarding-step-button:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.onboarding-step-node { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; width: 28px; height: 28px; border: 1.5px solid var(--border); border-radius: 50%; background: var(--white); color: var(--ink-2); font-size: 13px; font-weight: 700; transition: background-color 240ms var(--ease-out), border-color 240ms var(--ease-out), color 240ms var(--ease-out), box-shadow 240ms var(--ease-out); }
+.onboarding-step-marker.is-current .onboarding-step-node { border-color: var(--emerald); background: var(--emerald); color: var(--white); box-shadow: 0 0 0 4px var(--tint-2); }
+.onboarding-step-marker.is-current .onboarding-step-button { color: var(--ink); font-weight: 700; }
 .onboarding-step-marker.is-done .onboarding-step-button { color: var(--ink); }
-.onboarding-step-marker.is-done .onboarding-step-node { border-color: var(--emerald); background: var(--tint-2); color: var(--emerald-text); }
-.onboarding-step-connector { position: absolute; z-index: 0; top: 13px; left: 32px; right: 0; height: 2px; background: var(--border); transition: background-color 300ms var(--ease-out); }
+.onboarding-step-marker.is-done .onboarding-step-node { border-color: var(--emerald); background: var(--emerald); color: var(--white); }
+.onboarding-step-connector { flex: 1 1 auto; min-width: 16px; height: 2px; margin: 0 12px; border-radius: 1px; background: var(--border); transition: background-color 300ms var(--ease-out); }
 .onboarding-step-marker.is-done .onboarding-step-connector { background: var(--emerald); }
-.onboarding-next { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 20px; padding: 10px 12px; border-left: 3px solid var(--emerald); background: var(--tint-1); color: var(--ink-2); }
-.onboarding-next .eyebrow { margin: 0; font-size: 11px; }
-.onboarding-next strong { color: var(--ink); font-size: 13px; }
 .onboarding-step-form { animation: onboardingStepForward 360ms var(--ease-out) both; }
 .onboarding-step-form.back { animation-name: onboardingStepBack; }
 @keyframes onboardingStepForward { from { opacity: 0; translate: 18px 0; } to { opacity: 1; translate: 0 0; } }
@@ -2498,16 +2498,16 @@ button.onboarding-step-button:hover { color: var(--ink); }
   .onboarding { gap: 28px; }
   .onboarding.is-step-1 .onboarding-host .mascot-chat { scale: 0.9; transform-origin: center; }
   .onboarding.is-step-1 .onboarding-card { padding-top: 20px; padding-bottom: 20px; }
-  .onboarding.is-step-1 .onboarding-progress { margin-bottom: 8px; }
-  .onboarding.is-step-1 .onboarding-next { margin-bottom: 12px; padding: 8px 10px; }
+  .onboarding.is-step-1 .onboarding-progress { margin-bottom: 14px; padding-bottom: 14px; }
   .onboarding.is-step-1 .onboarding-card form { gap: 8px; }
   .onboarding.is-step-1 .onboarding-card .form-field { margin-bottom: 0; }
 }
 @media (max-width: 480px) {
-  .onboarding-step-button { gap: 5px; font-size: 11px; }
-  .onboarding-step-node { flex-basis: 24px; width: 24px; height: 24px; }
-  .onboarding-step-connector { top: 11px; left: 28px; }
-  .onboarding-next { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .onboarding-step-button { gap: 6px; font-size: 12px; }
+  .onboarding-step-node { flex-basis: 24px; width: 24px; height: 24px; font-size: 12px; }
+  .onboarding-step-connector { margin: 0 6px; min-width: 8px; }
+  /* Only the current step keeps its label on a phone; the others show their number */
+  .onboarding-step-marker:not(.is-current) .onboarding-step-button > span:last-child { display: none; }
 }
 /* Settings: the search chain, in the order it is tried */
 .search-chain { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }

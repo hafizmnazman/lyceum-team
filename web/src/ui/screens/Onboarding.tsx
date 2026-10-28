@@ -153,10 +153,7 @@ export function OnboardingScreen() {
               {i < STEPS.length - 1 ? <span className="onboarding-step-connector" aria-hidden /> : null}
             </div>)}
           </div>
-          <p className="onboarding-next" aria-live="polite">
-            <span className="eyebrow">Step {step + 1} of {STEPS.length}</span>
-            <strong>{step === STEPS.length - 1 ? "Final check" : "Next: " + STEPS[step + 1]}</strong>
-          </p>
+          <p className="sr-only" aria-live="polite">Step {step + 1} of {STEPS.length}: {STEPS[step]}</p>
 
           {step === 0 ? <form className={"onboarding-step-form " + direction} onSubmit={(e) => { e.preventDefault(); void saveProfile(); }}>
             <h1 id="onboarding-title" className="onboarding-title">Set up your workspace</h1>
