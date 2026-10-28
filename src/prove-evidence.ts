@@ -9,6 +9,10 @@ import {
 import { evidenceMarkdown, evidenceReport, locateExcerpt, textFingerprint, wilsonInterval } from "./lib/evidence.ts";
 import { signalFromEvidence } from "./agents/signal.ts";
 import { runCurriculum } from "./agents/curriculum.ts";
+import { applySuggestion, readSuggestions, revisionRequest } from "./lib/revision.ts";
+import { suggestRevision } from "../server/llm.ts";
+import { settingsFromEnv } from "./lib/agentSettings.ts";
+import { validateCourseDefinition } from "./lib/curriculum.ts";
 import type { CLO, CourseDefinition, CoverageStage, EvidenceSource, SkillMapping, SkillMention } from "./types.ts";
 import { parseWorkspaceBackup, workspaceFingerprint } from "./lib/workspaceBackup.ts";
 
@@ -278,4 +282,44 @@ test("a lecturer's own course with reviewed evidence reaches Programme, routing 
   assert.equal(gap.live?.postings, 8);
   assert.equal(gap.gap, 1, "demand 1, coverage 0");
   assert.ok(currentGaps().CLO4, "the fixture's outcomes are still there for the demo");
+});
+
+test("Quill: the revision request carries the gaps with a receipt; suggestions are checked, then applied one at a time", async () => {
+  prepareCourse();
+  for (let i = 0; i < 3; i++) {
+    const id = posting("Analyst " + i, "Firm " + i, POSTING + " Ref " + i + ".");
+    quote(id, "Cash-flow forecasting", "prepare cash-flow forecasts for small business clients");
+    if (i === 0) quote(id, "Power BI", "Experience with Power BI is preferred", "preferred");
+    setEvidenceSourceReviewed(id, true);
+  }
+  setSkillMapping("BUS205", { skill: "Cash-flow forecasting", cloIds: ["BUS205-outcome-1"], stage: "introduced", target: "assessed", evidence: "Week 1 lecture." });
+  const s = getState(), def = s.courseDefinitions.BUS205 ?? s.curriculumDrafts.find((d) => d.subjectId === "BUS205")!.definition;
+  const request = revisionRequest("BUS205", def, evidenceReportForCourse("BUS205"), s.skillMentions);
+  assert.deepEqual(request.gaps.map((g) => [g.skill, g.postings, g.eligible, g.outcomes.join()]), [["Cash-flow forecasting", 3, 3, "CLO1"], ["Power BI", 1, 3, ""]],
+    "below target and unmapped skills, most asked first, outcomes by label");
+  assert.equal(request.gaps[0].quote, "prepare cash-flow forecasts for small business clients", "an exact quotation as the receipt");
+  const reply = { suggestions: [
+    { kind: "edit-outcome", outcome: "CLO1", text: "Build and assess a 13-week cash-flow forecast for a small business.", bloom: "create", skill: "Cash-flow forecasting", reason: "3 of 3 postings ask for it." },
+    { kind: "add-topic", title: "Dashboards in Power BI", hours: 2, outcomes: ["CLO2", "CLO9"], skill: "Power BI", reason: "1 of 3 postings." },
+    { kind: "edit-outcome", outcome: "CLO7", text: "An outcome the course does not have.", bloom: "Apply", skill: "x", reason: "dropped" },
+    { kind: "add-outcome", text: "Use SQL.", bloom: "Apply", skill: "SQL", reason: "A skill it was never shown." },
+    { kind: "delete-everything", reason: "dropped" },
+  ] };
+  const suggestions = await suggestRevision(settingsFromEnv({ LYCEUM_AGENT_PROVIDER: "ollama", LYCEUM_AGENT_MODEL: "m" }), request, async (m) => {
+    assert.match(m[0].content ?? "", /You are Quill/); assert.match(m[1].content ?? "", /Power BI/);
+    return { content: "Here you go: " + JSON.stringify(reply) };
+  });
+  assert.deepEqual(suggestions.map((x) => x.kind), ["edit-outcome", "add-topic", "add-outcome"], "unknown outcome and unknown kind dropped");
+  assert.equal(suggestions[0].kind === "edit-outcome" && suggestions[0].bloom, "Create", "Bloom level normalised");
+  assert.deepEqual(suggestions[1].kind === "add-topic" && suggestions[1].outcomes, ["CLO2"], "an outcome label the course lacks is dropped from a topic");
+  assert.equal(suggestions[2].skill, "", "a skill the model was not shown loses its link");
+  assert.deepEqual(readSuggestions({ nope: 1 }, request), []);
+  let next = def;
+  suggestions.forEach((x, i) => { next = applySuggestion(next, x, "BUS205", "n" + i); });
+  assert.equal(next.outcomes.find((c) => c.label === "CLO1")?.text, "Build and assess a 13-week cash-flow forecast for a small business.");
+  assert.equal(next.outcomes.find((c) => c.label === "CLO3")?.text, "Use SQL.", "an added outcome takes the next free label");
+  assert.deepEqual(next.topics.at(-1)?.cloIds, ["BUS205-outcome-2"]);
+  assert.equal(validateCourseDefinition(next, "BUS205").filter((i) => i.severity === "error").every((i) => /hour|contact/i.test(i.message)), true,
+    "the applied revision is checked by the course's own rules; only the hours budget can object");
+  assert.equal(def.outcomes.find((c) => c.label === "CLO1")?.text, "Prepare and justify a cash-flow plan for a small business.", "the source definition is untouched");
 });

@@ -1,6 +1,6 @@
 import { useRef, useState, type InputHTMLAttributes } from "react";
 import { can } from "../../app/roles.ts";
-import { adoptCurriculumRevision, checkCurriculumRevision, definitionForCourse, discardCurriculumRevision, nowIso, openRecap,
+import { adoptCurriculumRevision, checkCurriculumRevision, definitionForCourse, discardCurriculumRevision, evidenceReportForCourse, nowIso, openRecap,
   saveCurriculumRevision, startCurriculumRevision, type AppState } from "../../app/store.ts";
 import { BLOOM_LEVELS, curriculumChanges, curriculumImpact, curriculumMarkdown, learningTime, nextFreeSlot, splitForSlot, topicHours, validateCourseDefinition, withDerivedFields } from "../../lib/curriculum.ts";
 import { downloadText } from "../../lib/download.ts";
@@ -14,6 +14,8 @@ import { ChangeSummary, CountUpSummary, Dumbbell, OutcomeChanges, SlideDiffList,
 import { useMarkData } from "../primitives/DeckPreview.tsx";
 import { packMaker, previousVersion } from "./packCompare.ts";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
+import { fetchRevisionSuggestions } from "../../agents/client.ts";
+import { applySuggestion, revisionRequest, type RevisionSuggestion } from "../../lib/revision.ts";
 
 type Props = { state: AppState; person: Person; subject: Subject };
 const list = (text: string) => [...new Set(text.split(",").map(s => s.trim()).filter(Boolean))];
@@ -84,6 +86,37 @@ function DefinitionSummary({ definition }: { definition: CourseDefinition }) {
     <h4>Topic sequence</h4>
     {definition.topics.length ? <ol className="journey-list">{definition.topics.map(t => <li key={t.id}><strong>{t.title}</strong> · {topicHours(t)} · {t.selfStudyHours} self-study h · week {t.week ?? "not set"}</li>)}</ol> : <p>No topic outline is recorded yet.</p>}
   </div>;
+}
+
+const SUGGESTION_LABEL: Record<RevisionSuggestion["kind"], string> = { "edit-outcome": "Reword", "add-outcome": "Add outcome", "add-topic": "Add topic" };
+/** Quill reads the open revision and the skills the course is behind on, and suggests single changes. Applying one edits the
+ *  revision in this editor only; saving, checking and adopting stay the lecturer's. */
+function QuillSuggestions({ state, subject, definition, onApply }: { state: AppState; subject: Subject; definition: CourseDefinition; onApply: (s: RevisionSuggestion) => void }) {
+  const [list, setList] = useState<RevisionSuggestion[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const request = revisionRequest(subject.id, definition, evidenceReportForCourse(subject.id), state.skillMentions);
+  const ask = async () => {
+    setBusy(true); setError("");
+    const r = await fetchRevisionSuggestions(request);
+    setBusy(false);
+    if (r.ok) setList(r.suggestions); else setError(r.error);
+  };
+  const drop = (i: number) => setList(l => l && l.filter((_, j) => j !== i));
+  const gap = (skill: string) => request.gaps.find(g => g.skill === skill);
+  return <section className="workspace-panel" aria-labelledby="quill-title" data-demo-id="quill-suggestions">
+    <div className="section-heading"><div><h3 id="quill-title">Suggestions from Quill</h3>
+      <p className="muted">{request.gaps.length ? "Quill reads this revision and the " + request.gaps.length + " quoted skills the course is below target on or has not mapped, and suggests changes. You apply or dismiss each one." : "Quote and map employer requirements on Report first; Quill suggests changes against the skills the course is behind on."}</p></div>
+      <Button variant="primary" loading={busy} disabled={!request.gaps.length} data-demo-id="quill-ask" onClick={() => void ask()}>{list ? "Ask again" : "Suggest changes"}</Button></div>
+    {error ? <p role="alert" className="form-error">{error}</p> : null}
+    {list && !list.length ? <p className="muted">No suggestions this time.</p> : null}
+    {list?.length ? <ol className="ladder-list">{list.map((s, i) => { const g = gap(s.skill); return <li key={i} className="curriculum-object">
+      <p><Tag>{SUGGESTION_LABEL[s.kind]}{s.kind === "edit-outcome" ? " " + s.outcome : ""}</Tag> {s.kind === "add-topic" ? <><strong>{s.title}</strong> · {s.hours} h{s.outcomes.length ? " · " + s.outcomes.join(", ") : ""}</> : <><strong>{s.text}</strong> · {s.bloom}</>}</p>
+      <p className="muted">{s.reason}</p>
+      {g ? <p className="muted">{g.skill}: {g.postings} of {g.eligible} reviewed postings{g.quote ? <>, e.g. “{g.quote}”</> : null}</p> : <p className="muted">Not tied to a quoted skill.</p>}
+      <div className="button-row"><Button onClick={() => { onApply(s); drop(i); }}>Apply to the revision</Button><Button variant="quiet" onClick={() => drop(i)}>Dismiss</Button></div>
+    </li>; })}</ol> : null}
+  </section>;
 }
 
 const TOPIC_KINDS: Array<[TopicKind, string]> = [["lecture", "Lecture"], ["lab", "Lab"], ["mixed", "Lecture and lab"], ["quiz", "Quiz"], ["studio", "Studio"], ["review", "Review"]];
@@ -163,6 +196,8 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
     </section>
     {stale ? <p role="alert" className="form-error">The active course version changed. Export this candidate, discard it and start from the current version.</p> : null}
     {feedback ? <div role="status" tabIndex={-1} ref={alertRef} className="save-status">{feedback}</div> : null}
+    {mayEdit && !stale ? <QuillSuggestions state={state} subject={subject} definition={definition}
+      onApply={(s) => setDefinition(d => applySuggestion(d, s, subject.id, crypto.randomUUID()))} /> : null}
     <fieldset disabled={!mayEdit || stale} className="curriculum-fields">
       <section className="workspace-panel"><h3>Course brief</h3>
         <Field label="Course title"><Input value={definition.title} maxLength={200} data-demo-id="curriculum-title" onChange={e => setDefinition({ ...definition, title: e.target.value })} /></Field>

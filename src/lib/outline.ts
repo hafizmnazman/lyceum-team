@@ -9,7 +9,7 @@ import { z } from "zod";
 import type { BloomLevel, CourseDefinition, CourseOutcome, CourseTopic } from "../types.ts";
 
 export const BLOOM_LEVELS: BloomLevel[] = ["Remember", "Understand", "Apply", "Analyse", "Evaluate", "Create"];
-const bloomOf = (v: unknown): BloomLevel => {
+export const bloomOf = (v: unknown): BloomLevel => {
   const s = String(v ?? "").trim().toLowerCase().replace(/^analyz/, "analys");
   return BLOOM_LEVELS.find((b) => b.toLowerCase() === s || s.startsWith(b.toLowerCase().slice(0, 5))) ?? "Understand";
 };

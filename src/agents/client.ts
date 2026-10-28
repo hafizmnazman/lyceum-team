@@ -15,6 +15,7 @@ import type { CLO, CollectedPosting, CollectionProvider, IntakeInterpretation, P
 import { SOURCE_POLICIES, filterPostings } from "../lib/collect.ts";
 import { interpretLocally } from "./intakeLocal.ts";
 import type { OutlineProposal } from "../lib/outline.ts";
+import type { RevisionRequest, RevisionSuggestion } from "../lib/revision.ts";
 
 const PARSE_TIMEOUT_MS = 20000;
 const AGENT_TIMEOUT_MS = 30000;
@@ -242,6 +243,19 @@ export async function fetchCollection(request: CollectionRequest, onLog: (line: 
       bytes: typeof body.bytes === "number" ? body.bytes : null, durationMs: typeof body.durationMs === "number" ? body.durationMs : Date.now() - started };
   } catch (err) {
     return { ok: false, error: err instanceof Error && err.message === "timeout" ? "The collection timed out. Try again, or narrow the keywords." : "The local API is not reachable. Start it with npm run dev to collect from a live board." };
+  }
+}
+
+// ---------- Update: Quill's suggestions on an open revision (src/lib/revision.ts) ----------
+/** Ask the model in .env for suggestions on a revision. Nothing is applied here; the lecturer applies each one. */
+export async function fetchRevisionSuggestions(request: RevisionRequest): Promise<{ ok: true; suggestions: RevisionSuggestion[] } | { ok: false; error: string }> {
+  try {
+    const res = await withTimeout(fetch("/api/agent/revision", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request) }), OUTLINE_TIMEOUT_MS);
+    const body = (await res.json().catch(() => null)) as { suggestions?: RevisionSuggestion[]; error?: string } | null;
+    if (!res.ok || !body?.suggestions) return { ok: false, error: body?.error ?? "No suggestions came back (HTTP " + res.status + ")." };
+    return { ok: true, suggestions: body.suggestions };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error && err.message === "timeout" ? "The model took too long. Try again." : "The local API is not reachable. Start it with npm run dev." };
   }
 }
 

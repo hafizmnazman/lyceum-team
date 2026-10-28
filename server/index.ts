@@ -14,7 +14,7 @@ import { serve, type HttpBindings } from "@hono/node-server";
 import { parseSheet } from "./parse/sheet.ts";
 import { parsePdf } from "./parse/pdf.ts";
 import { parseDocx, parsePptx } from "./parse/office.ts";
-import { agentModel, runIntakeLLM, streamAgentLLM } from "./llm.ts";
+import { agentModel, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
 import { CollectError, collectBoard } from "./collect.ts";
 import { filterPostings } from "../src/lib/collect.ts";
 import { missingSettings, publicSettings } from "../src/lib/agentSettings.ts";
@@ -140,6 +140,21 @@ app.post("/api/agent/outline", async (c) => {
   } catch (err) {
     console.error("outline read failed:", err);
     return c.json({ error: "The model could not read this outline: " + (err instanceof Error ? err.message : String(err)).slice(0, 300) + " You can type the outcomes below instead." }, 502);
+  }
+});
+
+// Quill's suggestions on an open revision (src/lib/revision.ts): the outline and the gaps in, checked suggestions out.
+app.post("/api/agent/revision", async (c) => {
+  let request: Parameters<typeof suggestRevision>[1];
+  try { request = await c.req.json(); } catch { return c.json({ error: "Send the revision as JSON." }, 400); }
+  if (!request?.course || !Array.isArray(request.course.outcomes) || !Array.isArray(request.gaps)) return c.json({ error: "Send the course outline and its gaps." }, 400);
+  const { s, missing } = await agentModel();
+  if (missing.length) return c.json({ error: "Suggestions need the model set up: add " + missing.join(", ") + " to .env (see Settings)." }, 400);
+  try {
+    return c.json({ suggestions: await suggestRevision(s, request) });
+  } catch (err) {
+    console.error("revision suggestions failed:", err);
+    return c.json({ error: "The model could not suggest changes: " + (err instanceof Error ? err.message : String(err)).slice(0, 300) }, 502);
   }
 });
 

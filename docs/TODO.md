@@ -30,10 +30,15 @@ has real data; the demo runs on the fixtures.
 - [ ] **Market sources from real runs.** Replace `MARKET_SOURCES` (`src/data/market.ts`, the made-up JobStreet and
       LinkedIn counts) with the research runs actually done: board, date, postings kept, on real courses. The synthetic
       list stays, labelled, for the demo (Trends, DataRoom, Index).
-- [ ] **Intake live.** `src/agents/intake.ts` returns a canned filing that ignores the file. Run the model, with
-      `intakeLocal.ts` as the fallback with no model; the fixture stays as the demo's path (`src/agents/mode.ts`).
-- [ ] **Authoring live.** `store.ts:1278` and `:1316` pass `"fixture"`. Draft and critique with the model on the course's
-      real outline and evidence when one is set; the fixture stays for the demo. The lecturer still accepts each change.
+- [x] **Intake live** (already, since `refactor/unify-agent-model`). The Upload screen sends a real file to
+      `/api/agent/intake` on the configured model, with `intakeLocal.ts` as the fallback with no model. The one-click
+      `uploadResults` path and `runIntake`'s fixture stay for the demo and the proofs.
+- [x] **Authoring live: Quill on the Update step** (`feat/live-intake-authoring`). With a revision open, "Suggest changes"
+      sends the outline and the quoted skills the course is below target on or has not mapped (with counts and a quotation)
+      to the model, which suggests single changes: reword an outcome, add one, add a topic. Each is checked
+      (`src/lib/revision.ts`: unknown outcomes and kinds dropped, Bloom levels normalised) and the lecturer applies or
+      dismisses it into the open revision; saving, checking and adopting are unchanged. The sandbox Proposal screen
+      (`draftWithAgent`, `requestAgentReview`) keeps its CS220 fixture for the demo.
 - [ ] **Atlas proposes mappings.** Skill → CLO mapping is all by hand today. The model proposes a mapping with a reason;
       the lecturer confirms each one, the same way as quotations.
 - [ ] **Lens scan with a model.** `proposeMentions` uses a keyword list only. Add model-proposed quotations, still checked
