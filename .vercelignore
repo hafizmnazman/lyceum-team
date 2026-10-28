@@ -1,0 +1,13 @@
+# Upload only what the frontend build needs; keeps api/.env, the client secret, video/ and the rest off Vercel.
+/*
+!/web
+!/shared
+!/package.json
+!/package-lock.json
+!/tsconfig.json
+!/vercel.json
+/web/.env
+# api is an npm workspace: its package.json keeps npm install happy, its code and .env stay behind
+!/api
+/api/*
+!/api/package.json
