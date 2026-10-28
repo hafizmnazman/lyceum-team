@@ -1,5 +1,5 @@
 # Deploys the frontend (web/) to Vercel production, only when the repository owner starts it by hand:
-# Actions > "Deploy web (Vercel)" > Run workflow (branch: main). Pushes, pull requests and merges never trigger it.
+# Actions > "Deploy web (Vercel)" > Run workflow (branch: main), by hafizmnazman or No0bmazt3r. Pushes, pull requests and merges never trigger it.
 #
 # The run gates deployment in this order:
 #   1. The Checks workflow (checks.yml: typecheck and every prove suite) passed for this exact commit.
@@ -7,7 +7,7 @@
 #   3. The production environment's approval, if one is set, then the deploy.
 #
 # Why nobody else can deploy:
-# - The jobs run only if the owner both started the run and (for a re-run) clicked re-run, and only on main.
+# - The jobs run only if an allowed account (hafizmnazman or No0bmazt3r) both started the run and (for a re-run) clicked re-run, and only on main.
 # - The Vercel secrets live in the "production" GitHub Environment, which only main may use.
 # Setup, once: GitHub > Settings > Environments > production, secrets VERCEL_TOKEN (vercel.com/account/tokens),
 # VERCEL_ORG_ID and VERCEL_PROJECT_ID (orgId and projectId in .vercel/project.json after `vercel link`). The page's own
@@ -30,7 +30,7 @@ jobs:
   verify-checks:
     name: Verify checks
     runs-on: ubuntu-latest
-    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.ref == 'refs/heads/main'
+    if: contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.actor) && contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.triggering_actor) && github.ref == 'refs/heads/main'
     steps:
       - name: Require successful checks for this commit
         run: |
@@ -54,7 +54,7 @@ jobs:
   verify-database:
     name: Verify database migration
     runs-on: ubuntu-latest
-    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.ref == 'refs/heads/main'
+    if: contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.actor) && contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.triggering_actor) && github.ref == 'refs/heads/main'
     steps:
       - name: Require a successful migration for this commit
         run: |

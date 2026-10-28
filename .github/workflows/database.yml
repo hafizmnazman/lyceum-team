@@ -6,7 +6,7 @@
 # The check is scripts/db-status.ts (read-only: SELECT 1, then supabase/migrations/ against the versions Supabase has
 # recorded). Migrating is the Supabase CLI's own `db push`, which applies only what is pending and records each one.
 #
-# Why nobody else can run it: the job runs only when the owner both started the run and (for a re-run) clicked
+# Why nobody else can run it: the job runs only when an allowed account (the owner, hafizmnazman, or No0bmazt3r) both started the run and (for a re-run) clicked
 # re-run, and only on main; DATABASE_URL lives in the "production" GitHub Environment, which only main may use.
 # Set it up once: GitHub > Settings > Environments > New environment "production", Deployment branches: main only,
 # and the secret DATABASE_URL (the Session pooler string from Supabase > Connect, no ?sslmode=).
@@ -38,7 +38,7 @@ jobs:
     outputs:
       migration_needed: ${{ steps.migration-status.outputs.migration_needed }}
     runs-on: ubuntu-latest
-    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.ref == 'refs/heads/main'
+    if: contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.actor) && contains(fromJSON('["hafizmnazman", "No0bmazt3r"]'), github.triggering_actor) && github.ref == 'refs/heads/main'
     environment: production
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
