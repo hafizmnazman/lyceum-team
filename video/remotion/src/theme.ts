@@ -1,5 +1,5 @@
 // The film's theme: the app's tokens, imported, never copied (video/style.md).
-import { color, font, withAlpha } from "../../../src/theme/tokens.ts";
+import { color, font, withAlpha } from "../../../shared/theme/tokens.ts";
 
 export const C = color;
 export const F = font;

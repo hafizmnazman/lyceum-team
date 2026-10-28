@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { preview } from "vite";
 import puppeteer from "puppeteer-core";
-import { REMAINING_WORK } from "../src/app/sectionGuides.ts";
-import { PROOF } from "../src/data/proof.ts";
+import { REMAINING_WORK } from "../web/src/app/sectionGuides.ts";
+import { PROOF } from "../shared/data/proof.ts";
 
 const executablePath = [
   "C:/Program Files/Google/Chrome/Application/chrome.exe",

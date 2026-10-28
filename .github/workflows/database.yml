@@ -1,0 +1,75 @@
+# Checks the Supabase database on every push to main and applies pending migrations after the check:
+#   push to main       checks reachability, then migrates if needed
+#   manual "check"     checks reachability and pending migrations without changing anything
+#   manual "migrate"   checks, then applies pending migrations
+#
+# The check is scripts/db-status.ts (read-only: SELECT 1, then supabase/migrations/ against the versions Supabase has
+# recorded). Migrating is the Supabase CLI's own `db push`, which applies only what is pending and records each one.
+#
+# Why nobody else can run it: the job runs only when the owner both started the run and (for a re-run) clicked
+# re-run, and only on main; DATABASE_URL lives in the "production" GitHub Environment, which only main may use.
+# Set it up once: GitHub > Settings > Environments > New environment "production", Deployment branches: main only,
+# and the secret DATABASE_URL (the Session pooler string from Supabase > Connect, no ?sslmode=).
+name: Database (Supabase)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [check, migrate]
+        default: check
+
+concurrency:
+  group: database
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+run-name: Database ${{ github.event_name == 'push' && 'migrate' || inputs.action || 'check' }} for ${{ github.sha }}
+
+jobs:
+  database:
+    name: ${{ (github.event_name == 'push' || inputs.action == 'migrate') && 'Check and migrate' || 'Check' }} database
+    outputs:
+      migration_needed: ${{ steps.migration-status.outputs.migration_needed }}
+    runs-on: ubuntu-latest
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.ref == 'refs/heads/main'
+    environment: production
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: npm }
+      - run: npm ci # also installs the Supabase CLI (a dev dependency)
+      - name: Secrets present?
+        run: |
+          # Without DATABASE_URL the API's code falls back to the Supabase CLI's local database, which does not exist on
+          # GitHub's machine, so the check would fail for the wrong reason (or worse, a later step could target it). Stop.
+          case "$DATABASE_URL" in postgres://*|postgresql://*) ;; *) echo "DATABASE_URL is missing or isn't a postgres:// address (GitHub > Settings > Environments > production)." >&2; exit 1 ;; esac
+      - name: Is the database reachable, and what's pending?
+        id: check
+        run: node scripts/db-status.ts
+      - name: Report whether migration is needed
+        id: migration-status
+        run: |
+          if [ "${{ steps.check.outputs.pending }}" = "0" ]; then
+            echo "migration_needed=false" >> "$GITHUB_OUTPUT"
+            echo "migration_needed=false" >> "$GITHUB_STEP_SUMMARY"
+            echo "No migration is needed."
+          else
+            echo "migration_needed=true" >> "$GITHUB_OUTPUT"
+            echo "migration_needed=true" >> "$GITHUB_STEP_SUMMARY"
+            echo "${{ steps.check.outputs.pending }} migration(s) need to be applied."
+          fi
+      - name: Apply pending migrations
+        if: steps.check.outputs.pending != '0' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'migrate'))
+        run: npx supabase db push --db-url "$DATABASE_URL" --yes
+      - name: Check again
+        if: steps.check.outputs.pending != '0' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'migrate'))
+        run: node scripts/db-status.ts

@@ -32,7 +32,7 @@ function tag(x, y, label, onForest = false) {
 /** An estimate of a label's width in the 14 px semibold body face: capitals and digits are wider than lower case. */
 const textWidth = (s, px = 14) => [...s].reduce((w, ch) => w + (/[A-Z0-9*]/.test(ch) ? 0.73 : /[a-z]/.test(ch) ? 0.58 : ch === " " ? 0.3 : 0.36) * px, 0);
 const mark = (icon, x, y, size, fill = K.forest) => `<svg x="${x}" y="${y}" width="${size}" height="${size}" viewBox="0 0 24 24"><title>${esc(icon.title)}</title><path d="${icon.path}" fill="${fill}"/></svg>`;
-const lyceumMark = (x, y, size) => `<image x="${x}" y="${y}" width="${size}" height="${size}" href="data:image/svg+xml;base64,${readFileSync(join(ROOT, "public/brand/mark.svg")).toString("base64")}"/>`;
+const lyceumMark = (x, y, size) => `<image x="${x}" y="${y}" width="${size}" height="${size}" href="data:image/svg+xml;base64,${readFileSync(join(ROOT, "web/public/brand/mark.svg")).toString("base64")}"/>`;
 /** A labelled line with an arrowhead; dashed when planned. The label says the purpose, then the technology. */
 function arrow(x1, y1, x2, y2, label, o = {}) {
   const stroke = o.onForest ? K.onForest : K.ink2;

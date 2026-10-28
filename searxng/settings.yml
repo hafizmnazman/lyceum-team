@@ -1,0 +1,14 @@
+# Lyceum's SearXNG: the defaults, plus the JSON output Lyceum's agent reads (server/webTools.ts asks for format=json),
+# and no request limiter (it needs a separate Valkey server, and only this computer can reach this instance).
+use_default_settings: true
+general:
+  instance_name: "Lyceum search"
+server:
+  limiter: false
+  image_proxy: false
+  secret_key: "lyceum-local-only-change-me" # SEARXNG_SECRET in docker-compose.yml overrides this
+search:
+  safe_search: 1
+  formats:
+    - html
+    - json

@@ -1,5 +1,5 @@
-// Renders the cast from the same components the app uses (src/ui/mascots/),
-// through Vite's SSR loader, into public/brand/:
+// Renders the cast from the same components the app uses (web/src/ui/mascots/),
+// through Vite's SSR loader, into web/public/brand/:
 //   mascots/<who>-<pose>.svg and mascots/<who>-<pose>-<size>.png at 512 and 1024
 //   (the host also at 2048, for the poster);
 //   mark.svg and mark-white.svg (the host's silhouette), favicon.svg (the tile),
@@ -24,7 +24,7 @@ const server = await createServer({ root: ROOT, configFile: false, logLevel: "er
 let M;
 try { M = await server.ssrLoadModule("/src/ui/mascots/index.tsx"); } finally { await server.close(); }
 
-const OUT = join(ROOT, "public/brand"), MASCOTS = join(OUT, "mascots");
+const OUT = join(ROOT, "web/public/brand"), MASCOTS = join(OUT, "mascots");
 const standalone = (markup) => markup.replace("<svg ", "<svg xmlns=\"http://www.w3.org/2000/svg\" ");
 const render = (Component, props) => standalone(renderToStaticMarkup(React.createElement(Component, props)));
 
@@ -54,7 +54,7 @@ if (check) {
   const drift = [];
   for (const [path, markup] of svgs) if (!existsSync(path) || readFileSync(path, "utf8").replace(/\r\n/g, "\n") !== markup) drift.push(path.slice(ROOT.length + 1));
   for (const { path } of pngs) if (!existsSync(path)) drift.push(path.slice(ROOT.length + 1) + " (missing)");
-  if (!existsSync(manifestPath) || readFileSync(manifestPath, "utf8").replace(/\r\n/g, "\n") !== manifest) drift.push("public/brand/manifest.webmanifest");
+  if (!existsSync(manifestPath) || readFileSync(manifestPath, "utf8").replace(/\r\n/g, "\n") !== manifest) drift.push("web/public/brand/manifest.webmanifest");
   if (drift.length) { console.error("Mascot outputs are missing or have drifted (run node scripts/gen-mascots.mjs):\n  " + drift.join("\n  ")); process.exit(1); }
   console.log("Mascot outputs match the components: " + svgs.size + " SVGs, " + pngs.length + " PNGs and the manifest.");
   process.exit(0);
@@ -79,4 +79,4 @@ try {
 } finally {
   await browser.close();
 }
-console.log("Wrote " + svgs.size + " SVGs, " + pngs.length + " PNGs and the manifest into public/brand/.");
+console.log("Wrote " + svgs.size + " SVGs, " + pngs.length + " PNGs and the manifest into web/public/brand/.");

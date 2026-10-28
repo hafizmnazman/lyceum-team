@@ -87,14 +87,14 @@ Set up the course, make the decided change, prepare classes and keep a traceable
 
 See what employers are asking for, right now and over time.
 
-1. Run a research run against a permitted employer board (Greenhouse or Lever, through the local API) or the dated saved sample. Collection happens only when you ask.
+1. Run a research run against a permitted employer board (Greenhouse or Lever, through the local API), the dated saved sample, or Agent web search, where a model you choose in Settings searches the web and reads pages for your brief. Collection happens only when you ask.
 2. Keep the postings worth reading. Each keeps its link, publication date, retrieval time and fingerprint; a copy of a kept posting is flagged as a duplicate and not counted twice.
 3. Paste a document you are permitted to keep, such as an employer letter or an advisory board note, with its exact text.
 4. Freeze a snapshot of the reviewed evidence at each review and compare a later window with it. A skill is called rising or falling only when the two 95% intervals separate.
 
 **Output:** Dated sources with their receipts, and frozen snapshots to compare.
 
-**Current limit:** Two documented board APIs and a dated saved sample only; no other sites, no scheduled refresh and no employer-balanced view. A convenience sample describes the postings kept, not the labour market.
+**Current limit:** Two documented board APIs, a dated saved sample, and agent web search when a model and search key are set; no scheduled refresh and no employer-balanced view. Many job sites block or forbid automated reading. A convenience sample describes the postings kept, not the labour market.
 
 ## Report
 
@@ -326,6 +326,20 @@ Explore the prototype's course relevance and source-agreement presentation.
 **Output:** An illustrative course-level relevance view.
 
 **Current limit:** Source agreement describes direction only, not reliability or truth. All shipped market records are synthetic; this is not a live labour-market ranking.
+
+## Settings
+
+**For:** Whoever runs this copy of Lyceum · **Status:** Partial
+
+See which model and web search provider agent web search will use, as set in .env, and test both.
+
+1. In .env, set LYCEUM_AGENT_PROVIDER (openai, openrouter, gemini, groq, ollama, or custom with LYCEUM_AGENT_BASE_URL), LYCEUM_AGENT_MODEL and LYCEUM_AGENT_API_KEY. The model must support tool calling.
+2. Search needs nothing set: it tries SearXNG (npm run search:up starts one with Docker), then DuckDuckGo. To change the order, set LYCEUM_SEARCH_PROVIDER and LYCEUM_SEARCH_FALLBACK, and add a key such as TAVILY_API_KEY for a keyed provider; LYCEUM_SEARCH_TIME sets the default window.
+3. Open Settings to check what the local API read, and test the model (it must call a tool) and the search. Edits to .env apply on the next request.
+
+**Output:** A read-only view of the agent's settings, with keys shown only as their last four characters.
+
+**Current limit:** Keys sit unencrypted in .env on this computer. One run at a time. The agent's choices vary by model; every kept posting still needs the lecturer's review, and its text is the page as fetched.
 
 ## Institution settings
 

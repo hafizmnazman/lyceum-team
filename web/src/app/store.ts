@@ -1,0 +1,2919 @@
+// The central store: one in-memory state plus the actions that move it. Built as
+// a module-level external store (useSyncExternalStore) so React screens, the
+// self-driving demo runner, and the proof scripts all read the same state and
+// dispatch the same real actions.
+//
+// v3 changes over v2 (spec "This is an app, not a demo"):
+//  - the mutable world persists to localStorage (versioned key, debounced), and
+//    "Reset workspace" restores the seed;
+//  - timestamps are real in the browser and pinned in Node / demo mode, so the
+//    app feels live while the proofs and the recorded demo stay deterministic;
+//  - new slices: agentRuns (live agent presence), pendingIntake (the parse ->
+//    interpret -> confirm upload flow), testDrafts (the assessment studio), and
+//    relevanceRatings (the advisory's core output);
+//  - home is the Inbox; navigation syncs to the URL hash (wired in App.tsx).
+//
+// The v2 proposal state machine is carried unchanged:
+//   drafting --(coordinator runs)--> testing
+//   drafting --(lecturer submits)--> coordinator-review
+//   coordinator-review --(approve)--> testing   --(changes)--> drafting
+//   testing --(run done)--> management-approval
+//   management-approval --(approve)--> approved (writes a Prediction)
+//                       --(reject)--> drafting
+
+import { useSyncExternalStore } from "react";
+import type {
+  SlideRound,
+  SlideSuggestion,
+  SlideDraft,
+  SurveyDefinition,
+  SurveyResponse,
+  CqiNote,
+  ObeReport,
+  DraftItem,
+  TeachingSession,
+  AgentName,
+  AgentRun,
+  AssessmentBlueprint,
+  BloomLevel,
+  CLO,
+  ChangeProposal,
+  DataSource,
+  Hat,
+  IntakeInterpretation,
+  Notification,
+  NotificationKind,
+  ParsedDoc,
+  Person,
+  PersonId,
+  Prediction,
+  ProposalId,
+  RelevanceRating,
+  ResultUpload,
+  RoleAssignment,
+  Rubric,
+  Subject,
+  SubjectId,
+  SubjectVersion,
+  SurveyRecord,
+  TestDraft,
+  TestItem,
+  TeachingPlan,
+  CourseDefinition,
+  CurriculumDraft,
+  DecisionOutcome,
+  LoopEvent,
+  LoopEventKind,
+  BriefDecision,
+  BriefRecommendation,
+  CollectedPosting,
+  CollectionProvider,
+  EvidenceBrief,
+  EvidenceSnapshot,
+  EvidenceSource,
+  InstitutionProfile,
+  SkillMapping,
+  SkillMention,
+  VerdictReport,
+} from "../../../shared/types.ts";
+import type { Screen } from "./roles.ts";
+import { confirmLeaveEditor } from "./unsaved.ts";
+import { can, landingScreen, navAllows, hatsOn, isCoordinatorAnywhere } from "./roles.ts";
+import type { SimState } from "./sim.ts";
+import { initSim, SIM_TICK_MS, stepSim } from "./sim.ts";
+import type { SignalSimState } from "./signalSim.ts";
+import { initSignalSim, SIGNAL_TICK_MS, stepSignal } from "./signalSim.ts";
+import { DRILL_STEP_MS, DRILL_STEPS, scaleMs } from "../demo/timing.ts";
+import {
+  runAcceptanceWithDistribution,
+  type AcceptanceDistribution,
+} from "../../../shared/agents/acceptance.ts";
+import { sendVerdict, streamAgent } from "../../../shared/agents/client.ts";
+import { runIntake, type ParsedSheet } from "../../../shared/agents/intake.ts";
+import { runAuthoring } from "../../../shared/agents/authoring.ts";
+import { runAnalogy } from "../../../shared/agents/analogy.ts";
+import { marketGapByCLO, runSignal, signalFromEvidence, type OutcomeSignal, type SignalResult } from "../../../shared/agents/signal.ts";
+import { computeRelevanceRatings } from "../../../shared/data/market.ts";
+import { backupSummary, parseWorkspaceBackup, serializeWorkspaceBackup, workspaceFingerprint } from "../../../shared/lib/workspaceBackup.ts";
+import { courseDefinition, curriculumChanges, curriculumImpact, draftStructureError, validateCourseDefinition, withDerivedFields } from "../../../shared/lib/curriculum.ts";
+import { sessionIssues, type SaveResult, type SessionInput } from "../../../shared/lib/teachingPlan.ts";
+import {
+  evidenceReport, evidenceSourceError, mappingError, meetingBriefMarkdown, mentionError, normaliseWhitespace, proposeMentions, RECOMMENDATION_LABEL, skillKey, textFingerprint,
+  type EvidenceSourceInput, type MappingInput, type MentionInput, type MentionProposal,
+} from "../../../shared/lib/evidence.ts";
+import { BOARD_TOKEN, SOURCE_POLICIES } from "../../../shared/lib/collect.ts";
+import { CURRENT_ID, buildSnapshot, compareSnapshots, comparisonMarkdown, snapshotLabelError, type SnapshotComparison } from "../../../shared/lib/snapshots.ts";
+import { fetchCollection, type CollectionOutcome, type CollectionRequest } from "../../../shared/agents/client.ts";
+import { downloadDeck, MAX_DECK_SLIDES, MAX_SLIDE_CHARS, SLIDES_TO_ADD, slideRequest, type DeckSpec, type SlideRequest, type SuggestionRequest } from "../../../shared/lib/slides.ts";
+import { DECISION_OUTCOMES, NOTE_MAX, OUTCOME_LABEL, briefDecisionState } from "../../../shared/lib/decisions.ts";
+import { courseVersionIds, stepDef, stepForTab, taughtVersionId, termWindow, type CourseStep, type ReportTab } from "./loop.ts";
+export { REPORT_TABS, type ReportTab } from "./loop.ts";
+import { hashFor, type CourseRoute } from "./routes.ts";
+import { ITEMS, itemsForCLOs } from "../../../shared/data/items.ts";
+import { DEMO_INSTITUTION } from "../../../shared/data/institution.ts";
+import { institutionError } from "../../../shared/lib/institution.ts";
+import { boothAnswers, courseOutcomeSurvey, formTokenFor, gradesReleased, importResponseRows, newReaderSecret, readPasteCodes, ssrtSurvey, studentForm, type ImportResult, type PasteResult } from "../../../shared/lib/surveys.ts";
+import { DEMO_LINE } from "../../../shared/data/sample-course/index.ts";
+import { listedStudents, obeReport } from "../../../shared/lib/attainment.ts";
+import { itemRequest, templateItems, type ItemRequest } from "../../../shared/lib/items.ts";
+import { PRIOR_SURVEYS, PRIOR_SURVEY_RESPONSES } from "../../../shared/data/sample-course/surveys.ts";
+import { outlineDefinition } from "../../../shared/lib/outline.ts";
+import { cancelSignUp, hasSession, loadWorkspace, markOnboarded, saveWorkspace, signOut, updateProfile, whoAmI, type AccountUser } from "./account.ts";
+import {
+  CANONICAL_PROPOSAL,
+  CLOS,
+  DATA_SOURCES,
+  PEOPLE,
+  PROGRAMME,
+  ROLE_ASSIGNMENTS,
+  SEED_CLOS,
+  SEED_COURSE_DEFINITIONS,
+  SEED_PREDICTIONS,
+  SEED_RESULT_UPLOADS,
+  SEED_RUBRICS,
+  SEED_SUBJECTS,
+  SEED_TEACHING_PLANS,
+  SEED_SUBJECT_VERSIONS,
+  SUBJECTS,
+  SURVEY,
+  TERM,
+} from "../../../shared/data/seed.ts";
+
+// ---------- the seven agents (office + presence) ----------
+export type AgentId = AgentName;
+export type AgentState = "idle" | "working" | "done" | "needs-input";
+
+export const AGENT_LABELS: Record<AgentId, string> = {
+  intake: "Intake",
+  signal: "Signal",
+  curriculum: "Curriculum",
+  authoring: "Authoring",
+  cohort: "Cohort",
+  analogy: "Analogy",
+  evaluator: "Evaluator",
+};
+
+// ---------- time ----------
+// The seed clock: every seeded timestamp, and every timestamp in demo/proof
+// mode, so those paths are identical every run. In the browser (outside the
+// demo) actions stamp real time, which is what makes the app feel live.
+// The seed clock: every record made outside the browser (the proofs, the sample workspace, the screenshots
+// restored from it) carries this time. It sits after the saved sample's retrieval (9 October 2026), so a brief
+// is never dated before the postings it cites.
+export const SEED_NOW = "2026-10-22T10:00:00Z";
+let clockPinned = typeof window === "undefined";
+
+/** Pin (or unpin) the clock. The demo pins it on Play so a recording is
+ *  deterministic; proofs run in Node where it is pinned by default. */
+export function setClockPinned(pinned: boolean) {
+  clockPinned = typeof window === "undefined" ? true : pinned;
+}
+export function nowIso(): string {
+  return clockPinned ? SEED_NOW : new Date().toISOString();
+}
+
+export interface AppState {
+  // reference data
+  people: Person[];
+  assignments: RoleAssignment[];
+  programme: typeof PROGRAMME;
+  subjects: Subject[];
+  clos: CLO[];
+  survey: SurveyRecord[];
+  institution: InstitutionProfile; // the campus and every setting that shapes a figure (depth plan Section 3.1)
+
+  // session
+  currentPersonId: PersonId | null;
+  screen: Screen;
+  selectedSubjectId: SubjectId | null;
+  selectedProposalId: ProposalId | null;
+  studioTab: "overview" | "curriculum" | "plan" | "history"; // the Studio's panels: Course, Update, Teach, History
+  courseStep: CourseStep | null; // the loop step in view, the path's dark stop (app/loop.ts); read through routes.effectiveStep
+  reportTab: ReportTab; // the Report step's sub-step, in the URL as #/course/:id/report/<tab>
+
+  // mutable world
+  proposals: ChangeProposal[];
+  notifications: Notification[];
+  predictions: Prediction[];
+  resultUploads: ResultUpload[];
+  dataSources: DataSource[];
+  subjectVersions: SubjectVersion[];
+  testDrafts: TestDraft[];
+  teachingPlans: TeachingPlan[];
+  courseDefinitions: Record<string, CourseDefinition>;
+  rubrics: Rubric[]; // the assessment rubrics a course definition's components name (depth plan Section 4.2)
+  curriculumDrafts: CurriculumDraft[];
+  evidenceSources: EvidenceSource[];
+  skillMentions: SkillMention[];
+  skillMappings: SkillMapping[];
+  evidenceBriefs: EvidenceBrief[];
+  evidenceSnapshots: EvidenceSnapshot[]; // frozen evidence windows, compared to watch change over time
+  briefDecisions: BriefDecision[]; // the decision record on briefs (plan Section 4); never edited
+  events: LoopEvent[]; // append-only: decisions, snapshots, adoptions, briefs prepared, sent and read, term changes
+  surveys: SurveyDefinition[]; // the two student surveys per course and term (depth plan Section 7)
+  surveyResponses: SurveyResponse[]; // answers keyed by question id; nothing that identifies a student
+  obeReports: ObeReport[]; // the OBE course report as printed, a snapshot (depth plan Section 8.3)
+  cqiNotes: CqiNote[]; // the lecturer's continuous quality improvement notes, per course and term
+  skillLexicon: Record<string, string[]>; // per course: the terms the lecturer scans for
+  relevanceRatings: RelevanceRating[];
+
+  // v3: agent presence + the intake pipeline
+  agentRuns: AgentRun[];
+  pendingIntake: { doc: ParsedDoc; interp: IntakeInterpretation } | null;
+
+  // transient UI
+  sim: SimState | null;
+  signalSim: SignalSimState | null; // the staged Signal reveal on Trends
+  drillOpen: boolean;
+  drillStep: number; // -1 closed; 0..5 the six-hop drill-down revealing one by one
+  agentStates: Record<AgentId, AgentState>;
+  agentBubble: { agent: AgentId; text: string } | null;
+  agentPanelOpen: boolean; // the right-side agent panel (spec 5.7)
+  critique: string[] | null; // last Authoring review critique
+  flashUpload: ResultUpload | null; // last filed upload, for the Upload receipt
+  toast: string | null;
+  persistenceStatus: "pending" | "saved" | "unavailable";
+  account: { user: AccountUser; version: number } | null; // a signed-in real account: its workspace saves to the server, never to this browser
+  collectRun: CollectRun | null; // the current research run, never persisted
+  scanProposals: MentionProposal[]; // proposed quotations awaiting the lecturer
+  selectedBriefId: string | null;
+  requests: InFlightRequest[]; // real requests in flight (a fetch, a file parse, a pack render); the moods read only these, never persisted
+
+  idSeq: number;
+}
+
+/** A real request in flight. A mascot shows "working" only while one of these exists (plan Section 7.2). */
+export interface InFlightRequest { id: string; kind: "collect" | "parse" | "pack" | "course-file"; subjectId: SubjectId | null; startedAt: string }
+
+function idleAgents(): Record<AgentId, AgentState> {
+  return {
+    intake: "idle",
+    signal: "idle",
+    curriculum: "idle",
+    authoring: "idle",
+    cohort: "idle",
+    analogy: "idle",
+    evaluator: "idle",
+  };
+}
+
+function seedState(): AppState {
+  return {
+    people: PEOPLE,
+    assignments: [...ROLE_ASSIGNMENTS],
+    programme: PROGRAMME,
+    subjects: structuredClone(SEED_SUBJECTS),
+    clos: structuredClone(SEED_CLOS),
+    survey: SURVEY,
+    institution: structuredClone(DEMO_INSTITUTION),
+
+    currentPersonId: null,
+    screen: "login",
+    selectedSubjectId: null,
+    selectedProposalId: CANONICAL_PROPOSAL.id,
+    studioTab: "overview",
+    courseStep: null,
+    reportTab: "quote",
+
+    proposals: [structuredClone(CANONICAL_PROPOSAL)],
+    notifications: [],
+    predictions: [...SEED_PREDICTIONS],
+    resultUploads: [...SEED_RESULT_UPLOADS],
+    dataSources: [...DATA_SOURCES],
+    subjectVersions: [...SEED_SUBJECT_VERSIONS],
+    testDrafts: [],
+    teachingPlans: structuredClone(SEED_TEACHING_PLANS),
+    courseDefinitions: structuredClone(SEED_COURSE_DEFINITIONS),
+    rubrics: structuredClone(SEED_RUBRICS),
+    curriculumDrafts: [],
+    evidenceSources: [],
+    skillMentions: [],
+    skillMappings: [],
+    evidenceBriefs: [],
+    evidenceSnapshots: [],
+    briefDecisions: [],
+    events: [],
+    surveys: structuredClone(PRIOR_SURVEYS),
+    surveyResponses: structuredClone(PRIOR_SURVEY_RESPONSES),
+    obeReports: [],
+    cqiNotes: [],
+    skillLexicon: {},
+    relevanceRatings: computeRelevanceRatings(SUBJECTS, CLOS, SEED_NOW),
+
+    agentRuns: [],
+    pendingIntake: null,
+
+    sim: null,
+    signalSim: null,
+    drillOpen: false,
+    drillStep: -1,
+    agentStates: idleAgents(),
+    agentBubble: null,
+    agentPanelOpen: false,
+    critique: null,
+    flashUpload: null,
+    toast: null,
+    persistenceStatus: "saved",
+    account: null,
+    collectRun: null,
+    scanProposals: [],
+    selectedBriefId: null,
+    requests: [],
+
+    idSeq: 1,
+  };
+}
+
+// ---------- persistence (spec: "State persists") ----------
+const STORAGE_KEY = "lyceum-v3-state@1";
+
+// The slice of state worth keeping across refreshes: the mutable world and the
+// session. Transient UI (sims, drills, toasts, agent runs) always starts clean.
+const PERSISTED_KEYS = [
+  "programme",
+  "assignments",
+  "subjects",
+  "clos",
+  "survey",
+  "institution",
+  "currentPersonId",
+  "screen",
+  "selectedSubjectId",
+  "selectedProposalId",
+  "proposals",
+  "notifications",
+  "predictions",
+  "resultUploads",
+  "dataSources",
+  "subjectVersions",
+  "testDrafts",
+  "teachingPlans",
+  "courseDefinitions",
+  "rubrics",
+  "curriculumDrafts",
+  "evidenceSources",
+  "skillMentions",
+  "skillMappings",
+  "evidenceBriefs",
+  "evidenceSnapshots",
+  "briefDecisions",
+  "events",
+  "surveys",
+  "surveyResponses",
+  "obeReports",
+  "cqiNotes",
+  "skillLexicon",
+  "relevanceRatings",
+  "idSeq",
+] as const;
+
+function loadPersisted(): Partial<AppState> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AppState>;
+    // A running sim or a mid-demo screen must not resurrect into a fresh page.
+    if (parsed.screen === "login" || parsed.screen === undefined) parsed.currentPersonId = null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+function schedulePersist() {
+  if (typeof window === "undefined") return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushPersistence, 250);
+}
+
+/** Flush also runs on page exit so a quick refresh cannot discard the last edit. */
+export function flushPersistence() {
+  if (typeof window === "undefined") return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  // A real account's workspace goes to the server; the demo's browser copy is never touched while one is open.
+  if (state.account) { syncAccountWorkspace(); return; }
+  let status: AppState["persistenceStatus"] = "saved";
+  try {
+    const out: Record<string, unknown> = {};
+    for (const k of PERSISTED_KEYS) out[k] = state[k];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
+  } catch {
+    status = "unavailable";
+  }
+  if (state.persistenceStatus !== status) {
+    state = { ...state, persistenceStatus: status };
+    for (const listener of listeners) listener();
+  }
+}
+if (typeof window !== "undefined") window.addEventListener("pagehide", flushPersistence);
+
+let state: AppState = (() => {
+  const seed = seedState();
+  const persisted = loadPersisted();
+  return persisted ? { ...seed, ...persisted } : seed;
+})();
+
+// ---------- external-store plumbing ----------
+const listeners = new Set<() => void>();
+function emit() {
+  if (typeof window !== "undefined" && state.persistenceStatus !== "unavailable")
+    state = { ...state, persistenceStatus: "pending" };
+  for (const l of listeners) l();
+  schedulePersist();
+}
+function set(patch: Partial<AppState> | ((s: AppState) => Partial<AppState>)) {
+  const next = typeof patch === "function" ? patch(state) : patch;
+  state = { ...state, ...next };
+  emit();
+}
+export function getState(): AppState {
+  return state;
+}
+// A read-only hook for the headless demo smoke (scripts/demo-smoke.mjs): the
+// browser test asserts the demo's end state through this, nothing more.
+if (typeof window !== "undefined") {
+  (window as unknown as { __lyceum?: { getState: typeof getState } }).__lyceum = { getState };
+}
+function subscribe(l: () => void): () => void {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+export function useStore(): AppState {
+  return useSyncExternalStore(subscribe, getState, getState);
+}
+
+function nextId(prefix: string): string {
+  const used = new Set([...state.proposals, ...state.notifications, ...state.resultUploads, ...state.subjectVersions,
+    ...state.testDrafts, ...state.curriculumDrafts, ...state.agentRuns, ...state.evidenceSources, ...state.skillMentions, ...state.evidenceBriefs, ...state.evidenceSnapshots, ...state.briefDecisions, ...state.events, ...state.teachingPlans.flatMap(p => p.sessions)].map(x => x.id));
+  let id: string;
+  do { id = `${prefix}-${state.idSeq}`; state = { ...state, idSeq: state.idSeq + 1 }; } while (used.has(id));
+  return id;
+}
+
+// ---------- selectors ----------
+export function currentPerson(): Person | null {
+  return state.people.find((p) => p.id === state.currentPersonId) ?? null;
+}
+export function personById(id: PersonId): Person | undefined {
+  return state.people.find((p) => p.id === id);
+}
+export function subjectById(id: SubjectId): Subject | undefined {
+  return state.subjects.find((s) => s.id === id);
+}
+export function proposalById(id: ProposalId | null): ChangeProposal | undefined {
+  return id ? state.proposals.find((p) => p.id === id) : undefined;
+}
+export function unreadFor(personId: PersonId): Notification[] {
+  return state.notifications.filter((n) => n.toPersonId === personId && !n.read);
+}
+export function inboxFor(personId: PersonId): Notification[] {
+  return [...state.notifications]
+    .filter((n) => n.toPersonId === personId)
+    .sort((a, b) => (a.createdAt === b.createdAt ? 0 : a.createdAt < b.createdAt ? 1 : -1));
+}
+/** First person who holds the given hat on a subject. */
+export function personWithHat(subjectId: SubjectId, hat: Hat): Person | undefined {
+  const a = state.assignments.find((x) => x.subjectId === subjectId && x.hat === hat);
+  return a ? personById(a.personId) : undefined;
+}
+export function ratingFor(subjectId: SubjectId): RelevanceRating | undefined {
+  return state.relevanceRatings.find((r) => r.subjectId === subjectId);
+}
+export function testDraftById(id: string | undefined): TestDraft | undefined {
+  return id ? state.testDrafts.find((t) => t.id === id) : undefined;
+}
+
+// ---------- lecturer preparation (browser-local, separate from proposals) ----------
+function mayPlan(subjectId: SubjectId): boolean {
+  const person = currentPerson();
+  return !!person && !!subjectById(subjectId) && can(person, "draft-change", { subjectId, assignments: state.assignments });
+}
+
+function updateTeachingPlan(subjectId: SubjectId, update: (plan: TeachingPlan) => TeachingPlan) {
+  const previous = state.teachingPlans.find((p) => p.subjectId === subjectId);
+  const plan = update(previous ?? { subjectId, term: "", notes: "", sessions: [], updatedAt: nowIso(), updatedBy: state.currentPersonId! });
+  const stamped = { ...plan, updatedAt: nowIso(), updatedBy: state.currentPersonId! };
+  set((s) => ({ teachingPlans: [...s.teachingPlans.filter((p) => p.subjectId !== subjectId), stamped] }));
+}
+
+export function saveTeachingPlanDetails(subjectId: SubjectId, details: { term: string; notes: string }): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can edit this teaching plan." };
+  const previousTerm = state.teachingPlans.find((p) => p.subjectId === subjectId)?.term ?? "";
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, term: details.term.trim(), notes: details.notes.trim() }));
+  // A change of term is an event: from one stated term to another, it starts a new loop (app/loop.ts termWindow).
+  if (details.term.trim() !== previousTerm) logEvent("term-set", { subjectId, term: details.term.trim(), ...(previousTerm ? { previousTerm } : {}) });
+  return { ok: true };
+}
+
+export function saveTeachingSession(subjectId: SubjectId, input: SessionInput): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can edit this teaching plan." };
+  const previous = state.teachingPlans.find((p) => p.subjectId === subjectId);
+  const target = input.id ? previous?.sessions.find((s) => s.id === input.id) : undefined;
+  if (input.id && !target)
+    return { ok: false, error: "This session no longer exists. Add a new session instead." };
+  // The term's sample sessions stay as written for the prototype (depth plan Section 5.1); what a lecturer saves is their own.
+  if (target?.sample) return { ok: false, error: "Sample sessions stay as written for the prototype. Add your own session for week " + target.week + " instead." };
+  const issues = sessionIssues(input, state.clos.filter((c) => c.subjectId === subjectId));
+  if (issues.length) return { ok: false, error: issues.join(" ") };
+  // The slides, lab sheets and brief in this build are sample fixtures; a lecturer's own session never carries their text (CLAUDE.md).
+  const { sample: _sample, slides: _slides, labSheet: _labSheet, projectBrief: _projectBrief, items: _items, ...own } = input as SessionInput & { items?: unknown };
+  const session = {
+    ...own, id: input.id ?? nextId("TS"), topic: input.topic.trim(),
+    cloIds: [...new Set(input.cloIds)], activity: input.activity.trim(),
+    learningCheck: input.learningCheck.trim(), resources: input.resources.trim(),
+    updatedAt: nowIso(), updatedBy: state.currentPersonId!,
+    courseVersionId: subjectById(subjectId)?.currentVersionId, needsReview: false,
+    // The session's items, and slides Prism drafted, are kept as they are; they change only through their own actions below.
+    ...(target?.items ? { items: target.items } : {}),
+    ...(target?.slides && target.slidesBy ? { slides: target.slides, slidesBy: target.slidesBy } : {}),
+  };
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: [...plan.sessions.filter((s) => s.id !== session.id), session] }));
+  return { ok: true };
+}
+
+// ---------- the check's items (depth plan Section 10) ----------
+
+function sessionOf(subjectId: SubjectId, sessionId: string): TeachingSession | undefined {
+  return state.teachingPlans.find((p) => p.subjectId === subjectId)?.sessions.find((s) => s.id === sessionId);
+}
+function setSessionItems(subjectId: SubjectId, sessionId: string, items: DraftItem[]) {
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: plan.sessions.map((s) => (s.id === sessionId ? { ...s, items } : s)) }));
+}
+function itemError(item: DraftItem): string | null {
+  if (!item.stem.trim() || item.stem.length > 2000) return "Write the stem, under 2,000 characters.";
+  if (!(item.marks > 0 && item.marks <= 100)) return "Give the item a mark above 0 and up to 100.";
+  if (item.kind === "multichoice" && ((item.options ?? []).length < 2 || (item.options ?? []).length > 6 || (item.options ?? []).some((o) => o.text.length > 500)))
+    return "A multiple-choice item has two to six options, each under 500 characters.";
+  if (item.kind === "shortanswer" && ((item.answers ?? []).length > 10 || (item.answers ?? []).some((a) => a.length > 100))) return "Up to ten accepted answers, each under 100 characters.";
+  if (item.kind === "essay" && ((item.graderInfo ?? "").length > 4000 || !((item.responseLines ?? 15) >= 3 && (item.responseLines ?? 15) <= 40))) return "Keep the marker's guidance under 4,000 characters and the answer box between 3 and 40 lines.";
+  return null;
+}
+const ownSession = (subjectId: SubjectId, sessionId: string): TeachingSession | string => {
+  if (!mayPlan(subjectId)) return "Only an assigned lecturer or coordinator can change this course's items.";
+  const session = sessionOf(subjectId, sessionId);
+  if (!session) return "This session no longer exists.";
+  if (session.sample) return "Sample sessions stay as written for the prototype; a person can mark their items reviewed.";
+  return session;
+};
+
+/** Draft items for one of the lecturer's own sessions from Lyceum's templates; each key and accepted answer is theirs to write. */
+export function draftSessionItems(subjectId: SubjectId, sessionId: string): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  const definition = definitionForCourse(subjectId);
+  const outcomes = definition?.outcomes ?? [];
+  if (!session.cloIds.some((id) => outcomes.some((o) => o.id === id))) return { ok: false, error: "Link the session to an outcome first; the templates write from it." };
+  const drafted = templateItems(definition, session, outcomes, () => nextId("ITEM-" + subjectId));
+  setSessionItems(subjectId, sessionId, [...(session.items ?? []), ...drafted]);
+  set({ toast: drafted.length + " items drafted for your review. Write each key and accepted answer; the lint shows what is left." });
+  return { ok: true };
+}
+
+/** What Prism reads for one of the lecturer's own sessions (lib/items.ts itemRequest), or why it cannot draft yet. */
+export function sessionItemRequest(subjectId: SubjectId, sessionId: string): ItemRequest | string {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return session;
+  const definition = definitionForCourse(subjectId);
+  const request = itemRequest(definition, session, definition?.outcomes ?? []);
+  return request.outcomes.length ? request : "Link the session to an outcome first; Prism writes from it.";
+}
+/** Add Prism's items to a session, each with its own id and unreviewed: the lint and a person's review still decide. */
+export function addModelItems(subjectId: SubjectId, sessionId: string, items: DraftItem[]): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  const outcomeIds = new Set(session.cloIds);
+  const added = items.filter((i) => outcomeIds.has(i.cloId) && !itemError(i))
+    .map((i) => ({ ...i, id: nextId("ITEM-" + subjectId), source: "model" as const, reviewedBy: null, reviewedAt: null }));
+  if (!added.length) return { ok: false, error: "Prism's draft had no usable item. Try again, or draft from the templates." };
+  setSessionItems(subjectId, sessionId, [...(session.items ?? []), ...added]);
+  set({ toast: added.length + " items drafted by Prism for your review. Check each key; the lint shows what is left." });
+  return { ok: true };
+}
+
+/** What Prism reads to draft one of the lecturer's own sessions' slides (lib/slides.ts slideRequest), or why it cannot yet. */
+export function sessionSlideRequest(subjectId: SubjectId, sessionId: string): SlideRequest | string {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return session;
+  const subject = subjectById(subjectId)!;
+  return slideRequest(subject, session, state.clos.filter((c) => c.subjectId === subjectId), definitionForCourse(subjectId), evidenceReportForCourse(subjectId), state.skillMentions);
+}
+/** What Prism reads to suggest on one of the lecturer's own sessions: the session's records, and their deck (each slide's
+ *  text, in order) or null for a plan. */
+export function sessionSuggestionRequest(subjectId: SubjectId, sessionId: string, deck: string[] | null): SuggestionRequest | string {
+  const request = sessionSlideRequest(subjectId, sessionId);
+  return typeof request === "string" ? request : { ...request, deck, toAdd: SLIDES_TO_ADD };
+}
+/** A new round of Prism's suggestions on the session, after the earlier ones, which stay with their marks (the history). */
+export function addSlideRound(subjectId: SubjectId, sessionId: string, deck: { fileName: string; slides: string[] } | null,
+  suggestions: Array<Omit<SlideSuggestion, "id" | "status"> & { proposalId?: string }>): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  if (!suggestions.length) return { ok: false, error: "Prism had no suggestion. Try again." };
+  const round: SlideRound = { id: nextId("ROUND-" + subjectId), at: nowIso(), by: currentPerson()!.id,
+    deck: deck ? { fileName: deck.fileName.slice(0, 200), slides: deck.slides.slice(0, MAX_DECK_SLIDES).map((t) => t.slice(0, MAX_SLIDE_CHARS)) } : null,
+    suggestions: suggestions.map((x) => ({ ...x, id: nextId("SUG-" + subjectId), status: "open" as const })) };
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: plan.sessions.map((s) => (s.id === sessionId ? { ...s, slideRounds: [...(s.slideRounds ?? []), round] } : s)) }));
+  set({ toast: round.suggestions.length + (deck ? " suggestions from Prism on your slides." : " segments in Prism's plan for the session.") + " Mark each done or dismiss it." });
+  return { ok: true };
+}
+/** The lecturer marks one suggestion done (taken), dismissed (with an optional reason) or open again. Done and dismissed are
+ *  recorded as the proposal's verdict (api/record.ts); reopening sends nothing, and the next mark replaces the last. */
+export function markSlideSuggestion(subjectId: SubjectId, sessionId: string, roundId: string, suggestionId: string, status: SlideSuggestion["status"], reason?: string): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  const found = session.slideRounds?.find((r) => r.id === roundId)?.suggestions.find((x) => x.id === suggestionId);
+  if (!found) return { ok: false, error: "This suggestion no longer exists." };
+  const note = status === "dismissed" ? reason?.trim().slice(0, 500) || undefined : undefined;
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: plan.sessions.map((s) => s.id !== sessionId ? s : { ...s, slideRounds: s.slideRounds!.map((r) => r.id !== roundId ? r
+    : { ...r, suggestions: r.suggestions.map((x) => { if (x.id !== suggestionId) return x; const { reason: _r, ...rest } = x; return { ...rest, status, ...(note ? { reason: note } : {}) }; }) }) }) }));
+  if (status !== "open") void sendVerdict(found.proposalId, status === "done" ? "accepted" : "dismissed", note);
+  return { ok: true };
+}
+/** Discards slides Prism drafted before it suggested instead (the pack goes back to being built from the records). Slides the
+ *  lecturer saves are set the same way. */
+export function setSessionSlides(subjectId: SubjectId, sessionId: string, slides: SlideDraft[] | null): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  if (slides && !slides.length) return { ok: false, error: "Prism's draft had no usable slide. Try again." };
+  updateTeachingPlan(subjectId, (plan) => ({ ...plan, sessions: plan.sessions.map((s) => {
+    if (s.id !== sessionId) return s;
+    const { slides: _slides, slidesBy: _by, ...rest } = s;
+    return slides ? { ...rest, slides, slidesBy: "prism" as const } : rest;
+  }) }));
+  set({ toast: slides ? slides.length + " slides drafted by Prism. Preview the pack, download it and edit it in PowerPoint." : "Prism's slides discarded; the pack is built from the session again." });
+  return { ok: true };
+}
+
+/** Save one item of the lecturer's own session. A change clears its review: a person reviews what is there now. */
+export function saveSessionItem(subjectId: SubjectId, sessionId: string, item: DraftItem): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  const current = (session.items ?? []).find((i) => i.id === item.id);
+  if (!current) return { ok: false, error: "This item no longer exists." };
+  const error = itemError(item);
+  if (error) return { ok: false, error };
+  const content = (i: DraftItem) => JSON.stringify({ ...i, reviewedBy: null, reviewedAt: null });
+  const next: DraftItem = { ...item, kind: current.kind, source: current.source };
+  const changed = content(next) !== content(current);
+  const saved = changed ? { ...next, reviewedBy: null, reviewedAt: null, ...(current.source === "model" ? { edited: true } : {}) } : current;
+  if (changed && current.source === "model") void sendVerdict(current.proposalId, "edited");
+  setSessionItems(subjectId, sessionId, (session.items ?? []).map((i) => (i.id === item.id ? saved : i)));
+  return { ok: true };
+}
+
+export function removeSessionItem(subjectId: SubjectId, sessionId: string, itemId: string): SaveResult {
+  const session = ownSession(subjectId, sessionId);
+  if (typeof session === "string") return { ok: false, error: session };
+  const removed = (session.items ?? []).find((i) => i.id === itemId);
+  if (!removed) return { ok: false, error: "This item no longer exists." };
+  if (removed.source === "model") void sendVerdict(removed.proposalId, "dismissed");
+  setSessionItems(subjectId, sessionId, (session.items ?? []).filter((i) => i.id !== itemId));
+  return { ok: true };
+}
+
+/** A person on the course marks a session's items reviewed: a record of who and when, never the app's approval. */
+export function markItemsReviewed(subjectId: SubjectId, sessionId: string): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can review this course's items." };
+  const session = sessionOf(subjectId, sessionId);
+  if (!session?.items?.length) return { ok: false, error: "This session has no items to review." };
+  const at = nowIso(), person = currentPerson()!;
+  setSessionItems(subjectId, sessionId, session.items.map((i) => ({ ...i, reviewedBy: person.id, reviewedAt: at })));
+  // Prism's items, reviewed: taken as drafted, or edited first (that verdict was sent when the edit was saved).
+  for (const i of session.items) if (i.source === "model" && !i.edited && !i.reviewedBy) void sendVerdict(i.proposalId, "accepted");
+  set({ toast: session.items.length + " items marked reviewed by " + person.name + ". The app records the review; it approves nothing." });
+  return { ok: true };
+}
+
+export function deleteTeachingSession(subjectId: SubjectId, sessionId: string): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can edit this teaching plan." };
+  const plan = state.teachingPlans.find((p) => p.subjectId === subjectId);
+  if (!plan?.sessions.some((s) => s.id === sessionId)) return { ok: false, error: "This session no longer exists." };
+  updateTeachingPlan(subjectId, (p) => ({ ...p, sessions: p.sessions.filter((s) => s.id !== sessionId) }));
+  return { ok: true };
+}
+
+function setAgent(agent: AgentId, st: AgentState) {
+  set((s) => ({ agentStates: { ...s.agentStates, [agent]: st } }));
+}
+function resetAgents() {
+  set({ agentStates: idleAgents(), agentBubble: null });
+}
+
+// ---------- agent presence (spec 5.7) ----------
+export function beginAgentRun(agent: AgentId, label: string, onPage: string): string {
+  const id = nextId("AR");
+  const run: AgentRun = {
+    id,
+    agent,
+    status: "thinking",
+    startedAt: nowIso(),
+    label,
+    streamText: "",
+    onPage,
+  };
+  setAgent(agent, "working");
+  set((s) => ({ agentRuns: [...s.agentRuns.slice(-19), run] }));
+  return id;
+}
+export function appendAgentStream(runId: string, chunk: string) {
+  set((s) => ({
+    agentRuns: s.agentRuns.map((r) =>
+      r.id === runId ? { ...r, status: "streaming", streamText: (r.streamText ?? "") + chunk } : r,
+    ),
+  }));
+}
+export function finishAgentRun(
+  runId: string,
+  status: "done" | "failed" | "fallback",
+  opts?: { label?: string; resultRef?: string },
+) {
+  const run = state.agentRuns.find((r) => r.id === runId);
+  if (run) setAgent(run.agent, "done");
+  set((s) => ({
+    agentRuns: s.agentRuns.map((r) =>
+      r.id === runId
+        ? { ...r, status, label: opts?.label ?? r.label, resultRef: opts?.resultRef }
+        : r,
+    ),
+  }));
+}
+export function latestRunFor(agent: AgentId): AgentRun | undefined {
+  return [...state.agentRuns].reverse().find((r) => r.agent === agent);
+}
+
+/** Fire a live agent stream in the background. The deterministic path never
+ *  depends on it: the fixture result is applied first and stands either way;
+ *  the live stream augments it (visible model output in the strip and panel,
+ *  and optionally a richer text result via onText). Skipped in Node and while
+ *  the clock is pinned, so proofs and the recorded demo stay identical. */
+function augmentLive(
+  agent: "authoring" | "evaluator",
+  label: string,
+  onPage: string,
+  payload: unknown,
+  onText?: (text: string) => void,
+) {
+  if (typeof window === "undefined" || clockPinned) return;
+  const runId = beginAgentRun(agent, label, onPage);
+  void streamAgent(agent, payload, (chunk) => appendAgentStream(runId, chunk)).then((text) => {
+    if (text) {
+      finishAgentRun(runId, "done", { label });
+      onText?.(text);
+    } else {
+      finishAgentRun(runId, "fallback", { label: `${label} (offline draft used)` });
+    }
+  });
+}
+export function toggleAgentPanel(open?: boolean) {
+  set((s) => ({ agentPanelOpen: open ?? !s.agentPanelOpen }));
+}
+
+// ---------- session actions ----------
+export function login(personId: PersonId) {
+  const person = personById(personId);
+  if (!person) return;
+  resetAgents();
+  set({ currentPersonId: personId, screen: landingScreen(person, state.assignments), courseStep: null });
+}
+export function logout() {
+  if (!confirmLeaveEditor()) return;
+  if (state.account) { void signOutAccount(); return; }
+  set({ currentPersonId: null, screen: "login", courseStep: null });
+}
+
+// ---------- real accounts (api/auth.ts, app/account.ts) ----------
+/** Change state and tell the screens without scheduling a save: for what the save itself reports back. */
+function setQuiet(patch: Partial<AppState>) {
+  state = { ...state, ...patch };
+  for (const l of listeners) l();
+}
+/** A new account's workspace: this person alone, no course yet, and an institution and programme named in onboarding.
+ *  The demo's courses, people, surveys and sandbox data are left out. */
+function freshWorkspace(me: Person, institution = ""): Partial<AppState> {
+  return {
+    programme: { id: "PRG-" + me.id, title: "My programme", departmentOwnerId: me.id, subjectIds: [] },
+    institution: { ...structuredClone(DEMO_INSTITUTION), name: institution || "My institution", shortName: institution ? shortNameOf(institution) : "Mine", demo: false, showMark: false },
+    assignments: [], subjects: [], clos: [], survey: [], proposals: [], notifications: [], predictions: [], resultUploads: [], dataSources: [],
+    subjectVersions: [], testDrafts: [], teachingPlans: [], courseDefinitions: {}, rubrics: [], curriculumDrafts: [], evidenceSources: [],
+    skillMentions: [], skillMappings: [], evidenceBriefs: [], evidenceSnapshots: [], briefDecisions: [], events: [], surveys: [],
+    surveyResponses: [], obeReports: [], cqiNotes: [], skillLexicon: {}, relevanceRatings: [], idSeq: 1,
+  };
+}
+const accountPerson = (user: AccountUser): Person => ({ id: user.personId, name: user.name, orgRole: "academic", email: user.email, verified: false, account: true });
+/** Open a signed-in account's workspace: the saved one, or a fresh one that starts at onboarding. */
+export function openAccountWorkspace(user: AccountUser, saved: { backup: string; version: number } | null): SaveResult {
+  const me = accountPerson(user);
+  let data: Partial<AppState> = freshWorkspace(me, user.institution);
+  if (saved) {
+    const parsed = parseWorkspaceBackup(saved.backup, [me.id]);
+    if (!parsed.ok) return parsed;
+    data = structuredClone(parsed.backup.data);
+  }
+  resetAgents();
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  const onboarded = user.onboarded;
+  state = { ...seedState(), ...data, people: [me], account: { user, version: saved?.version ?? 0 }, currentPersonId: me.id,
+    screen: onboarded ? "inbox" : "onboarding", selectedSubjectId: null, selectedProposalId: null, persistenceStatus: "saved", toast: null };
+  for (const l of listeners) l();
+  return { ok: true };
+}
+/** After a sign in or sign up: load the account's saved workspace from the server and open it. */
+export async function enterAccount(user: AccountUser): Promise<SaveResult> {
+  const saved = await loadWorkspace();
+  if (!saved.ok) return saved;
+  return openAccountWorkspace(user, saved.workspace);
+}
+/** On page load: a Supabase session from an earlier visit, or one just finished by Google's redirect back, opens that
+ *  account again; without one the demo stays as it was. */
+export async function restoreAccountSession(): Promise<void> {
+  if (typeof window === "undefined") return;
+  accountRestoreError = null;
+  const me = await whoAmI();
+  if (me.ok && me.user) {
+    if (state.account) return;
+    const opened = await enterAccount(me.user);
+    if (!opened.ok) reportRestore("You are signed in, but your workspace could not be opened: " + opened.error);
+    return;
+  }
+  // No account opened. Silent when nobody is signed in (the demo); said out loud when Supabase holds a session, since
+  // otherwise a Google sign-in that fails here just lands back on the login page with no reason given.
+  if (!(await hasSession())) return;
+  reportRestore(me.ok
+    ? "You are signed in with Supabase, but the Lyceum API did not accept the sign-in. Check that SUPABASE_URL and SUPABASE_SECRET_KEY in api/.env belong to the same project as VITE_SUPABASE_URL in web/.env, then restart npm run dev."
+    : "You are signed in with Supabase, but the Lyceum API answered: " + me.error);
+}
+/** Why the last sign-in could not open an account, shown on the login screen; null when nothing went wrong. */
+export let accountRestoreError: string | null = null;
+function reportRestore(message: string) {
+  accountRestoreError = message;
+  console.error("[lyceum] " + message);
+  for (const l of listeners) l();
+}
+/** Back to the demo workspace kept in this browser, signed out. */
+function closeAccountWorkspace() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  const persisted = loadPersisted();
+  state = { ...seedState(), ...(persisted ?? {}), currentPersonId: null, screen: "login", account: null };
+  for (const l of listeners) l();
+}
+export async function signOutAccount() {
+  flushPersistence();
+  // Wait for every save, including one queued while another was running, before the session ends.
+  while (accountSync) await accountSync;
+  // Signing out of a sign-up that never finished onboarding deletes it, as before (api/account.ts).
+  if (state.account && !state.account.user.onboarded) await cancelSignUp();
+  await signOut();
+  closeAccountWorkspace();
+}
+/** Supabase ended the session elsewhere (signed out in another tab, or the session expired): back to sign in. */
+export function accountSignedOut() {
+  if (state.account) closeAccountWorkspace();
+}
+let accountSync: Promise<void> | null = null, accountDirty = false;
+/** Save the open account's workspace over the version it was loaded at. One save at a time; edits made meanwhile go in
+ *  the next. When another window saved first, its copy is loaded here and the person is told. */
+function syncAccountWorkspace() {
+  const account = state.account;
+  if (!account) return;
+  if (accountSync) { accountDirty = true; return; }
+  accountSync = saveWorkspace(serializeWorkspaceBackup(state, nowIso()), account.version).then(async (result) => {
+    if (state.account?.user.id !== account.user.id) return;
+    if (result.ok) setQuiet({ account: { ...state.account, version: result.version }, persistenceStatus: "saved" });
+    else if (result.status === 409) {
+      const latest = await loadWorkspace();
+      if (latest.ok && latest.workspace) {
+        openAccountWorkspace(account.user, latest.workspace);
+        setQuiet({ toast: "This workspace was saved from another window, so its newer copy is open here. Your last change in this window was not kept." });
+      }
+    } else setQuiet({ persistenceStatus: "unavailable", toast: "Not saved: " + result.error });
+  }).finally(() => {
+    accountSync = null;
+    if (accountDirty) { accountDirty = false; syncAccountWorkspace(); }
+  });
+}
+/** An institution's initials for its short name: Universiti Teknologi PETRONAS, UTP. */
+function shortNameOf(institution: string): string {
+  return institution.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).map((w) => w[0]).join("").toUpperCase().slice(0, 10) || institution.slice(0, 10);
+}
+/** Onboarding's course step, after createCourseWorkspace: the outline the lecturer accepted (imported or typed) becomes the
+ *  course's first version through the same save, check and adopt as any revision, and the term is set on its teaching plan.
+ *  If the check finds a problem the course is kept with the revision open, and the message says what to fix in Update. */
+export function applyOnboardingOutline(subjectId: SubjectId, rows: Parameters<typeof outlineDefinition>[2], term: string, source: string): SaveResult {
+  const draft = state.curriculumDrafts.find((d) => d.subjectId === subjectId && d.status === "drafting");
+  const base = definitionForCourse(subjectId);
+  if (!draft || !base) return { ok: false, error: "The course was not found." };
+  if (term.trim()) {
+    const planned = saveTeachingPlanDetails(subjectId, { term, notes: "" });
+    if (!planned.ok) return planned;
+  }
+  if (!rows.outcomes.length) return { ok: true }; // nothing to adopt: the lecturer adds outcomes in Update
+  const reason = "The first outline, " + (source ? "imported from " + source + " and reviewed" : "entered") + " at onboarding.";
+  const saved = saveCurriculumRevision(draft.id, draft.revision, { definition: outlineDefinition(base, subjectId, rows), reason, effectiveTerm: term.trim() || "Not set" });
+  if (!saved.ok) return saved;
+  const checked = checkCurriculumRevision(draft.id, draft.revision + 1);
+  const adopted = checked.ok ? adoptCurriculumRevision(draft.id, draft.revision + 1, true) : checked;
+  if (!adopted.ok) {
+    const error = "Your course is made, and its outline is saved as a revision, but it needs a fix before it becomes the course version: " + adopted.error + " Open Update to correct it.";
+    set({ toast: error });
+    return { ok: false, error };
+  }
+  set({ toast: "Your course is ready, with its outline as the first version. Watch is next." });
+  return adopted;
+}
+/** Onboarding's last step, after the first course is made: the account now counts (api/auth.ts, pending accounts). */
+export async function completeOnboarding(): Promise<SaveResult> {
+  const account = state.account;
+  if (!account) return { ok: false, error: "Sign in first." };
+  const done = await markOnboarded();
+  if (!done.ok) return done;
+  setQuiet({ account: { ...state.account!, user: done.user } });
+  return { ok: true };
+}
+/** Onboarding's first step: the person's name, role and institution (kept on the account) and their programme. */
+export async function saveOnboardingProfile(input: { name: string; institution: string; programme: string; jobRole?: string }): Promise<SaveResult> {
+  const account = state.account;
+  if (!account) return { ok: false, error: "Sign in first." };
+  const name = input.name.trim(), institution = input.institution.trim(), programme = input.programme.trim();
+  if (!name || name.length > 100) return { ok: false, error: "Enter your name, up to 100 characters." };
+  if (!institution || institution.length > 200) return { ok: false, error: "Enter your institution's name." };
+  if (!programme || programme.length > 200) return { ok: false, error: "Enter the programme your courses belong to." };
+  if (input.jobRole !== undefined && !input.jobRole) return { ok: false, error: "Choose your role." };
+  let user = account.user;
+  const changes = { ...(name !== user.name ? { name } : {}), ...(institution !== user.institution ? { institution } : {}), ...(input.jobRole && input.jobRole !== user.jobRole ? { jobRole: input.jobRole } : {}) };
+  if (Object.keys(changes).length) {
+    const saved = await updateProfile(changes);
+    if (!saved.ok) return saved;
+    user = saved.user;
+  }
+  const shortName = shortNameOf(institution);
+  set((s) => ({ account: { ...account, user }, people: s.people.map((p) => (p.id === user.personId ? { ...p, name } : p)),
+    institution: { ...s.institution, name: institution, shortName }, programme: { ...s.programme, title: programme } }));
+  return { ok: true };
+}
+/** Person switch (the account menu): change who we are, clamp the screen. */
+export function switchUser(personId: PersonId) {
+  if (personId !== state.currentPersonId && !confirmLeaveEditor()) return;
+  const person = personById(personId);
+  if (!person) return;
+  set((s) => ({
+    currentPersonId: personId,
+    screen: navAllows(person, s.assignments, s.screen)
+      ? s.screen
+      : landingScreen(person, s.assignments),
+  }));
+}
+/** Go to a screen, or, with a course route, to one step of that course's loop (#/course/:id/<step>). */
+export function navigate(screen: Screen, course?: CourseRoute) {
+  if (screen === "login" && state.account) return; // an account leaves by signing out (logout), not by opening sign in
+  const target = course ? stepDef(course.step).screen : screen;
+  const leaving = target !== state.screen || (course !== undefined && course.subjectId !== state.selectedSubjectId);
+  if (leaving && !confirmLeaveEditor()) {
+    if (typeof window !== "undefined") window.history.replaceState(null, "", hashFor(state));
+    return;
+  }
+  if (!course) {
+    const step = screen === "studio" ? stepForTab(state.studioTab, state.courseStep) : screen === "watch" || screen === "report" || screen === "decide" || screen === "learn" ? screen : null;
+    set({ screen, courseStep: step });
+    return;
+  }
+  const tab = stepDef(course.step).tab;
+  set({ screen: target, selectedSubjectId: course.subjectId, courseStep: course.step, ...(tab ? { studioTab: tab } : {}), ...(course.reportTab ? { reportTab: course.reportTab } : {}) });
+}
+/** One step of a course's loop: the path, the handoff cards and the deep links all come through here. */
+export function openStep(subjectId: SubjectId, step: CourseStep, reportTab?: ReportTab) {
+  navigate(stepDef(step).screen, { subjectId, step, ...(reportTab ? { reportTab } : {}) });
+}
+/** The Report step's sub-step (Quote, Review, Count, Map, Brief); it lives in the URL. */
+export function selectReportTab(reportTab: ReportTab) { set({ reportTab }); }
+export function selectSubject(subjectId: SubjectId | null) {
+  if (subjectId !== state.selectedSubjectId && !confirmLeaveEditor()) return;
+  set({ selectedSubjectId: subjectId, studioTab: "overview", courseStep: state.screen === "studio" ? "course" : state.courseStep });
+}
+export function selectStudioTab(studioTab: AppState["studioTab"]) { set({ studioTab, courseStep: stepForTab(studioTab, state.courseStep) }); }
+
+// ---------- requests in flight (what the mascots may call "working") ----------
+let requestSeq = 0;
+export function beginRequest(kind: InFlightRequest["kind"], subjectId: SubjectId | null): string {
+  const id = "REQ-" + ++requestSeq;
+  set((s) => ({ requests: [...s.requests, { id, kind, subjectId, startedAt: nowIso() }] }));
+  return id;
+}
+export function endRequest(id: string) {
+  if (state.requests.some((r) => r.id === id)) set((s) => ({ requests: s.requests.filter((r) => r.id !== id) }));
+}
+/** Render and download an editable deck (a teaching pack or a brief) as a request Prism can be seen working on. */
+export function downloadPack(subjectId: SubjectId, spec: DeckSpec): Promise<void> {
+  return trackRequest("pack", subjectId, () => downloadDeck(spec));
+}
+/** Run real work with its request registered, so a mood can only say "working" while the work runs. */
+export async function trackRequest<T>(kind: InFlightRequest["kind"], subjectId: SubjectId | null, work: () => Promise<T>): Promise<T> {
+  const id = beginRequest(kind, subjectId);
+  try { return await work(); } finally { endRequest(id); }
+}
+export function selectProposal(proposalId: ProposalId | null) {
+  set({ selectedProposalId: proposalId });
+}
+export function dismissToast() {
+  set({ toast: null });
+}
+export function showToast(message: string) {
+  set({ toast: message });
+}
+
+// ---------- the institution profile (depth plan Section 3.1) ----------
+/** May this person change the institution's settings? A course coordinator, as the plan's Guide panel says. */
+export function mayEditInstitution(person = currentPerson()): boolean {
+  return !!person && person.orgRole === "academic" && isCoordinatorAnywhere(person.id, state.assignments);
+}
+export function saveInstitutionProfile(profile: InstitutionProfile): SaveResult {
+  if (!mayEditInstitution()) return { ok: false, error: "Only a course coordinator can change the institution's settings." };
+  const error = institutionError(profile);
+  if (error) return { ok: false, error };
+  set({ institution: structuredClone(profile), toast: "Institution settings saved." });
+  return { ok: true };
+}
+
+// ---------- notifications ----------
+function notify(args: {
+  toPersonId: PersonId;
+  kind: NotificationKind;
+  subjectId?: SubjectId;
+  proposalId?: ProposalId;
+  agentFindings?: string;
+  briefId?: string;
+}) {
+  const n: Notification = {
+    id: nextId("N"),
+    toPersonId: args.toPersonId,
+    kind: args.kind,
+    subjectId: args.subjectId,
+    proposalId: args.proposalId,
+    agentFindings: args.agentFindings,
+    briefId: args.briefId,
+    read: false,
+    createdAt: nowIso(),
+  };
+  set((s) => ({ notifications: [...s.notifications, n] }));
+}
+
+export function openNotification(id: string) {
+  const n = state.notifications.find((x) => x.id === id);
+  if (!n) return;
+  if (n.kind === "evidence-brief") {
+    // A brief is read where it arrived, on Home, where the recipient can also record a decision.
+    if (!n.read && n.subjectId && currentPerson()) logEvent("brief-read", { subjectId: n.subjectId, briefId: n.briefId });
+    set((s) => ({ notifications: s.notifications.map((x) => (x.id === id ? { ...x, read: true } : x)), selectedBriefId: n.briefId ?? null, screen: "inbox", courseStep: null }));
+    return;
+  }
+  set((s) => ({
+    notifications: s.notifications.map((x) => (x.id === id ? { ...x, read: true } : x)),
+  }));
+  // A decision on your brief: open the Decide step of that course.
+  if (n.kind === "brief-decision" && n.subjectId) { openStep(n.subjectId, "decide"); return; }
+  if (n.proposalId) selectProposal(n.proposalId);
+  if (n.subjectId) selectSubject(n.subjectId);
+  // Land the reader in context. The old proposal chain lives in the illustrative sandbox (plan Section 4.2).
+  const person = currentPerson();
+  if (!person) return;
+  if (n.kind === "review-request" || n.kind === "ping-update") navigate("proposal");
+  else if (n.kind === "ping-new-subject") navigate("new-subject");
+  else if (n.kind === "test-done" || n.kind === "approved" || n.kind === "rejected") {
+    navigate(person.orgRole === "management" ? "approval" : "proposal");
+  }
+}
+
+// ---------- proposal helpers ----------
+function patchProposal(id: ProposalId, fn: (p: ChangeProposal) => ChangeProposal) {
+  set((s) => ({ proposals: s.proposals.map((p) => (p.id === id ? fn(p) : p)) }));
+}
+function authorIsCoordinator(p: ChangeProposal): boolean {
+  return hatsOn(p.authorId, p.subjectId, state.assignments).includes("coordinator");
+}
+
+// ---------- Trends -> routing (spec Section 7) ----------
+/** The course's signal from its own evidence (signalFromEvidence), once it has a reviewed demand and coverage. */
+export function courseSignal(subjectId: SubjectId) {
+  return signalFromEvidence(subjectId, evidenceReportForCourse(subjectId), state.clos.filter((c) => c.subjectId === subjectId).map((c) => c.id));
+}
+/** The programme's signal: the fixture, with each course that has its own reviewed evidence judged on that instead. */
+export function currentSignal(): SignalResult {
+  const fixture = runSignal(state.programme.id);
+  const live = new Map(state.subjects.flatMap((s) => { const d = courseSignal(s.id).drift; return d ? [[s.id, d] as const] : []; }));
+  if (!live.size) return fixture;
+  return { ...fixture, subjectDrift: [...fixture.subjectDrift.filter((d) => !live.has(d.subjectId)), ...live.values()] };
+}
+/** Demand, coverage and gap per outcome for Trends: the fixture's programme outcomes, plus each course's own outcomes
+ *  once judged on its evidence (those carry `live`). */
+export function currentGaps(): Record<string, { demand: number; coverage: number; gap: number; live?: OutcomeSignal }> {
+  const out: Record<string, { demand: number; coverage: number; gap: number; live?: OutcomeSignal }> = { ...marketGapByCLO() };
+  for (const s of state.subjects) for (const o of courseSignal(s.id).outcomes)
+    if (o.coverage !== null) out[o.cloId] = { demand: o.demand, coverage: o.coverage, gap: o.gap!, live: o };
+  return out;
+}
+export function routeDrift(subjectId: SubjectId) {
+  const signal = currentSignal();
+  setAgent("signal", "done");
+  setAgent("curriculum", "done");
+  const drift = signal.subjectDrift.find((d) => d.subjectId === subjectId);
+  const rating = ratingFor(subjectId);
+  const sources = rating
+    ? new Set(rating.evidence.map((e) => e.sourceId)).size
+    : 0;
+  const own = courseSignal(subjectId);
+  const top = own.drift ? own.outcomes.filter((o) => o.gap !== null).sort((a, b) => b.gap! - a.gap!)[0] : undefined;
+  const findings = top
+    ? `Demand on this subject's outcomes is outpacing coverage (gap ${top.gap!.toFixed(2)} on ${top.cloId}): ` +
+      `${top.postings} of ${top.eligible} reviewed postings ask for ${top.skill}. From the course's own evidence.`
+    : `Demand on this subject's outcomes is outpacing coverage (gap ${(drift?.gap ?? 0).toFixed(2)}` +
+      (sources > 0 ? `, corroborated across ${sources} market sources` : "") +
+      `). Sampled from the skills signal over the programme.`;
+  if (drift?.flag === "new-subject") {
+    notify({
+      toPersonId: state.programme.departmentOwnerId,
+      kind: "ping-new-subject",
+      subjectId,
+      agentFindings: findings,
+    });
+    set({ toast: "Routed to the department owner to scope a new subject." });
+  } else {
+    const coord = personWithHat(subjectId, "coordinator");
+    const proposal = state.proposals.find((p) => p.subjectId === subjectId);
+    if (coord) {
+      notify({
+        toPersonId: coord.id,
+        kind: "ping-update",
+        subjectId,
+        proposalId: proposal?.id,
+        agentFindings: findings,
+      });
+      set({ toast: `Routed to ${coord.name}, the subject coordinator.` });
+    }
+  }
+}
+
+// ---------- Trends -> the staged Signal reveal ----------
+let signalTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Play the Signal agent's staged reveal on the Trends screen: reading ->
+ *  extracting -> mapping -> done, landing on CS220 / CLO4 gap 0.62.
+ *  Deterministic, fixed ticks. Idempotent while running. */
+export function runSignalReveal() {
+  if (state.signalSim && state.signalSim.phase !== "done") return;
+  setAgent("signal", "working");
+  set({ signalSim: initSignalSim() });
+  if (signalTimer) clearInterval(signalTimer);
+  signalTimer = setInterval(tickSignal, scaleMs(SIGNAL_TICK_MS));
+}
+
+function tickSignal() {
+  const ss = state.signalSim;
+  if (!ss) {
+    if (signalTimer) clearInterval(signalTimer);
+    signalTimer = null;
+    return;
+  }
+  const next = stepSignal(ss);
+  set({ signalSim: next });
+  if (next.phase === "done") {
+    if (signalTimer) clearInterval(signalTimer);
+    signalTimer = null;
+    setAgent("signal", "done");
+    setAgent("curriculum", "done");
+  }
+}
+
+/** Clear the reveal so a fresh demo run replays it from the top. */
+export function resetSignalReveal() {
+  if (signalTimer) clearInterval(signalTimer);
+  signalTimer = null;
+  set({ signalSim: null });
+}
+
+// ---------- the real intake pipeline (parse -> interpret -> confirm) ----------
+/** Stage an interpreted upload for the user to confirm. The preview-and-confirm
+ *  step is the trust boundary: nothing files until a human has seen what the
+ *  agent read and what it made of it. */
+export function stagePendingIntake(doc: ParsedDoc, interp: IntakeInterpretation) {
+  set({ pendingIntake: { doc, interp } });
+}
+export function clearPendingIntake() {
+  set({ pendingIntake: null });
+}
+
+/** File the confirmed interpretation into the spine. Returns what was filed. */
+export function confirmPendingIntake(): string | null {
+  const pending = state.pendingIntake;
+  const person = currentPerson();
+  if (!pending || !person) return null;
+  const { doc, interp } = pending;
+  const subjectId = interp.subjectGuess;
+  const term = interp.termGuess ?? TERM;
+  const at = nowIso();
+  const involved = interp.docType === "clo-survey" ? [...new Set((interp.surveyRecords ?? []).map(r => r.subjectId))] : subjectId ? [subjectId] : [];
+  if (involved.some(id => !subjectById(id) || !can(person, "upload-results", { subjectId: id, assignments: state.assignments }))) {
+    set({ toast: "You can only file records for your assigned courses. Correct the course selection." }); return null;
+  }
+
+  if (interp.docType === "results" && subjectId && interp.mappedRows?.length) {
+    // The results are for the version taught; the person filing confirms it in the review panel.
+    const courseVersionId = interp.courseVersionId ?? taughtVersionId(state, subjectId) ?? undefined;
+    if (courseVersionId && !courseVersionIds(state, subjectId).has(courseVersionId)) {
+      set({ toast: "Choose a version of " + subjectId + " for these results." }); return null;
+    }
+    const upload: ResultUpload = {
+      id: nextId(`RU-${subjectId}`),
+      subjectId,
+      uploadedBy: person.id,
+      term,
+      rows: interp.mappedRows.map((r) => (r.marks ? { ...r, passMarkAtFiling: state.institution.kpi.passMark } : r)),
+      filedAt: at,
+      sourceFileName: doc.fileName,
+      ...(courseVersionId ? { courseVersionId } : {}),
+      ...(doc.sample ? { sample: true } : {}),
+    };
+    const ds: DataSource = {
+      kind: "results",
+      subjectId,
+      term,
+      recordCount: listedStudents(upload),
+      ingestedAt: at,
+      verified: false,
+      sourceFileName: doc.fileName,
+      ...(doc.sample ? { sample: true } : {}),
+    };
+    set((s) => ({
+      resultUploads: [...s.resultUploads, upload],
+      dataSources: [ds, ...s.dataSources],
+      flashUpload: upload,
+      pendingIntake: null,
+      toast: `Filed ${doc.fileName} to ${subjectId}, ${term}` + (courseVersionId ? `, matched to version ${courseVersionId}.` : "."),
+    }));
+    fillPredictionsForSubject(subjectId);
+    return upload.id;
+  }
+
+  if (interp.docType === "clo-survey" && interp.surveyRecords?.length) {
+    const records = interp.surveyRecords;
+    const bySubject = new Map<string, number>();
+    for (const r of records) {
+      bySubject.set(r.subjectId, (bySubject.get(r.subjectId) ?? 0) + 1);
+    }
+    const sources: DataSource[] = [...bySubject.entries()].map(([sid, count]) => ({
+      kind: "clo-survey",
+      subjectId: sid,
+      term,
+      recordCount: count,
+      ingestedAt: at,
+      verified: false,
+      sourceFileName: doc.fileName,
+      ...(doc.sample ? { sample: true } : {}),
+    }));
+    set((s) => ({
+      survey: [...s.survey, ...records],
+      dataSources: [...sources, ...s.dataSources],
+      pendingIntake: null,
+      toast: `Filed ${records.length} survey records from ${doc.fileName}.`,
+    }));
+    return `${records.length} records`;
+  }
+
+  if ((interp.docType === "syllabus" || interp.docType === "slides") && subjectId) {
+    const ds: DataSource = {
+      kind: interp.docType === "syllabus" ? "syllabus" : "material",
+      subjectId,
+      term,
+      recordCount: doc.pages.length,
+      ingestedAt: at,
+      verified: false,
+      sourceFileName: doc.fileName,
+      ...(doc.sample ? { sample: true } : {}),
+    };
+    set((s) => ({
+      dataSources: [ds, ...s.dataSources],
+      subjects:
+        interp.docType === "syllabus"
+          ? s.subjects.map((su) =>
+              su.id === subjectId ? { ...su, syllabusVerifiedAt: undefined, syllabusSourceUrl: doc.fileName } : su,
+            )
+          : s.subjects,
+      pendingIntake: null,
+      toast: `Filed ${doc.fileName} as ${interp.docType === "syllabus" ? "a reviewed syllabus upload" : "course material"} for ${subjectId}.`,
+    }));
+    return ds.sourceFileName ?? null;
+  }
+
+  set({ toast: "Nothing was filed: the interpretation had no usable content.", pendingIntake: null });
+  return null;
+}
+
+// ---------- Upload (the v2 one-click fixture path, kept for demo + proofs) ----------
+const DEMO_SHEET: ParsedSheet = {
+  fileName: "CS220-results-2025-S1.xlsx",
+  headers: ["student", "CLO4 score"],
+  rows: [
+    { student: "anon-1", "CLO4 score": 0.55 },
+    { student: "anon-2", "CLO4 score": 0.6 },
+  ],
+};
+
+export function uploadResults(subjectId: SubjectId) {
+  const person = currentPerson();
+  if (!person) return;
+  setAgent("intake", "working");
+  const intake = runIntake(DEMO_SHEET, subjectId, {
+    uploadedBy: person.id,
+    term: TERM,
+    filedAt: nowIso(),
+    uploadId: `RU-${subjectId}-${TERM}`,
+  });
+  const taught = taughtVersionId(state, subjectId);
+  const upload: ResultUpload = taught ? { ...intake, courseVersionId: taught } : intake;
+  set((s) => {
+    const others = s.resultUploads.filter((u) => u.id !== upload.id);
+    const ds: DataSource = {
+      kind: "results",
+      subjectId,
+      term: TERM,
+      recordCount: upload.rows.reduce((m, r) => Math.max(m, r.n), 0),
+      ingestedAt: upload.filedAt,
+      verified: true,
+    };
+    const dataSources = [
+      ds,
+      ...s.dataSources.filter(
+        (d) => !(d.kind === "results" && d.subjectId === subjectId && d.term === TERM),
+      ),
+    ];
+    return { resultUploads: [...others, upload], dataSources, flashUpload: upload };
+  });
+  setAgent("intake", "done");
+  fillPredictionsForSubject(subjectId);
+}
+
+function masteryFromUpload(u: ResultUpload): number {
+  if (u.rows.length === 0) return 0;
+  return u.rows.reduce((sum, r) => sum + r.meanScore, 0) / u.rows.length;
+}
+
+/** The latest results upload for a subject filed AT OR AFTER a moment. A
+ *  prediction is a claim about the change taking effect, so it is only scored by
+ *  results that arrived after it was made, never by what was already on file. */
+function latestUploadSince(subjectId: SubjectId, since: string): ResultUpload | undefined {
+  return [...state.resultUploads]
+    .filter((u) => u.subjectId === subjectId && u.filedAt >= since)
+    .sort((a, b) => (a.filedAt < b.filedAt ? 1 : -1))[0];
+}
+
+/** Closed loop: score any open prediction on a subject against results filed
+ *  after the prediction was made. Returns how many were scored. */
+function fillPredictionsForSubject(subjectId: SubjectId): number {
+  let scored = 0;
+  set((s) => ({
+    predictions: s.predictions.map((p) => {
+      if (p.subjectId !== subjectId || p.actualMastery !== undefined) return p;
+      const upload = latestUploadSince(subjectId, p.madeAt);
+      if (!upload) return p;
+      const actual = masteryFromUpload(upload);
+      scored += 1;
+      return { ...p, actualMastery: actual, residual: Math.abs(p.predictedMastery - actual) };
+    }),
+  }));
+  return scored;
+}
+
+/** Score every open prediction against results filed since it was made. Honest
+ *  toast: only claims what it actually did. */
+export function scoreOpenPredictions() {
+  let scored = 0;
+  for (const subjectId of new Set(
+    state.predictions.filter((p) => p.actualMastery === undefined).map((p) => p.subjectId),
+  )) {
+    scored += fillPredictionsForSubject(subjectId);
+  }
+  set({
+    toast:
+      scored > 0
+        ? `Scored ${scored} prediction${scored === 1 ? "" : "s"} against the filed results.`
+        : "No new results have been filed since these predictions were made.",
+  });
+}
+
+// ---------- Course Studio: authoring ----------
+export function draftWithAgent(proposalId: ProposalId, mode: "agent" | "hybrid") {
+  const p = proposalById(proposalId);
+  const subject = p && subjectById(p.subjectId);
+  if (!p || !subject) return;
+  setAgent("authoring", "working");
+  const clos = state.clos.filter((c) => c.subjectId === subject.id);
+  const result = runAuthoring(subject, clos, "Align with demand", "draft", p.draft, "fixture");
+  patchProposal(proposalId, (pp) => ({
+    ...pp,
+    draft: { ...result.draft, testDraftId: pp.draft.testDraftId },
+    history: [
+      ...pp.history,
+      { at: nowIso(), byPersonId: pp.authorId, action: "agent-drafted", note: `Agent drafted (${mode} mode).` },
+    ],
+  }));
+  setAgent("authoring", mode === "hybrid" ? "needs-input" : "done");
+  if (mode === "hybrid") {
+    set({ agentBubble: { agent: "authoring", text: "Drafted a revision. Your turn to refine a line." } });
+  }
+  augmentLive("authoring", `Drafting an update for ${subject.id} against rising demand`, "studio", {
+    job: "draft",
+    subject: { id: subject.id, title: subject.title },
+    clos: clos.map((c) => ({ id: c.id, text: c.text, bloomLevel: c.bloomLevel })),
+    target: "Align the subject with rising market demand for machine learning",
+    mode,
+  });
+}
+
+/** Replace a proposal's draft wholesale (the live Authoring path streams, then
+ *  commits through here so history stays honest about who wrote what). */
+export function applyAgentDraft(proposalId: ProposalId, draft: ChangeProposal["draft"], note: string) {
+  patchProposal(proposalId, (pp) => ({
+    ...pp,
+    draft: { ...draft, testDraftId: pp.draft.testDraftId },
+    history: [...pp.history, { at: nowIso(), byPersonId: pp.authorId, action: "agent-drafted", note }],
+  }));
+}
+
+export function requestAgentReview(proposalId: ProposalId) {
+  const p = proposalById(proposalId);
+  const subject = p && subjectById(p.subjectId);
+  if (!p || !subject) return;
+  setAgent("authoring", "working");
+  const clos = state.clos.filter((c) => c.subjectId === subject.id);
+  const result = runAuthoring(subject, clos, "Review draft", "review", p.draft, "fixture");
+  set({ critique: result.critique ?? [] });
+  setAgent("authoring", "needs-input");
+  set({ agentBubble: { agent: "authoring", text: "I flagged a few things in the draft." } });
+  // Live path: a real model critique replaces the fixture lines when it lands.
+  augmentLive(
+    "authoring",
+    `Reviewing the ${subject.id} draft`,
+    "studio",
+    {
+      job: "review",
+      subject: { id: subject.id, title: subject.title },
+      clos: clos.map((c) => ({ id: c.id, text: c.text, bloomLevel: c.bloomLevel })),
+      draft: p.draft,
+    },
+    (text) => {
+      const lines = text
+        .split("\n")
+        .map((l) => l.replace(/^[-*\d.\s]+/, "").trim())
+        .filter((l) => l.length > 8)
+        .slice(0, 6);
+      if (lines.length > 0) set({ critique: lines });
+    },
+  );
+}
+
+export function setCritique(critique: string[] | null) {
+  set({ critique });
+}
+
+/** Edit a single CLO-change line. */
+export function editCloChangeText(proposalId: ProposalId, index: number, text: string) {
+  patchProposal(proposalId, (p) => {
+    const cloChanges = [...(p.draft.cloChanges ?? [])];
+    if (cloChanges[index]) cloChanges[index] = { ...cloChanges[index], text };
+    return { ...p, draft: { ...p.draft, cloChanges } };
+  });
+}
+
+/** Edit the free-text parts of a draft (topics, test/lab notes). */
+export function editDraftField(
+  proposalId: ProposalId,
+  field: "topics" | "testDraft" | "labDraft",
+  value: string,
+) {
+  patchProposal(proposalId, (p) => ({
+    ...p,
+    draft: {
+      ...p.draft,
+      [field]: field === "topics" ? value.split("\n").filter((t) => t.trim().length > 0) : value,
+    },
+  }));
+}
+
+/** Start a fresh draft on a subject that has no open proposal. Authored by the
+ *  current person, so a lecturer's draft is correctly lecturer-authored (and so
+ *  must pass coordinator review before testing). Selects it. */
+export function startDraft(subjectId: SubjectId): ProposalId | null {
+  const person = currentPerson();
+  if (!person || !subjectById(subjectId) || !can(person, "draft-change", { subjectId, assignments: state.assignments })) return null;
+  const existing = state.proposals.find(
+    (p) => p.subjectId === subjectId && p.status !== "approved" && p.status !== "rejected",
+  );
+  if (existing) {
+    set({ selectedSubjectId: subjectId, selectedProposalId: existing.id, screen: "proposal", courseStep: null });
+    return existing.id;
+  }
+  const clo = state.clos.find((c) => c.subjectId === subjectId);
+  const id = `CP-${subjectId}-${state.idSeq}`;
+  const proposal: ChangeProposal = {
+    id,
+    subjectId,
+    kind: "update",
+    authorId: person.id,
+    draft: {
+      topics: [],
+      cloChanges: clo
+        ? [{ cloId: clo.id, op: "edit", text: clo.text, bloomLevel: clo.bloomLevel }]
+        : [],
+    },
+    status: "drafting",
+    history: [{ at: nowIso(), byPersonId: person.id, action: "drafted", note: "Draft started." }],
+  };
+  set((s) => ({
+    proposals: [...s.proposals, proposal],
+    idSeq: s.idSeq + 1,
+    selectedSubjectId: subjectId,
+    selectedProposalId: id,
+    screen: "proposal",
+    courseStep: null,
+  }));
+  return id;
+}
+
+// ---------- the assessment studio (spec 6.4) ----------
+const BLOOM_ORDER: BloomLevel[] = ["Remember", "Understand", "Apply", "Analyse", "Evaluate", "Create"];
+// Display difficulty per Bloom level for generated items (the ladder shape the
+// spine uses; labelled as a draft value until an item is calibrated).
+const BLOOM_B: Record<BloomLevel, number> = {
+  Remember: 0.1,
+  Understand: 0.3,
+  Apply: 0.5,
+  Analyse: 0.7,
+  Evaluate: 0.85,
+  Create: 1.0,
+};
+const BLOOM_VERB: Record<BloomLevel, string> = {
+  Remember: "Define",
+  Understand: "Explain",
+  Apply: "Apply",
+  Analyse: "Analyse",
+  Evaluate: "Evaluate",
+  Create: "Design",
+};
+
+/** Create (or return the existing) test draft for a subject/proposal. */
+export function createTestDraft(subjectId: SubjectId, proposalId?: ProposalId): string | null {
+  const person = currentPerson();
+  if (!person || !can(person,"draft-change",{ subjectId,assignments:state.assignments })) return null;
+  const existing = state.testDrafts.find(
+    (t) => t.subjectId === subjectId && t.status !== "approved" && (!proposalId || t.proposalId === proposalId),
+  );
+  if (existing) return existing.id;
+  const clos = state.clos.filter((c) => c.subjectId === subjectId);
+  const weight = clos.length > 0 ? 1 / clos.length : 1;
+  const draft: TestDraft = {
+    id: nextId(`TD-${subjectId}`),
+    subjectId,
+    proposalId,
+    blueprint: {
+      subjectId,
+      totalMarks: 40,
+      cloWeights: clos.map((c) => ({ cloId: c.id, weight })),
+      bloomMix: { Understand: 0.25, Apply: 0.5, Analyse: 0.25 },
+    },
+    items: [],
+    status: "drafting",
+    authorId: person.id,
+    courseVersionId: subjectById(subjectId)?.currentVersionId,
+  };
+  set((s) => ({ testDrafts: [...s.testDrafts, draft] }));
+  if (proposalId) {
+    patchProposal(proposalId, (p) => ({ ...p, draft: { ...p.draft, testDraftId: draft.id } }));
+  }
+  return draft.id;
+}
+
+
+function mayEditAssessment(t: TestDraft): boolean {
+  const person = currentPerson();
+  return !!person && can(person, "draft-change", { subjectId: t.subjectId, assignments: state.assignments }) &&
+    (t.authorId === person.id || can(person, "review-draft", { subjectId: t.subjectId, assignments: state.assignments }));
+}
+
+function assessmentLinkError(t: TestDraft): string | null {
+  const ids = new Set(state.clos.filter(c => c.subjectId === t.subjectId).map(c => c.id));
+  return t.blueprint.cloWeights.some(w => !ids.has(w.cloId)) || t.items.some(i => !ids.has(i.targetCLO))
+    ? "Repair removed outcome links before reviewing this assessment." : null;
+}
+
+/** Keep the questions; explicitly replace obsolete blueprint mappings. */
+export function resetAssessmentOutcomeWeights(testDraftId: string) {
+  const t = state.testDrafts.find(x => x.id === testDraftId);
+  if (!t || !mayEditAssessment(t)) return;
+  const clos = state.clos.filter(c => c.subjectId === t.subjectId);
+  if (!clos.length) { set({ toast: "Record course outcomes before resetting the blueprint." }); return; }
+  set(s => ({ testDrafts: s.testDrafts.map(x => x.id === t.id ? { ...x, status: "drafting",
+    needsReview: true, blueprint: { ...x.blueprint, cloWeights: clos.map(c => ({ cloId: c.id, weight: 1 / clos.length })) } } : x),
+    toast: "Outcome weights reset. Questions were kept; review their mappings and marks." }));
+}
+
+export function acknowledgeAssessmentCourseChange(testDraftId: string, acknowledged: boolean) {
+  const t = state.testDrafts.find(x => x.id === testDraftId);
+  if (!t || !mayEditAssessment(t)) return { ok: false, error: "Only the assessment author or course coordinator can record this review." };
+  if (!acknowledged) return { ok: false, error: "Review the blueprint and every question before recording the course-change review." };
+  const error = assessmentLinkError(t);
+  if (error) return { ok: false, error };
+  if (!t.items.length) return { ok: false, error: "Prepare and review the questions first." };
+  set(s => ({ testDrafts: s.testDrafts.map(x => x.id === t.id ? { ...x, status: "drafting",
+    needsReview: false, courseVersionId: subjectById(t.subjectId)?.currentVersionId } : x),
+    toast: "Course-change review recorded. Send the assessment through its normal review step." }));
+  return { ok: true };
+}
+
+export function updateBlueprint(testDraftId: string, blueprint: AssessmentBlueprint) {
+  const t = state.testDrafts.find(x => x.id === testDraftId);
+  if (!t || !mayEditAssessment(t)) return;
+  set((s) => ({
+    testDrafts: s.testDrafts.map((t) => (t.id === testDraftId ? { ...t, blueprint, status: "drafting" } : t)),
+  }));
+}
+
+/** Deterministic local item generation against the blueprint (the offline path;
+ *  the live Authoring agent replaces the wording, not the structure). */
+export function generateTestItems(testDraftId: string) {
+  const t = state.testDrafts.find((x) => x.id === testDraftId);
+  if (!t || !mayEditAssessment(t)) return;
+  const clos = state.clos.filter((c) => c.subjectId === t.subjectId);
+  const targetCount = Math.max(4, Math.round(t.blueprint.totalMarks / 5));
+  const mix = Object.entries(t.blueprint.bloomMix) as Array<[BloomLevel, number]>;
+  const bloomPool: BloomLevel[] = [];
+  for (const [level, share] of mix) {
+    const n = Math.max(1, Math.round(share * targetCount));
+    for (let i = 0; i < n; i += 1) bloomPool.push(level);
+  }
+  while (bloomPool.length < targetCount) bloomPool.push("Apply");
+  bloomPool.sort((a, b) => BLOOM_ORDER.indexOf(a) - BLOOM_ORDER.indexOf(b));
+
+  const items: TestItem[] = [];
+  let i = 0;
+  for (const cw of t.blueprint.cloWeights) {
+    const clo = clos.find((c) => c.id === cw.cloId);
+    if (!clo) continue;
+    const count = Math.max(1, Math.round(cw.weight * targetCount));
+    for (let k = 0; k < count && items.length < targetCount; k += 1) {
+      const bloom = bloomPool[Math.min(i, bloomPool.length - 1)];
+      i += 1;
+      items.push({
+        id: `${t.id}-Q${items.length + 1}`,
+        text: `${BLOOM_VERB[bloom]} ${clo.text.toLowerCase()} ${
+          bloom === "Apply" || bloom === "Analyse"
+            ? "on a worked scenario, showing each step"
+            : "in your own words, with one concrete example"
+        }.`,
+        targetCLO: clo.id,
+        bloomLevel: bloom,
+        difficulty: BLOOM_B[bloom],
+        marks: Math.max(2, Math.round((cw.weight * t.blueprint.totalMarks) / count)),
+        source: "agent",
+      });
+    }
+  }
+  set((s) => ({
+    testDrafts: s.testDrafts.map((x) => (x.id === testDraftId ? { ...x, items, status: "drafting" } : x)),
+    toast: `Drafted ${items.length} items against the blueprint.`,
+  }));
+}
+
+export function updateTestItem(testDraftId: string, itemId: string, patch: Partial<TestItem>) {
+  const draft = state.testDrafts.find(x => x.id === testDraftId);
+  if (!draft || !mayEditAssessment(draft)) return;
+  set((s) => ({
+    testDrafts: s.testDrafts.map((t) =>
+      t.id === testDraftId
+        ? {
+            ...t, status: "drafting",
+            items: t.items.map((it) =>
+              it.id === itemId ? { ...it, ...patch, source: "human" as const } : it,
+            ),
+          }
+        : t,
+    ),
+  }));
+}
+
+export function removeTestItem(testDraftId: string, itemId: string) {
+  const draft = state.testDrafts.find(x => x.id === testDraftId);
+  if (!draft || !mayEditAssessment(draft)) return;
+  set((s) => ({
+    testDrafts: s.testDrafts.map((t) =>
+      t.id === testDraftId ? { ...t, status: "drafting", items: t.items.filter((it) => it.id !== itemId) } : t,
+    ),
+  }));
+}
+
+/** A lecturer submits their test for coordinator review; a coordinator's own
+ *  draft can be approved directly. Same authority chain as proposals. */
+export function submitTestDraft(testDraftId: string) {
+  const t = state.testDrafts.find((x) => x.id === testDraftId);
+  const person = currentPerson();
+  if (!t || !person || t.authorId !== person.id || !mayEditAssessment(t) || t.status !== "drafting") return;
+  if (t.needsReview || assessmentLinkError(t)) { set({ toast: "Review the course change and repair outcome links before submitting this assessment." }); return; }
+  const isCoord = hatsOn(t.authorId, t.subjectId, state.assignments).includes("coordinator");
+  if (isCoord) {
+    set((s) => ({
+      testDrafts: s.testDrafts.map((x) => (x.id === testDraftId ? { ...x, status: "approved" } : x)),
+      toast: "Test approved (coordinator's own draft).",
+    }));
+    return;
+  }
+  set((s) => ({
+    testDrafts: s.testDrafts.map((x) =>
+      x.id === testDraftId ? { ...x, status: "coordinator-review" } : x,
+    ),
+  }));
+  const coord = personWithHat(t.subjectId, "coordinator");
+  if (coord) {
+    notify({
+      toPersonId: coord.id,
+      kind: "review-request",
+      subjectId: t.subjectId,
+      proposalId: t.proposalId,
+      agentFindings: "A lecturer has drafted a test and is asking for your review.",
+    });
+  }
+  set({ toast: "Test sent to the coordinator for review." });
+}
+
+export function approveTestDraft(testDraftId: string) {
+  const t = state.testDrafts.find((x) => x.id === testDraftId);
+  const person = currentPerson();
+  if (!t || !person || t.status !== "coordinator-review") return;
+  if (t.needsReview || assessmentLinkError(t)) { set({ toast: "Review the course change and repair outcome links before approving this assessment." }); return; }
+  if (!can(person, "review-draft", { subjectId: t.subjectId, assignments: state.assignments })) {
+    set({ toast: "Only the subject coordinator can approve a test." });
+    return;
+  }
+  set((s) => ({
+    testDrafts: s.testDrafts.map((x) => (x.id === testDraftId ? { ...x, status: "approved" } : x)),
+    toast: "Test approved.",
+  }));
+}
+
+// ---------- proposal state machine ----------
+/** Lecturer-only author submits to the coordinator for review. */
+export function submitForReview(proposalId: ProposalId) {
+  const p = proposalById(proposalId);
+  if (!p) return;
+  const coord = personWithHat(p.subjectId, "coordinator");
+  patchProposal(proposalId, (pp) => ({
+    ...pp,
+    status: "coordinator-review",
+    history: [...pp.history, { at: nowIso(), byPersonId: pp.authorId, action: "submitted-for-review" }],
+  }));
+  if (coord) {
+    notify({
+      toPersonId: coord.id,
+      kind: "review-request",
+      subjectId: p.subjectId,
+      proposalId,
+      agentFindings: "A lecturer has drafted a change and is asking for your review before testing.",
+    });
+  }
+  set({ toast: "Submitted to the coordinator for review." });
+}
+
+export function reviewApprove(proposalId: ProposalId) {
+  const proposal = proposalById(proposalId), person = currentPerson();
+  if (!proposal || !person || proposal.status !== "coordinator-review" || !can(person, "review-draft", { subjectId: proposal.subjectId, assignments: state.assignments })) return;
+  patchProposal(proposalId, (p) => ({
+    ...p,
+    status: "testing",
+    history: [
+      ...p.history,
+      { at: nowIso(), byPersonId: state.currentPersonId ?? p.authorId, action: "review-approved" },
+    ],
+  }));
+  set({ toast: "Review approved. Ready to run the acceptance test." });
+}
+
+export function reviewRequestChanges(proposalId: ProposalId, note: string) {
+  const p = proposalById(proposalId);
+  if (!p) return;
+  patchProposal(proposalId, (pp) => ({
+    ...pp,
+    status: "drafting",
+    history: [
+      ...pp.history,
+      {
+        at: nowIso(),
+        byPersonId: state.currentPersonId ?? pp.authorId,
+        action: "review-changes-requested",
+        note,
+      },
+    ],
+  }));
+  notify({
+    toPersonId: p.authorId,
+    kind: "review-request",
+    subjectId: p.subjectId,
+    proposalId,
+    agentFindings: note || "The coordinator asked for changes before this can be tested.",
+  });
+  set({ toast: "Changes requested; sent back to the author." });
+}
+
+/** Whether the test may run now. Two gates, both required:
+ *  1. The ACTOR must have run-test capability on the subject: an academic with a
+ *     hat there. This blocks management and the department from triggering a run.
+ *  2. The PROPOSAL must be ready: already review-approved (status testing), or a
+ *     coordinator's own draft (status drafting + author is the coordinator). This
+ *     stops a lecturer's draft reaching a test without review. */
+export function canRunTest(proposalId: ProposalId): boolean {
+  const p = proposalById(proposalId);
+  if (!p) return false;
+  const person = currentPerson();
+  if (!person || !can(person, "run-test", { subjectId: p.subjectId, assignments: state.assignments }))
+    return false;
+  if (p.status === "testing") return true;
+  if (p.status === "drafting") return authorIsCoordinator(p);
+  return false;
+}
+
+// ---------- the staged acceptance run ----------
+let simTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Shared by the staged and immediate runs: enforce the gate, set testing, build
+ *  the proxy cohort for a new subject, and compute the real spine result. */
+function prepareRun(
+  proposalId: ProposalId,
+): { report: VerdictReport; distribution: AcceptanceDistribution } | null {
+  const p = proposalById(proposalId);
+  const subject = p && subjectById(p.subjectId);
+  if (!p || !subject) return null;
+  if (subject.workspaceOnly) { set({ toast: "Use Outcomes & topics to check this course. The legacy learning scenario has no calibrated data for it." }); return null; }
+  if (p.baselineVersionId && p.baselineVersionId !== subject.currentVersionId) { set({ toast: "The proposal baseline is outdated. Start a revision from the current course version." }); return null; }
+  if (!canRunTest(proposalId)) {
+    set({ toast: "This draft must pass coordinator review before it can be tested." });
+    return null;
+  }
+  patchProposal(proposalId, (pp) => ({
+    ...pp,
+    status: "testing",
+    baselineVersionId: subject.currentVersionId,
+    testedDraftFingerprint: JSON.stringify(pp.draft),
+    history:
+      pp.status === "testing"
+        ? pp.history
+        : [
+            ...pp.history,
+            { at: nowIso(), byPersonId: state.currentPersonId ?? pp.authorId, action: "review-approved" },
+          ],
+  }));
+
+  // New-subject proposals are tested on an Analogy proxy cohort.
+  const isNew = p.kind === "new-subject";
+  let survey = state.survey;
+  let items = ITEMS;
+  let isProxyCohort = false;
+  if (isNew) {
+    const newCLOs = state.clos.filter((c) => c.subjectId === subject.id);
+    const analogy = runAnalogy(newCLOs, state.subjects, state.survey);
+    setAgent("analogy", "done");
+    survey = analogy.proxySurvey;
+    items = itemsForCLOs(newCLOs);
+    isProxyCohort = true;
+  }
+
+  setAgent("cohort", "working");
+  return runAcceptanceWithDistribution(p, subject, survey, items, {
+    subjects: state.subjects,
+    isProxyCohort,
+  });
+}
+
+export function startAcceptanceRun(proposalId: ProposalId) {
+  const prepared = prepareRun(proposalId);
+  if (!prepared) return;
+  const { report, distribution } = prepared;
+  set({ sim: initSim(proposalId, report, distribution), drillOpen: false, drillStep: -1, screen: "acceptance" });
+  selectProposal(proposalId);
+
+  if (simTimer) clearInterval(simTimer);
+  simTimer = setInterval(() => tickRun(report, distribution), scaleMs(SIM_TICK_MS));
+}
+
+/** Run without the staged reveal (a "skip animation" path; also used by proofs). */
+export function runAcceptanceImmediate(proposalId: ProposalId) {
+  const prepared = prepareRun(proposalId);
+  if (!prepared) return;
+  set({
+    sim: {
+      ...initSim(proposalId, prepared.report, prepared.distribution),
+      phase: "done",
+      learnersRun: prepared.report.groundedOnLearners,
+      bins: initSim(proposalId, prepared.report, prepared.distribution).finalBins,
+      displayedMastery: prepared.report.projectedMastery,
+    },
+  });
+  finishRun(proposalId, prepared.report);
+}
+
+function tickRun(report: VerdictReport, _distribution: AcceptanceDistribution) {
+  const sim = state.sim;
+  if (!sim) {
+    if (simTimer) clearInterval(simTimer);
+    simTimer = null;
+    return;
+  }
+  const next = stepSim(sim);
+  set({ sim: next });
+  if (next.phase === "done") {
+    if (simTimer) clearInterval(simTimer);
+    simTimer = null;
+    finishRun(next.proposalId, report);
+  }
+}
+
+function finishRun(proposalId: ProposalId, report: VerdictReport) {
+  const current = proposalById(proposalId);
+  if (!current || current.baselineVersionId !== subjectById(current.subjectId)?.currentVersionId || current.testedDraftFingerprint !== JSON.stringify(current.draft)) {
+    set({ toast: "The course or proposal changed during the scenario. Its result cannot be used for a decision." }); return;
+  }
+  patchProposal(proposalId, (p) => ({
+    ...p,
+    status: "management-approval",
+    acceptanceResult: report,
+    history: [
+      ...p.history,
+      {
+        at: nowIso(),
+        byPersonId: state.currentPersonId ?? p.authorId,
+        action: "tested",
+        note: `Projected mastery ${report.projectedMastery.toFixed(2)}.`,
+      },
+    ],
+  }));
+  setAgent("cohort", "done");
+  setAgent("evaluator", "needs-input");
+  // Drop any earlier test-done ping for this proposal so a re-run (reject then
+  // test again) does not pile up duplicate pings in management's inbox.
+  set((s) => ({
+    drillOpen: true,
+    agentBubble: { agent: "evaluator", text: `Verdict ready: ${report.projectedMastery.toFixed(2)} projected.` },
+    notifications: s.notifications.filter((n) => !(n.kind === "test-done" && n.proposalId === proposalId)),
+  }));
+  for (const m of state.people.filter((pp) => pp.orgRole === "management")) {
+    notify({
+      toPersonId: m.id,
+      kind: "test-done",
+      subjectId: proposalById(proposalId)?.subjectId,
+      proposalId,
+      agentFindings: report.summary,
+    });
+  }
+  // Live path: the Evaluator writes its own verdict prose for the gate; the
+  // measured numbers in the report are untouched either way.
+  const tested = proposalById(proposalId);
+  augmentLive("evaluator", "Compiling the verdict for management", "approval", {
+    subjectId: tested?.subjectId,
+    kind: tested?.kind,
+    currentMastery: report.currentMastery,
+    projectedMastery: report.projectedMastery,
+    weakest: report.cloMastery.reduce((a, b) => (b.meanP < a.meanP ? b : a), report.cloMastery[0]),
+    prerequisiteConflicts: report.prerequisiteConflicts,
+    groundedOnLearners: report.groundedOnLearners,
+    isProxyCohort: report.isProxyCohort,
+  });
+}
+
+/** The coordinator's explicit "send this to management" affordance after a test. */
+export function submitToManagement(proposalId: ProposalId) {
+  const p = proposalById(proposalId);
+  if (!p) return;
+  closeDrill();
+  set({ toast: "Verdict sent to management for approval." });
+}
+
+// ---------- the six-hop drill-down reveal ----------
+let drillTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Reveal the drill-down one hop at a time (verdict -> CLO4 -> learner -> theta ->
+ *  item -> P), each held long enough to read. Deterministic; the interval scales
+ *  under turbo for the smoke. Works for a human too. */
+export function startDrillReveal() {
+  const report = proposalById(state.selectedProposalId)?.acceptanceResult;
+  if (!report) return;
+  set({ drillOpen: true, drillStep: 0 });
+  if (drillTimer) clearInterval(drillTimer);
+  drillTimer = setInterval(() => {
+    const cur = state.drillStep;
+    if (cur >= DRILL_STEPS - 1) {
+      if (drillTimer) clearInterval(drillTimer);
+      drillTimer = null;
+      return;
+    }
+    set({ drillStep: cur + 1 });
+  }, scaleMs(DRILL_STEP_MS));
+}
+
+export function closeDrill() {
+  if (drillTimer) clearInterval(drillTimer);
+  drillTimer = null;
+  set({ drillStep: -1 });
+}
+
+// ---------- management approval gate ----------
+export function approveProposal(proposalId: ProposalId) {
+  const p = proposalById(proposalId), person = currentPerson();
+  if (!person || !p || !can(person, "approve", { subjectId: p.subjectId, assignments: state.assignments })) return;
+  if (!p.acceptanceResult || p.status !== "management-approval") return;
+  const subject = subjectById(p.subjectId);
+  if (!subject || p.baselineVersionId !== subject.currentVersionId || p.testedDraftFingerprint !== JSON.stringify(p.draft)) {
+    set({ toast: "This proposal or its baseline changed. Review and run it again before recording approval." }); return;
+  }
+  const baseline = definitionForCourse(subject.id)!;
+  const definition = structuredClone(baseline);
+  for (const [index,change] of (p.draft.cloChanges ?? []).entries()) {
+    const id = change.cloId ?? subject.id + "-" + p.id + "-outcome-" + (index + 1);
+    const existing = definition.outcomes.find(c => c.id === id);
+    if (change.op === "remove") {
+      if (!existing) { set({ toast: "A removed outcome is no longer in this course." }); return; }
+      definition.outcomes = definition.outcomes.filter(c => c.id !== id);
+    } else if (change.op === "edit") {
+      if (!existing) { set({ toast: "An edited outcome is no longer in this course." }); return; }
+      definition.outcomes = definition.outcomes.map(c => c.id === id ? { ...c, text: change.text, bloomLevel: change.bloomLevel } : c);
+    } else if (existing && p.kind !== "new-subject") {
+      set({ toast: "The proposed new outcome already exists. Review the operation." }); return;
+    } else if (!existing) definition.outcomes.push({ id, subjectId: subject.id, text: change.text,
+      bloomLevel: change.bloomLevel, label: "CLO" + (definition.outcomes.length + 1), assessmentEvidence: "", ploIds: [] });
+  }
+  if (p.draft.topics?.length) definition.topics = p.draft.topics.map((title,index) => {
+    const existing = baseline.topics.find(t => t.title === title);
+    return existing ? structuredClone(existing) : { id: subject.id + "-" + p.id + "-topic-" + index, title, week: null,
+      contactHours: 0, selfStudyHours: 0, cloIds: [], prerequisiteTopicIds: [], protected: false, resources: "" };
+  });
+  const structural = draftStructureError(definition,subject.id);
+  const errors = structural ? [structural] : validateCourseDefinition(definition,subject.id,baseline).filter(i => i.severity === "error").map(i => i.message);
+  if (definition.outcomes.some(c => state.clos.some(other => other.id === c.id && other.subjectId !== subject.id))) errors.push("An outcome identity belongs to another course.");
+  if (errors.length) { set({ toast: "Cannot apply this proposal: " + errors.join(" ") }); return; }
+  const at = nowIso(), versionId = nextId(subject.id + "-v");
+  const impact = curriculumImpact(baseline,definition,state.teachingPlans.find(t => t.subjectId === subject.id),state.testDrafts.filter(t => t.subjectId === subject.id));
+  const version: SubjectVersion = { id: versionId, subjectId: subject.id,
+    snapshot: { title: definition.title, cloIds: definition.outcomes.map(c => c.id), prerequisiteSubjectIds: [...subject.prerequisiteSubjectIds] },
+    cloSnapshot: structuredClone(definition.outcomes), definition: structuredClone(definition),
+    changedBy: person.id, changedAt: at, reason: "Local proposal decision applied. Institutional authority is not verified by the prototype." };
+  set(s => ({
+    proposals: s.proposals.map(pp => pp.id === proposalId ? { ...pp, status: "approved",
+      history: [...pp.history, { at, byPersonId: person.id, action: "approved", note: "Applied to local course version " + versionId + "." }] } : pp),
+    courseDefinitions: { ...s.courseDefinitions, [subject.id]: definition },
+    clos: [...s.clos.filter(c => c.subjectId !== subject.id), ...definition.outcomes],
+    subjects: s.subjects.map(c => c.id === subject.id ? { ...c, title: definition.title, cloIds: definition.outcomes.map(o => o.id), currentVersionId: versionId, status: "active" } : c),
+    subjectVersions: [...(s.subjectVersions.some(v => v.id === subject.currentVersionId)
+      ? s.subjectVersions.map(v => v.id === subject.currentVersionId && !v.definition ? { ...v, definition: structuredClone(baseline) } : v)
+      : [...s.subjectVersions, { id: subject.currentVersionId, subjectId: subject.id,
+          snapshot: { title: subject.title, cloIds: [...subject.cloIds], prerequisiteSubjectIds: [...subject.prerequisiteSubjectIds] },
+          cloSnapshot: structuredClone(baseline.outcomes), definition: baseline, changedBy: person.id, changedAt: at, reason: "Baseline preserved before proposal decision." }]), version],
+    predictions: [...s.predictions, { proposalId, subjectId: subject.id, predictedMastery: p.acceptanceResult!.projectedMastery, madeAt: at }],
+    teachingPlans: s.teachingPlans.map(t => t.subjectId === subject.id ? { ...t, sessions: t.sessions.map(session =>
+      impact.sessions.some(x => x.id === session.id) ? { ...session, needsReview: true, courseVersionId: session.courseVersionId ?? subject.currentVersionId } : session) } : t),
+    testDrafts: s.testDrafts.map(t => impact.assessments.some(x => x.id === t.id) ? { ...t, needsReview: true, status: "drafting" } : t),
+    toast: "Decision applied to a new local course version. The prediction remains an illustrative scenario."
+  }));
+  setAgent("evaluator", "done");
+  notify({ toPersonId: p.authorId, kind: "approved", subjectId: p.subjectId, proposalId,
+    agentFindings: "The prototype reviewer recorded a decision and applied the local course changes." });
+}
+
+export function rejectProposal(proposalId: ProposalId, note = "Not approved.") {
+  const p = proposalById(proposalId);
+  const person = currentPerson();
+  if (!person || !can(person, "approve", { subjectId: p?.subjectId, assignments: state.assignments })) return;
+  if (!p || p.status !== "management-approval") return;
+  patchProposal(proposalId, (pp) => ({
+    ...pp,
+    status: "drafting",
+    history: [
+      ...pp.history,
+      { at: nowIso(), byPersonId: person.id, action: "rejected", note },
+    ],
+  }));
+  notify({ toPersonId: p.authorId, kind: "rejected", subjectId: p.subjectId, proposalId, agentFindings: note });
+  set({ toast: "Rejected and returned to the author." });
+  setAgent("evaluator", "done");
+}
+
+// ---------- department: create subject + assign hats ----------
+export function createSubject(args: {
+  id: SubjectId;
+  title: string;
+  year: number;
+  semester: number;
+  coordinatorId: PersonId;
+  cloText: string;
+}): SubjectId {
+  const cloId = `${args.id}-CLO1`;
+  const subject: Subject = {
+    id: args.id,
+    title: args.title,
+    programmeId: state.programme.id,
+    year: args.year,
+    semester: args.semester,
+    cloIds: [cloId],
+    prerequisiteSubjectIds: [],
+    sharedWithProgrammeIds: [],
+    status: "proposed",
+    currentVersionId: `${args.id}-v1`,
+  };
+  const clo: CLO = { id: cloId, subjectId: args.id, text: args.cloText, bloomLevel: "Apply" };
+  const proposal: ChangeProposal = {
+    id: `CP-${args.id}-001`,
+    subjectId: args.id,
+    kind: "new-subject",
+    authorId: args.coordinatorId,
+    draft: {
+      topics: [args.cloText],
+      cloChanges: [{ cloId, op: "add", text: args.cloText, bloomLevel: "Apply" }],
+    },
+    status: "drafting",
+    history: [
+      { at: nowIso(), byPersonId: state.programme.departmentOwnerId, action: "drafted", note: "New subject scoped." },
+    ],
+  };
+  set((s) => ({
+    subjects: [...s.subjects, subject],
+    clos: [...s.clos, clo],
+    assignments: [...s.assignments, { personId: args.coordinatorId, subjectId: args.id, hat: "coordinator" }],
+    proposals: [...s.proposals, proposal],
+    toast: `Created ${args.id} and assigned a coordinator.`,
+  }));
+  return args.id;
+}
+
+export function assignHat(personId: PersonId, subjectId: SubjectId, hat: Hat) {
+  if (state.assignments.some((a) => a.personId === personId && a.subjectId === subjectId && a.hat === hat))
+    return;
+  set((s) => ({ assignments: [...s.assignments, { personId, subjectId, hat }], toast: "Hat assigned." }));
+}
+
+// ---------- office helpers ----------
+export function setAgentState(agent: AgentId, st: AgentState) {
+  setAgent(agent, st);
+}
+
+// ---------- reset (workspace + demo) ----------
+/** Reset the mutable world to seed and stop every timer. Used by the account
+ *  menu's "Reset workspace" and by the self-driving demo on each Play. */
+export function resetDemoState() {
+  // A real account's reset empties its own workspace and starts onboarding again; it never loads the demo into the account.
+  if (state.account) {
+    const user = state.account.user, version = state.account.version;
+    openAccountWorkspace(user, null);
+    state = { ...state, account: { user, version } };
+    emit();
+    return;
+  }
+  if (simTimer) clearInterval(simTimer);
+  simTimer = null;
+  if (signalTimer) clearInterval(signalTimer);
+  signalTimer = null;
+  if (drillTimer) clearInterval(drillTimer);
+  drillTimer = null;
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // fine: the in-memory reset below still applies
+    }
+  }
+  state = seedState();
+  emit();
+}
+export const resetWorkspace = resetDemoState;
+
+
+// ---------- lecturer-controlled curriculum revisions ----------
+export function definitionForCourse(subjectId: SubjectId): CourseDefinition | null {
+  const subject = subjectById(subjectId);
+  if (!subject) return null;
+  return structuredClone(state.courseDefinitions[subjectId] ?? courseDefinition(subject, state.clos, state.programme.title));
+}
+export function createCourseWorkspace(input: { code: string; title: string; programmeTitle: string; year: number; semester: number }): SaveResult & { subjectId?: string } {
+  const person = currentPerson();
+  if (!person || person.orgRole !== "academic") return { ok: false, error: "Use a lecturer workspace to create a personal course." };
+  const code = input.code.trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9._-]{1,39}$/.test(code)) return { ok: false, error: "Use a course code of 2 to 40 letters, numbers, dots, underscores or hyphens." };
+  if (state.subjects.some(s => s.id.toUpperCase() === code)) return { ok: false, error: "That course code is already in this workspace." };
+  if (!input.title.trim() || input.title.length > 200) return { ok: false, error: "Give the course a title of up to 200 characters." };
+  if (!Number.isInteger(input.year) || input.year < 1 || input.year > 12 || !Number.isInteger(input.semester) || input.semester < 1 || input.semester > 4)
+    return { ok: false, error: "Use a year from 1 to 12 and a semester from 1 to 4." };
+  const versionId = nextId(code + "-workspace");
+  const subject: Subject = { id: code, title: input.title.trim(), programmeId: state.programme.id,
+    year: input.year, semester: input.semester, cloIds: [], prerequisiteSubjectIds: [],
+    sharedWithProgrammeIds: [], status: "proposed", currentVersionId: versionId, workspaceOnly: true };
+  const definition = courseDefinition(subject, [], input.programmeTitle.trim());
+  set(s => ({ subjects: [...s.subjects, subject], courseDefinitions: { ...s.courseDefinitions, [code]: definition },
+    assignments: [...s.assignments, { personId: person.id, subjectId: code, hat: "lecturer" }],
+    programme: { ...s.programme, subjectIds: [...s.programme.subjectIds, code] },
+    subjectVersions: [...s.subjectVersions, { id: versionId, subjectId: code,
+      snapshot: { title: subject.title, cloIds: [], prerequisiteSubjectIds: [] }, cloSnapshot: [],
+      definition: structuredClone(definition), changedBy: person.id, changedAt: nowIso(),
+      reason: "Personal course workspace created; not institutional approval." }],
+    selectedSubjectId: code, selectedProposalId: null, studioTab: "curriculum", screen: "studio",
+    toast: "Course created. Add learning outcomes and a topic outline." }));
+  startCurriculumRevision(code);
+  return { ok: true, subjectId: code };
+}
+export function startCurriculumRevision(subjectId: SubjectId): SaveResult & { draftId?: string } {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can revise this course." };
+  const existing = state.curriculumDrafts.find(d => d.subjectId === subjectId && d.status === "drafting");
+  if (existing) return { ok: true, draftId: existing.id };
+  const subject = subjectById(subjectId)!;
+  const definition = definitionForCourse(subjectId)!;
+  const person = currentPerson()!;
+  const draft: CurriculumDraft = { id: nextId("REV-" + subjectId), subjectId, baselineVersionId: subject.currentVersionId,
+    revision: 1, definition, reason: "", effectiveTerm: "", status: "drafting", checkedRevision: null,
+    history: [{ at: nowIso(), byPersonId: person.id, action: "created", note: "Revision started from " + subject.currentVersionId, revision: 1 }] };
+  const baseline: SubjectVersion = { id: subject.currentVersionId, subjectId,
+    snapshot: { title: subject.title, cloIds: [...subject.cloIds], prerequisiteSubjectIds: [...subject.prerequisiteSubjectIds] },
+    cloSnapshot: structuredClone(state.clos.filter(c => c.subjectId === subjectId)), definition: structuredClone(definition),
+    changedBy: person.id, changedAt: nowIso(), reason: "Baseline preserved before revision." };
+  set(s => ({ curriculumDrafts: [...s.curriculumDrafts, draft],
+    subjectVersions: s.subjectVersions.some(v => v.id === baseline.id)
+      ? s.subjectVersions.map(v => v.id === baseline.id && !v.definition ? { ...v, definition: structuredClone(definition) } : v)
+      : [...s.subjectVersions, baseline], toast: "Revision started. The current course is unchanged." }));
+  return { ok: true, draftId: draft.id };
+}
+function editableRevision(draftId: string, expectedRevision: number): CurriculumDraft | string {
+  const draft = state.curriculumDrafts.find(d => d.id === draftId);
+  if (!draft || !mayPlan(draft.subjectId)) return "You cannot edit this course revision.";
+  if (draft.status !== "drafting") return "This revision is closed. Start a new revision.";
+  if (draft.revision !== expectedRevision) return "The saved revision changed. Reload it before saving your edits.";
+  if (subjectById(draft.subjectId)?.currentVersionId !== draft.baselineVersionId) return "The current course version changed. Start a revision from the latest version.";
+  return draft;
+}
+export function saveCurriculumRevision(draftId: string, expectedRevision: number,
+  input: { definition: CourseDefinition; reason: string; effectiveTerm: string }): SaveResult {
+  const draft = editableRevision(draftId, expectedRevision);
+  if (typeof draft === "string") return { ok: false, error: draft };
+  const error = draftStructureError(input.definition, draft.subjectId);
+  if (error) return { ok: false, error };
+  if (input.definition.outcomes.some(c => state.clos.some(existing => existing.id === c.id && existing.subjectId !== draft.subjectId))) return { ok: false, error: "An outcome identity belongs to another course." };
+  if (typeof input.reason !== "string" || input.reason.length > 50000 || typeof input.effectiveTerm !== "string" || input.effectiveTerm.length > 100)
+    return { ok: false, error: "Invalid revision rationale or teaching term." };
+  const revision = draft.revision + 1;
+  set(s => ({ curriculumDrafts: s.curriculumDrafts.map(d => d.id === draftId ? {
+    ...d, definition: withDerivedFields(input.definition), reason: input.reason.trim(), effectiveTerm: input.effectiveTerm.trim(),
+    revision, checkedRevision: null, history: [...d.history, { at: nowIso(), byPersonId: currentPerson()!.id,
+      action: "saved", note: "Candidate edited; previous checks invalidated.", revision }] } : d), toast: "Revision saved. Current course version is unchanged." }));
+  return { ok: true };
+}
+export function checkCurriculumRevision(draftId: string, expectedRevision: number): SaveResult {
+  const draft = editableRevision(draftId, expectedRevision);
+  if (typeof draft === "string") return { ok: false, error: draft };
+  const baseline = state.subjectVersions.find(v => v.id === draft.baselineVersionId)?.definition;
+  const errors = validateCourseDefinition(draft.definition, draft.subjectId, baseline).filter(i => i.severity === "error");
+  if (errors.length) return { ok: false, error: errors.map(e => e.message).join(" ") };
+  set(s => ({ curriculumDrafts: s.curriculumDrafts.map(d => d.id === draftId ? { ...d, checkedRevision: d.revision,
+    history: [...d.history, { at: nowIso(), byPersonId: currentPerson()!.id, action: "checked",
+      note: "Configured constraints checked. Academic judgement and institutional review remain required.", revision: d.revision }] } : d),
+    toast: "Constraints checked. Review warnings and the change summary." }));
+  return { ok: true };
+}
+export function adoptCurriculumRevision(draftId: string, expectedRevision: number, acknowledgement: boolean): SaveResult {
+  const draft = editableRevision(draftId, expectedRevision);
+  if (typeof draft === "string") return { ok: false, error: draft };
+  if (draft.checkedRevision !== draft.revision) return { ok: false, error: "Check this saved revision before using it." };
+  if (!mayAdopt(draft.subjectId)) return { ok: false, error: "Only the course coordinator can make a checked revision the course version. The checked revision is saved for them." };
+  if (!draft.reason.trim() || !draft.effectiveTerm.trim()) return { ok: false, error: "Record the decision rationale and teaching term." };
+  if (!acknowledgement) return { ok: false, error: "Confirm the local decision boundary and review the affected teaching work." };
+  if (draft.definition.outcomes.some(c => state.clos.some(existing => existing.id === c.id && existing.subjectId !== draft.subjectId))) return { ok: false, error: "An outcome identity now belongs to another course." };
+  const subject = subjectById(draft.subjectId)!;
+  const baseline = definitionForCourse(subject.id)!;
+  const errors = validateCourseDefinition(draft.definition, subject.id, baseline).filter(i => i.severity === "error");
+  if (errors.length) return { ok: false, error: errors.map(e => e.message).join(" ") };
+  if (!curriculumChanges(baseline, draft.definition).length) return { ok: false, error: "There are no course changes to save as a new version." };
+  const person = currentPerson()!;
+  const at = nowIso(), versionId = nextId(subject.id + "-workspace");
+  const def = structuredClone(draft.definition);
+  const impact = curriculumImpact(baseline, def, state.teachingPlans.find(p => p.subjectId === subject.id),
+    state.testDrafts.filter(t => t.subjectId === subject.id));
+  const version: SubjectVersion = { id: versionId, subjectId: subject.id,
+    snapshot: { title: def.title.trim(), cloIds: def.outcomes.map(c => c.id), prerequisiteSubjectIds: [...subject.prerequisiteSubjectIds] },
+    cloSnapshot: def.outcomes.map(c => ({ ...c })), definition: structuredClone(def), effectiveTerm: draft.effectiveTerm,
+    changedBy: person.id, changedAt: at, reason: draft.reason };
+  set(s => ({ courseDefinitions: { ...s.courseDefinitions, [subject.id]: def },
+    clos: [...s.clos.filter(c => c.subjectId !== subject.id), ...def.outcomes.map(c => ({ ...c }))],
+    subjects: s.subjects.map(c => c.id === subject.id ? { ...c, title: def.title.trim(),
+      cloIds: def.outcomes.map(o => o.id), currentVersionId: versionId } : c),
+    subjectVersions: [...s.subjectVersions, version],
+    curriculumDrafts: s.curriculumDrafts.map(d => d.id === draftId ? { ...d, status: "adopted",
+      history: [...d.history, { at, byPersonId: person.id, action: "adopted", note: "Used as local course version " + versionId + ". " + draft.reason, revision: d.revision }] } : d),
+    teachingPlans: s.teachingPlans.map(p => p.subjectId === subject.id ? { ...p,
+      sessions: p.sessions.map(session => impact.sessions.some(x => x.id === session.id)
+        ? { ...session, needsReview: true, courseVersionId: session.courseVersionId ?? subject.currentVersionId } : session) } : p),
+    testDrafts: s.testDrafts.map(t => impact.assessments.some(x => x.id === t.id)
+      ? { ...t, needsReview: true, status: "drafting" } : t),
+    proposals: s.proposals.map(p => p.subjectId === subject.id && p.status !== "approved" && p.status !== "rejected"
+      ? { ...p, baselineVersionId: p.baselineVersionId ?? subject.currentVersionId, acceptanceResult: undefined, status: "drafting" } : p),
+    toast: "New local course version saved. Review affected teaching sessions and assessments." }));
+  logEvent("version-adopted", { subjectId: subject.id, versionId, draftId }, at);
+  return { ok: true };
+}
+export function discardCurriculumRevision(draftId: string, expectedRevision: number, note: string): SaveResult {
+  const draft = state.curriculumDrafts.find(d => d.id === draftId);
+  if (!draft || !mayPlan(draft.subjectId) || draft.status !== "drafting") return { ok: false, error: "You cannot discard this revision." };
+  if (draft.revision !== expectedRevision) return { ok: false, error: "The revision changed; reload it first." };
+  if (!note.trim()) return { ok: false, error: "Record why you are discarding this revision." };
+  set(s => ({ curriculumDrafts: s.curriculumDrafts.map(d => d.id === draftId ? { ...d, status: "discarded",
+    history: [...d.history, { at: nowIso(), byPersonId: currentPerson()!.id, action: "discarded", note: note.trim(), revision: d.revision }] } : d),
+    toast: "Revision discarded. The current course version is unchanged." }));
+  return { ok: true };
+}
+
+
+let recoveryBackup: string | null = null;
+const RECOVERY_KEY = "lyceum-v3-pre-restore@1";
+export function exportWorkspaceBackup(): string {
+  return serializeWorkspaceBackup(state, nowIso());
+}
+export function previewWorkspaceBackup(raw: string) {
+  if (!currentPerson()) return { ok: false as const, error: "Open a local workspace before importing a backup." };
+  const result = parseWorkspaceBackup(raw, state.people.map(p => p.id));
+  return result.ok ? { ok: true as const, summary: backupSummary(result.backup.data),
+    exportedAt: result.backup.exportedAt, fingerprint: workspaceFingerprint(state) } : result;
+}
+export function getRecoveryBackup(): string | null {
+  if (recoveryBackup) return recoveryBackup;
+  if (typeof window === "undefined") return null;
+  try { return localStorage.getItem(RECOVERY_KEY); } catch { return null; }
+}
+export function restoreWorkspaceBackup(raw: string, expectedFingerprint: string, acknowledged: boolean): SaveResult {
+  if (!currentPerson()) return { ok: false, error: "Open a local workspace before restoring." };
+  if (!acknowledged) return { ok: false, error: "Confirm that you want to replace this browser workspace." };
+  if (workspaceFingerprint(state) !== expectedFingerprint) return { ok: false, error: "The workspace changed after preview. Preview the backup again." };
+  const parsed = parseWorkspaceBackup(raw, state.people.map(p => p.id));
+  if (!parsed.ok) return parsed;
+  const recovery = exportWorkspaceBackup();
+  const next: AppState = { ...seedState(), ...structuredClone(parsed.backup.data), people: state.people, account: state.account,
+    currentPersonId: state.currentPersonId, screen: "guide", persistenceStatus: "saved",
+    selectedSubjectId: null, selectedProposalId: null, toast: "Workspace restored. A pre-restore recovery backup is available." };
+  if (typeof window !== "undefined" && !state.account) {
+    try {
+      localStorage.setItem(RECOVERY_KEY, recovery);
+      const persisted = Object.fromEntries(PERSISTED_KEYS.map(k => [k, next[k]]));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
+    } catch {
+      return { ok: false, error: "Storage could not save the recovery and restored workspace. Nothing was replaced. Export your current workspace first." };
+    }
+  }
+  if (saveTimer) clearTimeout(saveTimer);
+  if (simTimer) clearInterval(simTimer);
+  if (signalTimer) clearInterval(signalTimer);
+  if (drillTimer) clearInterval(drillTimer);
+  saveTimer = null; simTimer = null; signalTimer = null; drillTimer = null;
+  recoveryBackup = recovery;
+  state = next;
+  emit();
+  return { ok: true };
+}
+
+/** The guided walk's starting point (depth plan Section 9.1): the tour's end state from the sample workspace, restored the
+ *  way a backup is, with the current workspace kept as the recovery copy, and signed in as the person the walk follows. */
+export function restoreSampleWorkspace(raw: string, personId: PersonId): SaveResult {
+  if (!state.people.some(p => p.id === personId)) return { ok: false, error: "The walk's person is not in this workspace." };
+  const parsed = parseWorkspaceBackup(raw, state.people.map(p => p.id));
+  if (!parsed.ok) return parsed;
+  const recovery = exportWorkspaceBackup();
+  const next: AppState = { ...seedState(), ...structuredClone(parsed.backup.data),
+    currentPersonId: personId, screen: "inbox", persistenceStatus: "saved", selectedSubjectId: null, selectedProposalId: null, toast: null };
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(RECOVERY_KEY, recovery);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(PERSISTED_KEYS.map(k => [k, next[k]]))));
+    } catch {
+      // The walk still runs in memory; the recovery copy stays in memory for this visit.
+    }
+  }
+  if (saveTimer) clearTimeout(saveTimer);
+  if (simTimer) clearInterval(simTimer);
+  if (signalTimer) clearInterval(signalTimer);
+  if (drillTimer) clearInterval(drillTimer);
+  saveTimer = null; simTimer = null; signalTimer = null; drillTimer = null;
+  recoveryBackup = recovery;
+  state = next;
+  emit();
+  return { ok: true };
+}
+
+// ---------- the two student surveys (depth plan Section 7) ----------
+
+/** The term's two instruments for a course, built from its course record and the institution profile: the Course
+ *  Outcome Survey (one item per outcome) and the SSRT (a demo instrument). Once per course and term. */
+export function createCourseSurveys(subjectId: SubjectId): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can prepare this course's surveys." };
+  const subject = subjectById(subjectId)!;
+  const term = termWindow(state, subjectId).term;
+  if (!term) return { ok: false, error: "Set the term this loop runs for first, on the Course step; a survey belongs to a term." };
+  if (state.surveys.some((x) => x.subjectId === subjectId && x.term === term && !x.sample)) return { ok: false, error: "This term's surveys already exist." };
+  const at = nowIso(), by = currentPerson()!.id;
+  const definition = definitionForCourse(subjectId)!;
+  const upload = state.resultUploads.filter((u) => u.subjectId === subjectId && u.term === term).at(-1);
+  const classSize = upload ? listedStudents(upload) || null : null;
+  const common = { subject, institution: state.institution, term, versionId: subject.currentVersionId, classSize, at, by };
+  set((s) => ({ surveys: [...s.surveys,
+    courseOutcomeSurvey({ ...common, id: nextId("SURV-" + subjectId), outcomes: definition.outcomes }),
+    ssrtSurvey({ ...common, id: nextId("SURV-" + subjectId) })], toast: "The term's two surveys are ready to open." }));
+  return { ok: true };
+}
+
+/** Open a survey for the booth collector: a reader secret held only here, and the submission token derived from it. */
+export async function openSurveyForCollection(formId: string, classSize: number | null): Promise<SaveResult> {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form || form.sample) return { ok: false, error: "Choose one of this term's surveys." };
+  if (!mayPlan(form.subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can open this survey." };
+  if (classSize !== null && !(Number.isInteger(classSize) && classSize > 0 && classSize <= 5000)) return { ok: false, error: "The class size is a whole number of students, or left blank." };
+  const readerSecret = form.readerSecret ?? newReaderSecret();
+  const formToken = await formTokenFor(readerSecret);
+  set((s) => ({ surveys: s.surveys.map((x) => (x.id === formId ? { ...x, readerSecret, formToken, classSize } : x)) }));
+  if (!form.formToken) logEvent("survey-opened", { subjectId: form.subjectId, formId, term: form.term });
+  return { ok: true };
+}
+
+/** Leave the student's form with the booth collector, so the QR can carry the short link; the long link carries the form itself. */
+export async function publishSurveyForm(formId: string): Promise<SaveResult> {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form?.formToken || !form.readerSecret) return { ok: false, error: "Open the survey for collection first." };
+  const subject = subjectById(form.subjectId)!;
+  const demoLine = state.courseDefinitions[form.subjectId]?.sample ? DEMO_LINE : null;
+  try {
+    const res = await fetch("/api/survey/" + form.formToken + "/form", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reader: form.readerSecret, form: studentForm(form, subject, state.institution, demoLine) }) });
+    return res.ok ? { ok: true } : { ok: false, error: "The collector answered " + res.status + "." };
+  } catch {
+    return { ok: false, error: "The collector on this laptop could not be reached, so only the long link works; it carries the whole form." };
+  }
+}
+
+/** Collect the booth's responses: one per device, each checked against the questions, stored as booth responses, which
+ *  are a demonstration of the collector and never course evidence. */
+export async function collectBoothResponses(formId: string): Promise<SaveResult & { added?: number }> {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form?.formToken || !form.readerSecret) return { ok: false, error: "Open the survey for collection first." };
+  if (!mayPlan(form.subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can collect this survey." };
+  let body: { responses?: Array<{ clientId?: unknown; answers?: unknown }> };
+  try {
+    const res = await fetch("/api/survey/" + form.formToken + "/responses?reader=" + encodeURIComponent(form.readerSecret));
+    if (!res.ok) return { ok: false, error: res.status === 403 ? "The collector refused the reader secret." : "The collector answered " + res.status + "." };
+    body = await res.json();
+  } catch {
+    return { ok: false, error: "The collector on this laptop could not be reached. Start the local API (npm run booth, or npm run dev) and collect again." };
+  }
+  const known = new Set(state.surveyResponses.filter((r) => r.formId === formId && r.clientId).map((r) => r.clientId));
+  const fresh: SurveyResponse[] = [];
+  for (const r of body.responses ?? []) {
+    const clientId = typeof r.clientId === "string" && /^[A-Za-z0-9-]{8,64}$/.test(r.clientId) ? r.clientId : null;
+    const answers = boothAnswers(form, r.answers);
+    if (!clientId || !answers || known.has(clientId)) continue;
+    known.add(clientId);
+    fresh.push({ id: nextId("SR-" + form.subjectId), formId, term: form.term, answers, collectedAt: nowIso(), clientId, source: "booth" });
+  }
+  if (fresh.length) {
+    set((s) => ({ surveyResponses: [...s.surveyResponses, ...fresh] }));
+    logEvent("survey-collected", { subjectId: form.subjectId, formId, term: form.term, count: fresh.length, source: "booth" });
+  }
+  return { ok: true, added: fresh.length };
+}
+
+/** Import a Microsoft Forms, Google Forms or Moodle Feedback export (its rows, the header first, the format read from the
+ *  header), matched on the question ids (depth plan Section 7.2). */
+export function importSurveyRows(formId: string, rows: unknown[][]): SaveResult & { result?: ImportResult } {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form || form.sample) return { ok: false, error: "Choose one of this term's surveys to import into." };
+  if (!mayPlan(form.subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can import into this survey." };
+  const result = importResponseRows(rows, form, nowIso(), () => nextId("SR-" + form.subjectId));
+  if (!result.responses.length) return { ok: false, error: "No response in the file matched this survey's question ids (Q1., Q2., ...).", result };
+  set((s) => ({ surveyResponses: [...s.surveyResponses, ...result.responses] }));
+  logEvent("survey-collected", { subjectId: form.subjectId, formId, term: form.term, count: result.responses.length, source: "imported" });
+  return { ok: true, result };
+}
+
+/** Read the codes students pasted into a course page or an email (the paste way, Section 7.2): each checked against the
+ *  survey, a device already read counted once, a code for another survey refused. */
+export function readPastedSurveyCodes(formId: string, text: string): SaveResult & { result?: PasteResult } {
+  const form = state.surveys.find((x) => x.id === formId);
+  if (!form || form.sample) return { ok: false, error: "Choose one of this term's surveys to read codes into." };
+  if (!mayPlan(form.subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can read codes into this survey." };
+  if (!form.formToken) return { ok: false, error: "Open the survey first; its codes are bound to it." };
+  const known = state.surveyResponses.filter((r) => r.formId === formId && r.clientId).map((r) => r.clientId!);
+  const result = readPasteCodes(text, form, nowIso(), () => nextId("SR-" + form.subjectId), known);
+  if (!result.codes) return { ok: false, error: "No code in the text: each one starts LYC1-.", result };
+  if (result.responses.length) {
+    set((s) => ({ surveyResponses: [...s.surveyResponses, ...result.responses] }));
+    logEvent("survey-collected", { subjectId: form.subjectId, formId, term: form.term, count: result.responses.length, source: "pasted" });
+  }
+  return { ok: true, result };
+}
+
+/** The coordinator records that the term's grades are released: from then on, never before, the term's survey results show. */
+export function recordGradesReleased(subjectId: SubjectId, term: string): SaveResult {
+  if (!mayAdopt(subjectId)) return { ok: false, error: "Only the course coordinator records that grades are released." };
+  if (!term.trim()) return { ok: false, error: "Set the term first." };
+  if (gradesReleased(state.events, subjectId, term)) return { ok: false, error: "Grades are already recorded as released for " + term + "." };
+  logEvent("grades-released", { subjectId, term });
+  set({ toast: "Grades recorded as released for " + term + ". The term's survey results open." });
+  return { ok: true };
+}
+
+// ---------- attainment against a stated threshold (depth plan Section 8) ----------
+
+/** The results file a course's report for a term reads: the latest filed for that term, never a seeded example. */
+export function reportUpload(s: AppState, subjectId: SubjectId, term: string): ResultUpload | null {
+  const seeded = new Set(SEED_RESULT_UPLOADS.map((u) => u.id));
+  return s.resultUploads.filter((u) => u.subjectId === subjectId && u.term === term && !seeded.has(u.id))
+    .sort((a, b) => a.filedAt.localeCompare(b.filedAt)).at(-1) ?? null;
+}
+
+/** The OBE course report for a course and term, built from records and the profile as they stand: the term's results
+ *  file, its Course Outcome Survey (booth responses never counted) and the term's latest CQI note. */
+export function obeReportFor(s: AppState, subjectId: SubjectId, term: string, upload: ResultUpload, at: string, by: PersonId, id = "OBE-preview"): ObeReport {
+  const definition = s.courseDefinitions[subjectId];
+  return obeReport({ id, subjectId, term, upload, at, by,
+    clos: s.clos.filter((c) => c.subjectId === subjectId), outcomes: definition?.outcomes ?? [], plos: s.programme.plos ?? [],
+    institution: s.institution, survey: s.surveys.find((x) => x.subjectId === subjectId && x.term === term && x.kind === "course-outcome") ?? null,
+    responses: s.surveyResponses, events: s.events,
+    cqiNoteId: s.cqiNotes.filter((n) => n.subjectId === subjectId && n.term === term).at(-1)?.id ?? null });
+}
+
+/** Save the term's OBE course report as printed: a snapshot of its figures and of the version, threshold, method and
+ *  survey they were printed with, so a later setting change cannot relabel it. */
+export function saveObeReport(subjectId: SubjectId): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can save this course's report." };
+  const term = termWindow(state, subjectId).term;
+  if (!term) return { ok: false, error: "Set the term this loop runs for first, on the Course step." };
+  const upload = reportUpload(state, subjectId, term);
+  if (!upload) return { ok: false, error: "File this term's results first; the report reads them." };
+  if (!upload.rows.some((r) => r.marks)) return { ok: false, error: "This results file kept no distribution; file the results again to compute the shares." };
+  const report = obeReportFor(state, subjectId, term, upload, nowIso(), currentPerson()!.id, nextId("OBE-" + subjectId));
+  set((s) => ({ obeReports: [...s.obeReports, report], toast: "The OBE course report is saved as printed, at a pass mark of " + report.passMark + "." }));
+  return { ok: true };
+}
+
+/** The lecturer's continuous quality improvement note for the course and term, a saved record History shows. */
+export function saveCqiNote(subjectId: SubjectId, text: string): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can write this course's CQI note." };
+  const term = termWindow(state, subjectId).term;
+  if (!term) return { ok: false, error: "Set the term this loop runs for first, on the Course step." };
+  const note = text.trim();
+  if (!note) return { ok: false, error: "Write what will change next term, and why." };
+  if (note.length > NOTE_MAX) return { ok: false, error: "Keep the note under " + NOTE_MAX + " characters." };
+  const at = nowIso(), id = nextId("CQI-" + subjectId);
+  const upload = reportUpload(state, subjectId, term);
+  const cqi: CqiNote = { id, subjectId, term, versionId: upload?.courseVersionId ?? taughtVersionId(state, subjectId) ?? null, text: note, at, byPersonId: currentPerson()!.id };
+  set((s) => ({ cqiNotes: [...s.cqiNotes, cqi], toast: "The CQI note is saved for " + term + "." }));
+  logEvent("cqi-noted", { subjectId, term, noteId: id }, at);
+  return { ok: true };
+}
+
+/** A course's term recap (depth plan Section 9.1 item 4), at #/course/:id/recap. */
+export function openRecap(subjectId: SubjectId) {
+  if (!confirmLeaveEditor()) return;
+  set({ screen: "recap", selectedSubjectId: subjectId, courseStep: null });
+}
+
+
+// ---------- lecturer-supplied evidence receipts (plan Sections 7 and 8, manual path) ----------
+// Nothing here fetches. A source is the text the lecturer pasted; a mention is an
+// exact quotation from it; a mapping is the lecturer's reviewed coverage judgement.
+export function addEvidenceSource(subjectId: SubjectId, input: EvidenceSourceInput): SaveResult & { sourceId?: string } {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can record evidence for this course." };
+  const error = evidenceSourceError(input);
+  if (error) return { ok: false, error };
+  const text = input.text.trim(), textHash = textFingerprint(text), normalised = normaliseWhitespace(text).toLowerCase();
+  const original = state.evidenceSources.find((s) => s.subjectId === subjectId && s.kind === input.kind && s.duplicateOf === null &&
+    s.textHash === textHash && normaliseWhitespace(s.text).toLowerCase() === normalised);
+  const source: EvidenceSource = { id: nextId("EV-" + subjectId), subjectId, kind: input.kind, title: normaliseWhitespace(input.title),
+    organisation: normaliseWhitespace(input.organisation), url: input.url.trim(), sourceDate: input.sourceDate.trim(), text, textHash,
+    duplicateOf: original?.id ?? null, provenance: "lecturer-supplied", reviewed: false, addedBy: currentPerson()!.id, addedAt: nowIso() };
+  set((s) => ({ evidenceSources: [...s.evidenceSources, source],
+    toast: original ? "Recorded as a duplicate copy of " + original.title + ". It counts once." : "Source recorded. Quote its requirements, then mark the extraction reviewed." }));
+  return { ok: true, sourceId: source.id };
+}
+export function setEvidenceSourceReviewed(sourceId: string, reviewed: boolean): SaveResult {
+  const source = state.evidenceSources.find((s) => s.id === sourceId);
+  if (!source || !mayPlan(source.subjectId)) return { ok: false, error: "You cannot change this evidence source." };
+  if (source.duplicateOf) return { ok: false, error: "Review the original copy; duplicates follow it." };
+  if (source.kind !== "job-posting") return { ok: false, error: "Only job postings enter the denominator. Contextual documents are listed, not counted." };
+  set((s) => ({ evidenceSources: s.evidenceSources.map((x) => (x.id === sourceId ? { ...x, reviewed } : x)),
+    toast: reviewed ? "Extraction marked reviewed. This posting now counts in the denominator." : "Extraction marked unreviewed. This posting is excluded until reviewed." }));
+  return { ok: true };
+}
+export function removeEvidenceSource(sourceId: string): SaveResult {
+  const source = state.evidenceSources.find((s) => s.id === sourceId);
+  if (!source || !mayPlan(source.subjectId)) return { ok: false, error: "You cannot remove this evidence source." };
+  const promoted = state.evidenceSources.find((s) => s.duplicateOf === sourceId);
+  set((s) => ({
+    evidenceSources: s.evidenceSources.filter((x) => x.id !== sourceId).map((x) => x.duplicateOf !== sourceId ? x
+      : x.id === promoted?.id ? { ...x, duplicateOf: null, reviewed: source.reviewed } : { ...x, duplicateOf: promoted!.id }),
+    skillMentions: s.skillMentions.filter((m) => m.sourceId !== sourceId),
+    toast: "Source and its quotations removed." + (promoted ? " " + promoted.title + " is now the original copy." : ""),
+  }));
+  return { ok: true };
+}
+export function addSkillMention(sourceId: string, input: MentionInput): SaveResult & { mentionId?: string } {
+  const source = state.evidenceSources.find((s) => s.id === sourceId);
+  if (!source || !mayPlan(source.subjectId)) return { ok: false, error: "You cannot quote from this evidence source." };
+  const error = mentionError(input, source.text);
+  if (error) return { ok: false, error };
+  const skill = normaliseWhitespace(input.skill), excerpt = input.excerpt.trim(), key = skillKey(skill);
+  if (state.skillMentions.some((m) => m.sourceId === sourceId && skillKey(m.skill) === key && normaliseWhitespace(m.excerpt).toLowerCase() === normaliseWhitespace(excerpt).toLowerCase()))
+    return { ok: false, error: "That excerpt is already recorded for this skill." };
+  const mention: SkillMention = { id: nextId("SM-" + source.subjectId), sourceId, subjectId: source.subjectId, skill, excerpt,
+    requirement: input.requirement, addedBy: currentPerson()!.id, addedAt: nowIso() };
+  set((s) => ({ skillMentions: [...s.skillMentions, mention], toast: "Requirement quoted from " + source.title + "." }));
+  return { ok: true, mentionId: mention.id };
+}
+export function removeSkillMention(mentionId: string): SaveResult {
+  const mention = state.skillMentions.find((m) => m.id === mentionId);
+  if (!mention || !mayPlan(mention.subjectId)) return { ok: false, error: "You cannot remove this quotation." };
+  set((s) => ({ skillMentions: s.skillMentions.filter((m) => m.id !== mentionId), toast: "Quotation removed." }));
+  return { ok: true };
+}
+export function setSkillMapping(subjectId: SubjectId, input: MappingInput): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can map evidence to this course." };
+  const outcomes = state.clos.filter((c) => c.subjectId === subjectId);
+  const error = mappingError(input, outcomes.map((c) => c.id));
+  if (error) return { ok: false, error };
+  const key = skillKey(input.skill);
+  const display = state.skillMentions.find((m) => m.subjectId === subjectId && skillKey(m.skill) === key)?.skill ?? normaliseWhitespace(input.skill);
+  const mapping: SkillMapping = { subjectId, skill: display, cloIds: [...input.cloIds], stage: input.stage, target: input.target,
+    evidence: input.evidence.trim(), updatedBy: currentPerson()!.id, updatedAt: nowIso() };
+  set((s) => ({ skillMappings: [...s.skillMappings.filter((m) => !(m.subjectId === subjectId && skillKey(m.skill) === key)), mapping],
+    toast: "Coverage mapping saved. It records your reviewed judgement, not a measured outcome." }));
+  return { ok: true };
+}
+export function evidenceReportForCourse(subjectId: SubjectId) {
+  return evidenceReport(subjectId, state.evidenceSources, state.skillMentions, state.skillMappings, state.clos.filter((c) => c.subjectId === subjectId));
+}
+
+// ---------- the lecturer's research run (plan Section 7, manual and permitted-board paths) ----------
+export interface CollectRun {
+  subjectId: SubjectId; provider: CollectionProvider; board: string; query: string; inText: boolean;
+  status: "running" | "done" | "failed"; postings: CollectedPosting[]; retrievedAt: string | null; cached: boolean; total: number; error: string | null; label: string;
+  log: string[]; // what actually happened, with clock times: the request, the bytes received, the match
+  endpoint: string | null; bytes: number | null; durationMs: number | null;
+}
+const clock = () => new Date().toTimeString().slice(0, 8);
+type CollectionLoader = (request: CollectionRequest, onLog?: (line: string) => void) => Promise<CollectionOutcome>;
+/** Fetch postings from a permitted board or the saved sample. Only on request; nothing is imported until the lecturer chooses. */
+export async function runCollection(subjectId: SubjectId, input: { provider: CollectionProvider; board: string; query: string; inText: boolean }, loader: CollectionLoader = fetchCollection): Promise<SaveResult> {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can collect evidence for this course." };
+  if (!SOURCE_POLICIES[input.provider]?.enabled) return { ok: false, error: "Choose a supported source." };
+  const agent = input.provider === "agent";
+  const board = input.provider === "sample" ? "sample" : agent ? input.board.trim().replace(/\s+/g, " ").slice(0, 300) : input.board.trim().toLowerCase();
+  if (agent && board.length < 3) return { ok: false, error: "Describe what the agent should look for, for example: data analyst internships in Malaysia." };
+  if (input.provider !== "sample" && !agent && !BOARD_TOKEN.test(board)) return { ok: false, error: "Enter the employer's board token: letters, digits, hyphens or underscores, for example the NAME in jobs.lever.co/NAME or boards.greenhouse.io/NAME." };
+  const run = { subjectId, provider: input.provider, board, query: input.query.trim(), inText: Boolean(input.inText) };
+  const opening = clock() + (input.provider === "sample"
+    ? " Loading the saved sample shipped with the app. No network request."
+    : agent ? " Asking the agent, through the local API (/api/agent-search), to find postings for \"" + board + "\". It searches and reads the web with the model and search provider in Settings."
+    : " Requesting " + SOURCE_POLICIES[input.provider].name + " \"" + board + "\" through the local API (/api/collect/" + input.provider + "/" + board + "). Only this host is permitted.");
+  set({ collectRun: { ...run, status: "running", postings: [], retrievedAt: null, cached: false, total: 0, error: null, label: "", log: [opening], endpoint: null, bytes: null, durationMs: null } });
+  // The agent's steps arrive while it works; each joins the log of the run that asked for them.
+  const onLog = (line: string) => {
+    const live = state.collectRun;
+    if (live && live.status === "running" && live.subjectId === subjectId && live.board === board && live.provider === input.provider) set({ collectRun: { ...live, log: [...live.log, clock() + " " + line] } });
+  };
+  const result = await trackRequest("collect", subjectId, () => loader({ ...run, subjectId }, onLog));
+  const current = state.collectRun;
+  if (!current || current.status !== "running" || current.subjectId !== subjectId || current.board !== board || current.provider !== input.provider) return { ok: true };
+  if (result.ok) {
+    const size = typeof result.bytes === "number" ? " (" + (result.bytes >= 1048576 ? (result.bytes / 1048576).toFixed(1) + " MB" : Math.round(result.bytes / 1024) + " kB") + ")" : "";
+    const took = typeof result.durationMs === "number" ? " in " + (result.durationMs / 1000).toFixed(1) + " s" : "";
+    const received = clock() + (agent ? " The agent kept " : " Received ") + result.total + " postings" + size + " from " + (result.endpoint ?? "the source") + took + (agent ? ". Retrieved from the web on request, starting " + result.retrievedAt + "." : input.provider === "sample" ? ". Sample retrieved " + result.retrievedAt + "." : result.cached ? ". Served from the local cache; fetched live at " + result.retrievedAt + "." : ". Fetched live at " + result.retrievedAt + ".");
+    const matched = clock() + " Kept " + result.postings.length + " of " + result.total + (run.query ? " whose " + (run.inText ? "title or text" : "title") + " matches \"" + run.query + "\"." : " (no keywords).") + " Nothing is imported until you choose.";
+    set({ collectRun: { ...run, status: "done", postings: result.postings, retrievedAt: result.retrievedAt, cached: result.cached, total: result.total, error: null, label: result.label,
+      log: [...(state.collectRun?.log ?? [opening]), received, matched], endpoint: result.endpoint ?? null, bytes: result.bytes ?? null, durationMs: result.durationMs ?? null } });
+    return { ok: true };
+  }
+  set({ collectRun: { ...run, status: "failed", postings: [], retrievedAt: null, cached: false, total: 0, error: result.error, label: "", log: [...(state.collectRun?.log ?? [opening]), clock() + " Failed: " + result.error], endpoint: null, bytes: null, durationMs: null } });
+  return { ok: false, error: result.error };
+}
+export function clearCollection() { set({ collectRun: null }); }
+/** Open a scheduled run (api/watch.ts) as the course's research run, so its postings are imported the same way. */
+export function openWatchRun(subjectId: SubjectId, run: { provider: string; board: string; ranAt: string; total: number; postings: CollectedPosting[] }, query: string, inText: boolean) {
+  const provider = run.provider as CollectionProvider;
+  set({ collectRun: { subjectId, provider, board: run.board, query, inText, status: "done", postings: run.postings, retrievedAt: run.ranAt, cached: false, total: run.total,
+    error: null, label: (SOURCE_POLICIES[provider]?.name ?? provider) + " \"" + run.board + "\" (scheduled run)", endpoint: null, bytes: null, durationMs: null,
+    log: [clock() + " Opened the scheduled run of " + run.ranAt.slice(0, 16).replace("T", " ") + ": " + run.postings.length + " of " + run.total + " postings kept. Nothing is imported until you choose."] } });
+}
+/** Keep chosen postings as sources. Each is a receipt with its link, publication date and retrieval time; it counts only after review. */
+export function importCollectedPostings(subjectId: SubjectId, postingIds: string[]): SaveResult & { imported?: number; skipped?: number } {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can import evidence for this course." };
+  const run = state.collectRun;
+  if (!run || run.subjectId !== subjectId || run.status !== "done") return { ok: false, error: "Fetch postings first." };
+  const chosen = run.postings.filter((p) => postingIds.includes(p.id));
+  if (!chosen.length) return { ok: false, error: "Select at least one posting to import." };
+  const person = currentPerson()!;
+  const already = new Set(state.evidenceSources.filter((s) => s.subjectId === subjectId).map((s) => s.collection?.postingId ?? ""));
+  const added: EvidenceSource[] = [];
+  let imported = 0, skipped = 0;
+  for (const posting of chosen) {
+    const text = posting.text.trim();
+    if (already.has(posting.id) || text.length < 20) { skipped += 1; continue; }
+    const textHash = textFingerprint(text), normalised = normaliseWhitespace(text).toLowerCase();
+    const original = [...state.evidenceSources, ...added].find((s) => s.subjectId === subjectId && s.kind === "job-posting" && s.duplicateOf === null &&
+      s.textHash === textHash && normaliseWhitespace(s.text).toLowerCase() === normalised);
+    added.push({ id: nextId("EV-" + subjectId), subjectId, kind: "job-posting", title: normaliseWhitespace(posting.title), organisation: normaliseWhitespace(posting.organisation),
+      url: posting.url, sourceDate: posting.publishedAt ? posting.publishedAt.slice(0, 10) : "", text, textHash, duplicateOf: original?.id ?? null, provenance: "collected",
+      collection: { provider: posting.provider, board: posting.board, postingId: posting.id, retrievedAt: posting.retrievedAt, label: run.label || SOURCE_POLICIES[posting.provider].name },
+      reviewed: false, addedBy: person.id, addedAt: nowIso() });
+    already.add(posting.id); imported += 1;
+    void sendVerdict(posting.proposalId, "accepted");
+  }
+  set((s) => ({ evidenceSources: [...s.evidenceSources, ...added],
+    toast: imported + " postings imported as sources, " + skipped + " skipped. Quote their requirements, then mark the extraction reviewed." }));
+  return { ok: true, imported, skipped };
+}
+export function setSkillLexicon(subjectId: SubjectId, terms: string[]): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can set the terms for this course." };
+  if (!Array.isArray(terms) || terms.length > 100 || terms.some((t) => typeof t !== "string" || !t.trim() || t.length > 60)) return { ok: false, error: "Use up to 100 terms of at most 60 characters each." };
+  set((s) => ({ skillLexicon: { ...s.skillLexicon, [subjectId]: terms.map((t) => normaliseWhitespace(t)) }, toast: "Terms saved with the course." }));
+  return { ok: true };
+}
+/** Propose one exact sentence per posting and term. The lecturer confirms; nothing is recorded by the scan itself. */
+export function scanForRequirements(subjectId: SubjectId): SaveResult & { count?: number } {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can scan evidence for this course." };
+  const terms = state.skillLexicon[subjectId] ?? [];
+  if (!terms.length) return { ok: false, error: "Save the skills to look for first." };
+  const proposals = proposeMentions(state.evidenceSources.filter((s) => s.subjectId === subjectId), terms, state.skillMentions.filter((m) => m.subjectId === subjectId));
+  set({ scanProposals: proposals, toast: proposals.length ? proposals.length + " quotations proposed. Confirm the ones you accept." : "No new sentence names those terms." });
+  return { ok: true, count: proposals.length };
+}
+/** Lens's quotations, already checked against their postings, join the scan's list to be confirmed like any other. */
+export function addProposals(subjectId: SubjectId, proposals: MentionProposal[]): number {
+  const ours = new Set(state.evidenceSources.filter((s) => s.subjectId === subjectId).map((s) => s.id));
+  const have = new Set([...state.scanProposals, ...state.skillMentions].map((p) => p.sourceId + "\n" + skillKey(p.skill)));
+  const fresh = proposals.filter((p) => ours.has(p.sourceId) && !have.has(p.sourceId + "\n" + skillKey(p.skill)));
+  set((s) => ({ scanProposals: [...s.scanProposals, ...fresh] }));
+  return fresh.length;
+}
+export function confirmProposals(subjectId: SubjectId, proposals: MentionProposal[]): { added: number; skipped: number } {
+  let added = 0, skipped = 0;
+  const handled = new Set<string>();
+  for (const proposal of proposals) {
+    const source = state.evidenceSources.find((s) => s.id === proposal.sourceId);
+    if (!source || source.subjectId !== subjectId) { skipped += 1; continue; }
+    const result = addSkillMention(proposal.sourceId, { skill: proposal.skill, excerpt: proposal.excerpt, requirement: proposal.requirement });
+    if (result.ok) added += 1; else skipped += 1;
+    // Lens's proposals: taken as proposed, or with the lecturer's own requirement level (edited).
+    const original = state.scanProposals.find((p) => p.sourceId === proposal.sourceId && p.term === proposal.term);
+    if (result.ok) void sendVerdict(original?.proposalId, original && original.requirement !== proposal.requirement ? "edited" : "accepted");
+    handled.add(proposal.sourceId + "\n" + proposal.term);
+  }
+  set((s) => ({ scanProposals: s.scanProposals.filter((p) => !handled.has(p.sourceId + "\n" + p.term)), toast: added + " quotations recorded, " + skipped + " skipped." }));
+  return { added, skipped };
+}
+export function dismissProposal(sourceId: string, term: string) {
+  void sendVerdict(state.scanProposals.find((p) => p.sourceId === sourceId && p.term === term)?.proposalId, "dismissed");
+  set((s) => ({ scanProposals: s.scanProposals.filter((p) => !(p.sourceId === sourceId && p.term === term)) }));
+}
+export function clearProposals() { set({ scanProposals: [] }); }
+/** Bulk review: the lecturer vouches that every listed posting's extraction is complete. Duplicates follow their original. */
+export function setSourcesReviewed(subjectId: SubjectId, sourceIds: string[], reviewed: boolean): SaveResult {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can review evidence for this course." };
+  const ids = new Set(sourceIds);
+  set((s) => ({ evidenceSources: s.evidenceSources.map((x) => ids.has(x.id) && x.subjectId === subjectId && x.kind === "job-posting" && !x.duplicateOf ? { ...x, reviewed } : x),
+    toast: reviewed ? "Extraction marked reviewed. These postings now count in the denominator." : "Postings marked unreviewed and excluded until reviewed." }));
+  return { ok: true };
+}
+export function selectBrief(briefId: string | null) { set({ selectedBriefId: briefId }); }
+/** A meeting brief is a snapshot of the evidence at one moment, with the lecturer's recommendation and every receipt. */
+export function prepareEvidenceBrief(subjectId: SubjectId, input: { recommendation: BriefRecommendation; notes: string }): SaveResult & { briefId?: string } {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can prepare a brief for this course." };
+  if (!(input.recommendation in RECOMMENDATION_LABEL)) return { ok: false, error: "Choose a recommendation." };
+  if (typeof input.notes !== "string" || input.notes.length > 20000) return { ok: false, error: "Keep the notes within 20,000 characters." };
+  const subject = subjectById(subjectId)!, person = currentPerson()!, at = nowIso();
+  const outcomes = state.clos.filter((c) => c.subjectId === subjectId);
+  const changes = changesSinceLastSnapshot(subjectId);
+  const markdown = meetingBriefMarkdown(subject, evidenceReportForCourse(subjectId), state.evidenceSources, state.skillMentions, outcomes, state.people, person,
+    { recommendation: input.recommendation, notes: input.notes.trim() }, at,
+    changes ? { since: changes.before.label, note: changes.note, lines: comparisonMarkdown(changes) } : undefined);
+  const brief: EvidenceBrief = { id: nextId("BR-" + subjectId), subjectId, createdBy: person.id, createdAt: at, recommendation: input.recommendation, notes: input.notes.trim(), markdown, recipients: [], sentAt: null };
+  set((s) => ({ evidenceBriefs: [...s.evidenceBriefs, brief], selectedBriefId: brief.id, toast: "Brief prepared. Review it, then download or send it." }));
+  logEvent("brief-prepared", { subjectId, briefId: brief.id }, at);
+  return { ok: true, briefId: brief.id };
+}
+export function sendEvidenceBrief(briefId: string, recipientIds: string[]): SaveResult {
+  const brief = state.evidenceBriefs.find((b) => b.id === briefId);
+  if (!brief || !mayPlan(brief.subjectId)) return { ok: false, error: "You cannot send this brief." };
+  if (brief.sentAt) return { ok: false, error: "This brief was already sent. Prepare a new one to send an update." };
+  const person = currentPerson()!;
+  const recipients = [...new Set(recipientIds)].filter((id) => id !== person.id);
+  if (!recipients.length) return { ok: false, error: "Choose at least one colleague." };
+  if (recipients.some((id) => !personById(id))) return { ok: false, error: "A recipient is unknown to this workspace." };
+  const at = nowIso();
+  set((s) => ({ evidenceBriefs: s.evidenceBriefs.map((b) => (b.id === briefId ? { ...b, recipients, sentAt: at } : b)) }));
+  logEvent("brief-sent", { subjectId: brief.subjectId, briefId }, at);
+  for (const toPersonId of recipients) notify({ toPersonId, kind: "evidence-brief", subjectId: brief.subjectId, briefId,
+    agentFindings: "Evidence brief for " + brief.subjectId + " from " + person.name + ": " + RECOMMENDATION_LABEL[brief.recommendation] + "." });
+  set({ toast: "Brief sent to " + recipients.map((id) => personById(id)?.name ?? id).join(", ") + "." });
+  return { ok: true };
+}
+
+// ---------- the event log and the decision record (plan Section 4) ----------
+/** Append one event. Events are never edited or removed; the How it works timeline reads them first. */
+function logEvent(kind: LoopEventKind, refs: LoopEvent["refs"], at = nowIso()): LoopEvent {
+  const event: LoopEvent = { id: nextId("EVT-" + refs.subjectId), at, byPersonId: currentPerson()!.id, kind, refs };
+  set((s) => ({ events: [...s.events, event] }));
+  return event;
+}
+/** May this person record a decision on the course (Section 4.2)? Coordinators, the programme owner,
+ *  and the owner of a personal course workspace, who holds both positions. */
+export function mayDecide(subjectId: SubjectId, person = currentPerson()): boolean {
+  const subject = subjectById(subjectId);
+  if (!person || !subject) return false;
+  return can(person, "decide", { subjectId, assignments: state.assignments }) || (Boolean(subject.workspaceOnly) && hatsOn(person.id, subjectId, state.assignments).length > 0);
+}
+/** May this person make a checked revision the course version? The coordinator, or a personal workspace's owner. */
+export function mayAdopt(subjectId: SubjectId, person = currentPerson()): boolean {
+  const subject = subjectById(subjectId);
+  if (!person || !subject) return false;
+  return can(person, "adopt", { subjectId, assignments: state.assignments }) || (Boolean(subject.workspaceOnly) && hatsOn(person.id, subjectId, state.assignments).length > 0);
+}
+/** Record one person's decision on a brief. The record is immutable; deciding again is an amendment, a new
+ *  record that becomes the person's standing decision. The note is required: it says why. */
+export function recordDecision(briefId: string, outcome: DecisionOutcome, note: string): SaveResult & { decisionId?: string } {
+  const person = currentPerson();
+  const brief = state.evidenceBriefs.find((b) => b.id === briefId);
+  if (!person || !brief) return { ok: false, error: "Choose a brief to decide on." };
+  if (!DECISION_OUTCOMES.includes(outcome)) return { ok: false, error: "Choose adopt, retain, defer or return." };
+  if (typeof note !== "string" || !note.trim()) return { ok: false, error: "Write the reason for this decision. The note travels with the record." };
+  if (note.length > NOTE_MAX) return { ok: false, error: "Keep the note within " + NOTE_MAX + " characters." };
+  if (!mayDecide(brief.subjectId, person)) return { ok: false, error: "Only a course coordinator or the programme owner can record a decision on this course." };
+  const isAuthor = brief.createdBy === person.id;
+  if (!isAuthor && !brief.recipients.includes(person.id)) return { ok: false, error: "Only a recipient of this brief can record a decision on it." };
+  const subject = subjectById(brief.subjectId)!;
+  if (briefDecisionState(brief, state.evidenceBriefs, state.briefDecisions, Boolean(subject.workspaceOnly)).supersededBy)
+    return { ok: false, error: "A newer brief exists for this course. Record the decision on the latest brief." };
+  const at = nowIso();
+  const decision: BriefDecision = { id: nextId("DEC-" + brief.subjectId), briefId, subjectId: brief.subjectId, courseVersionId: subject.currentVersionId,
+    term: termWindow(state, brief.subjectId).term, byPersonId: person.id, at, outcome, note: note.trim() };
+  set((s) => ({ briefDecisions: [...s.briefDecisions, decision] }));
+  logEvent("decision-recorded", { subjectId: brief.subjectId, briefId, decisionId: decision.id }, at);
+  if (!isAuthor) notify({ toPersonId: brief.createdBy, kind: "brief-decision", subjectId: brief.subjectId, briefId,
+    agentFindings: person.name + " recorded a decision on your " + brief.subjectId + " brief: " + OUTCOME_LABEL[outcome] + "." });
+  set({ toast: isAuthor && !subject.workspaceOnly ? "Decision recorded as self-recorded. A second person's confirmation is open." : "Decision recorded: " + OUTCOME_LABEL[outcome] + "." });
+  return { ok: true, decisionId: decision.id };
+}
+
+// ---------- watching the evidence over time (the Watch step) ----------
+// A snapshot freezes the reviewed evidence for a course so a later window can be
+// compared with it. Snapshots are never edited; a comparison never changes a course.
+function snapshotsFor(subjectId: SubjectId): EvidenceSnapshot[] {
+  return state.evidenceSnapshots.filter((s) => s.subjectId === subjectId);
+}
+/** The evidence as it stands now, shaped like a snapshot but not saved. */
+export function currentEvidenceWindow(subjectId: SubjectId): EvidenceSnapshot {
+  return buildSnapshot({ id: CURRENT_ID, subjectId, label: "Current evidence", takenBy: currentPerson()?.id ?? "", takenAt: nowIso() },
+    evidenceReportForCourse(subjectId), state.evidenceSources, state.skillMentions, state.skillLexicon[subjectId] ?? []);
+}
+export function takeEvidenceSnapshot(subjectId: SubjectId, label: string): SaveResult & { snapshotId?: string } {
+  if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can freeze the evidence for this course." };
+  const error = snapshotLabelError(label, snapshotsFor(subjectId));
+  if (error) return { ok: false, error };
+  const report = evidenceReportForCourse(subjectId);
+  if (report.eligible === 0) return { ok: false, error: "Review at least one posting first. A snapshot with no reviewed postings has no denominator to compare later." };
+  const snapshot = buildSnapshot({ id: nextId("SN-" + subjectId), subjectId, label, takenBy: currentPerson()!.id, takenAt: nowIso() },
+    report, state.evidenceSources, state.skillMentions, state.skillLexicon[subjectId] ?? []);
+  logEvent("snapshot-frozen", { subjectId, snapshotId: snapshot.id }, snapshot.takenAt);
+  set((s) => ({ evidenceSnapshots: [...s.evidenceSnapshots, snapshot],
+    toast: "Snapshot \"" + snapshot.label + "\" frozen: " + snapshot.eligible + " reviewed postings, " + snapshot.skills.length + " skills. Later evidence is compared with it." }));
+  return { ok: true, snapshotId: snapshot.id };
+}
+export function removeEvidenceSnapshot(snapshotId: string): SaveResult {
+  const snapshot = state.evidenceSnapshots.find((s) => s.id === snapshotId);
+  if (!snapshot || !mayPlan(snapshot.subjectId)) return { ok: false, error: "You cannot remove this snapshot." };
+  set((s) => ({ evidenceSnapshots: s.evidenceSnapshots.filter((x) => x.id !== snapshotId), toast: "Snapshot \"" + snapshot.label + "\" removed. Its sources and quotations are untouched." }));
+  return { ok: true };
+}
+/** Compare an earlier snapshot with a later one, or with the current evidence (afterId "current"). */
+export function compareEvidenceWindows(subjectId: SubjectId, beforeId: string, afterId: string): (SaveResult & { comparison?: SnapshotComparison }) {
+  const saved = snapshotsFor(subjectId);
+  const before = saved.find((s) => s.id === beforeId);
+  const after = afterId === CURRENT_ID ? currentEvidenceWindow(subjectId) : saved.find((s) => s.id === afterId);
+  if (!before || !after) return { ok: false, error: "Choose two snapshots of this course." };
+  if (before.id === after.id) return { ok: false, error: "Choose two different windows." };
+  return { ok: true, comparison: compareSnapshots(before, after) };
+}
+/** The latest frozen snapshot against the current evidence, or null when nothing has been frozen. */
+export function changesSinceLastSnapshot(subjectId: SubjectId): SnapshotComparison | null {
+  const saved = snapshotsFor(subjectId);
+  if (!saved.length) return null;
+  return compareSnapshots(saved[saved.length - 1], currentEvidenceWindow(subjectId));
+}
+/** The trend line shown beside the counts: the snapshot comparison when there is one, otherwise the honest default. */
+export function evidenceTrendNote(subjectId: SubjectId): string {
+  return changesSinceLastSnapshot(subjectId)?.note ?? evidenceReportForCourse(subjectId).trendNote;
+}

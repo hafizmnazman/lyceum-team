@@ -21,11 +21,20 @@ hafiz@lyceum-team:~$ npm run prove:journey | grep -E "^ℹ (tests|pass|fail)"
 Node.js 24 or newer (the scripts run TypeScript directly), and Chrome or Edge for the browser checks. On Windows PowerShell, use `npm.cmd` if the execution policy blocks `npm.ps1`.
 
 ```bash
-npm install
-npm run dev        # the workspace on http://localhost:5173 and the local API on :8787
+npm install                            # once, at the root: installs for web/ and api/ together
+cp api/.env.example api/.env           # the API's settings: the model, search, Supabase's secret key and database
+cp web/.env.example web/.env           # the browser's settings: Supabase's URL and publishable key, the API's port
+cp .env.example .env                   # optional: SearXNG's secret for Docker
+
+npm start          # SearXNG in Docker, then the web app on http://localhost:5173 and the API on :8787
+npm run dev        # the same without Docker
 ```
 
-Choose **Dr Sobri** on the sign-in screen for the whole lecturer workflow, or **Play demo** for the self-driving tour (about 7 minutes). Work is saved in the browser; the core needs no AI key and no account. Live board collection (Greenhouse and Lever) and document parsing go through the local API; the dated saved sample works without it. Copy `.env.example` to `.env` only for the optional model features, and never commit `.env`.
+Accounts and the database are Supabase. Point both `.env` files at the cloud project, or run one locally with `npm run db:up` (the Supabase CLI, Docker needed; `npx supabase status` prints the values). The schema is `supabase/migrations/`: `npm run db:reset` applies it locally, `npm run db:push` to the linked cloud project (`npx supabase link` once).
+
+Each side also runs on its own from its folder: `cd web && npm run dev` for the frontend, `cd api && npm run dev` for the backend. The web app forwards `/api` to the API, so start both for anything that signs in, saves to the server or calls a model.
+
+Choose **Dr Sobri** on the sign-in screen for the whole lecturer workflow, or **Play demo** for the self-driving tour (about 7 minutes). The demo personas save in the browser and need no AI key and no account. Live board collection (Greenhouse and Lever) and document parsing go through the API; the dated saved sample works without it. Never commit a `.env`.
 
 ### <samp>hafiz@lyceum-team:~$ npm run prove:all</samp>
 
@@ -39,21 +48,26 @@ npm run smoke:integrity    # also smoke:workspace and smoke:curriculum, after a 
 
 The guide, the palette and the prose have their own checks: `node scripts/generate-guide.mjs --check`, `node scripts/contrast-check.mjs`, `node scripts/dash-scan.mjs`. The pitch builds and checks itself with `npm run deck`. Run these before a pull request; consolidation runs the same.
 
-### <samp>hafiz@lyceum-team:~$ tree ./src</samp>
+### <samp>hafiz@lyceum-team:~$ tree -L 2</samp>
 
 ```text
-src/
-  ui/screens/     one file per loop step, plus Home, Courses, How it works, Evaluation, the landing page and the sandbox
-  ui/shell/       the header, the sidebar and the loop's path across the top of every step (LoopRail.tsx)
-  ui/primitives/  shared components: buttons, fields, tags, the ring, the handoff card
-  ui/mascots/     the host and the seven helpers, drawn in code
-  theme/          tokens.ts, the only source of colour and type, and the generated global.css
-  app/            the store, roles, the loop and its ring, routes, the event log, moods
-  lib/            the deterministic core: evidence maths, collection, curriculum checks, slides, benchmark
-  data/           seed data, sourced figures, the labelled scan benchmark
-  demo/           the self-driving tour
-  prove-*.ts      the automated checks
-server/           the local API: file parsing, job-board collection, optional model streaming
+web/              FRONTEND: the React app (Vite). index.html, public/, vite.config.ts, .env.example
+  src/ui/screens/     one file per loop step, plus Home, Courses, How it works, Evaluation, the landing page and the sandbox
+  src/ui/shell/       the header, the sidebar and the loop's path across the top of every step (LoopRail.tsx)
+  src/ui/primitives/  shared components: buttons, fields, tags, the ring, the handoff card
+  src/ui/mascots/     the host and the seven helpers, drawn in code
+  src/theme/          the generated global.css
+  src/app/            the store, roles, the loop and its ring, routes, the event log, moods, the account client
+  src/demo/           the self-driving tour
+api/              BACKEND: the Hono API. Accounts, the database and its migrations/, file parsing (parse/), job-board
+                  collection, scheduled Watch, the agents' model calls. .env.example
+shared/           code both sides run, imported by relative path
+  lib/                the deterministic core: evidence maths, collection, curriculum checks, slides, benchmark
+  agents/             the agents' fixtures and the browser's client for them
+  data/               seed data, sourced figures, the labelled scan benchmark
+  theme/tokens.ts     the only source of colour and type
+  types.ts            the domain types
+tests/            prove-*.ts, the automated checks
 mcp/              the local door: a read-only MCP server over an exported workspace
 scripts/          browser smokes, the screenshot, deck, brief and poster generators
 deck/             the pitch, an HTML deck with its PDF and PPTX export
@@ -62,9 +76,9 @@ video/            the film: script, storyboard, style, the capture and the Remot
 
 ### <samp>hafiz@lyceum-team:~$ cat ./ui-rules</samp>
 
-- Colours and type come from `src/theme/tokens.ts` only; a hand-written hex anywhere else fails the contrast check. Fonts are bundled, never fetched.
-- Lime sits on forest surfaces only. Anything outlined with a lip is a control; a flat pill is a label. The look lives in one block at the end of `src/theme/global.css`.
-- Every step screen reads the same way: the path, the helper's question in a bubble, the work, the handoff to the next step (`src/ui/screens/StepFrame.tsx`).
+- Colours and type come from `shared/theme/tokens.ts` only; a hand-written hex anywhere else fails the contrast check. Fonts are bundled, never fetched.
+- Lime sits on forest surfaces only. Anything outlined with a lip is a control; a flat pill is a label. The look lives in one block at the end of `web/src/theme/global.css`.
+- Every step screen reads the same way: the path, the helper's question in a bubble, the work, the handoff to the next step (`web/src/ui/screens/StepFrame.tsx`).
 - Honesty labels on every surface: real, prototype, illustrative, planned. Synthetic data says synthetic, and every number on a surface is registered with its source in `docs/claims.md`.
 - Nothing moves without a real request or a saved record, and the characters never appear on an error.
 - No en or em dashes, anywhere.

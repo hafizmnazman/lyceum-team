@@ -1,6 +1,6 @@
 // The kiosk's film (depth plan Section 9.1, D6b): copies the existing Loop90 render beside the app, with its render date
 // and fingerprint, so #/kiosk can play it. It renders nothing: the film comes from video/out, where the render left it,
-// and public/media/ is ignored by git, as the deck's copy is.
+// and web/public/media/ is ignored by git, as the deck's copy is.
 // Usage: node scripts/kiosk-film.mjs [--check]
 
 import { createHash } from "node:crypto";
@@ -31,4 +31,4 @@ if (check) {
 mkdirSync(DIR, { recursive: true });
 copyFileSync(SOURCE, dest);
 writeFileSync(json, JSON.stringify(info, null, 2) + "\n");
-console.log("Copied the Loop90 render of " + info.renderedAt.slice(0, 10) + " (" + Math.round(info.bytes / 1024) + " KB) to public/media/ for the kiosk.");
+console.log("Copied the Loop90 render of " + info.renderedAt.slice(0, 10) + " (" + Math.round(info.bytes / 1024) + " KB) to web/public/media/ for the kiosk.");

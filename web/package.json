@@ -1,0 +1,12 @@
+{
+  "name": "@lyceum/web",
+  "private": true,
+  "type": "module",
+  "description": "Lyceum's frontend: the React app. Dependencies are installed once at the repo root.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "booth": "vite preview --host"
+  }
+}

@@ -1,0 +1,12 @@
+# Weekly pull requests for outdated or vulnerable dependencies, grouped so they don't flood the repo.
+version: 2
+updates:
+  - package-ecosystem: npm # the npm workspace at the root (web/ + api/ share one package.json and lockfile)
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+    ignore:
+      # @types/node follows the Node we run; bump its major with Node itself
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]

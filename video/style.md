@@ -2,7 +2,7 @@
 
 A flat, colourful cartoon explainer of the kind the big infographics channels make: bold shapes, a dark field, bright accents, everything gently moving, a narrator you can see, captions that belong to the picture. The Dataworks guide was the template; this is the same document rewritten for Lyceum's tokens (plan Section 16.1). Inspired by that look, never copied: no other channel's characters, music or sound.
 
-Every colour below is a token in `src/theme/tokens.ts`, used by name; the film imports that file, so a value is never typed here or in the project.
+Every colour below is a token in `shared/theme/tokens.ts`, used by name; the film imports that file, so a value is never typed here or in the project.
 
 ## Frame
 
@@ -38,7 +38,7 @@ The audit's rules hold in the film as in the app: lime only on forest surfaces, 
 - **Bricolage Grotesque** 800 at 120 to 180 px for the big numbers, 600 at 48 to 64 px for scene titles.
 - **Plus Jakarta Sans** 600 at 36 to 48 px for labels, 700 at 48 px for captions.
 - **JetBrains Mono** at 26 to 28 px for chips, dates and ids.
-- The bundled files from `public/fonts`, loaded before the first frame; nothing is fetched at render time.
+- The bundled files from `web/public/fonts`, loaded before the first frame; nothing is fetched at render time.
 - No en or em dash on screen. Use commas, colons or "to" (`12 to 18 months`).
 
 ## Illustration
@@ -52,7 +52,7 @@ The audit's rules hold in the film as in the app: lime only on forest surfaces, 
 
 ## Characters
 
-- **The host, Tualang**, presents: bottom left in its round badge, its mouth opening with the loudness of the voice, the lime leaf as its prop. The same drawing as the app (`src/ui/mascots/host.tsx`).
+- **The host, Tualang**, presents: bottom left in its round badge, its mouth opening with the loudness of the voice, the lime leaf as its prop. The same drawing as the app (`web/src/ui/mascots/host.tsx`).
 - **The lecturer figure**, Dr Aisyah, appears bottom right when she asks: faceless but for two dot eyes and a mouth that opens with her voice, a quarter turn towards the host. She is fictional, and the film says so once.
 - **The seven helpers** pop in at their stations while their step runs and never narrate.
 - Mascots are the cutest thing on screen and never read as data: no mascot sits on a chart, and none appears on a refusal or an error.

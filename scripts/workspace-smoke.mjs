@@ -7,9 +7,9 @@ import { tmpdir } from "node:os";
 import { preview } from "vite";
 import puppeteer from "puppeteer-core";
 import JSZip from "jszip";
-import { SECTION_GUIDES } from "../src/app/sectionGuides.ts";
-import { PROOF } from "../src/data/proof.ts";
-import { WALK } from "../src/demo/walk.ts";
+import { SECTION_GUIDES } from "../web/src/app/sectionGuides.ts";
+import { PROOF } from "../shared/data/proof.ts";
+import { WALK } from "../web/src/demo/walk.ts";
 
 const executablePath = ["C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"].find(existsSync);
 assert.ok(executablePath, "An installed Chrome or Edge is required");
@@ -236,7 +236,7 @@ try {
   // The survey's booth round trip (depth plan Section 7.2): the local API on a spare port and the built app served with
   // its proxy; the lecturer prepares and opens the Course Outcome Survey, a phone at 320 px answers through the short link
   // the QR carries, and the lecturer collects one response from one device, never counted as the course's evidence.
-  const api = spawn(process.execPath, ["server/index.ts"], { env: { ...process.env, PORT: "8792" }, stdio: ["ignore", "pipe", "pipe"] });
+  const api = spawn(process.execPath, ["api/index.ts"], { env: { ...process.env, PORT: "8792" }, stdio: ["ignore", "pipe", "pipe"] });
   let boothServer;
   try {
     await new Promise((resolve, reject) => { api.stdout.on("data", (d) => { if (String(d).includes("lyceum api")) resolve(); }); api.on("exit", () => reject(new Error("the local API exited"))); });

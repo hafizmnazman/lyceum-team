@@ -9,9 +9,9 @@ import { pathToFileURL } from "node:url";
 
 const root = process.argv[2] ?? process.cwd();
 const mod = (p) => import(pathToFileURL(join(root, p)).href);
-const store = await mod("src/app/store.ts");
-const { PEOPLE_IDS } = await mod("src/data/seed.ts");
-const sample = JSON.parse(readFileSync(join(root, "public/demo/collected-sample.json"), "utf8"));
+const store = await mod("web/src/app/store.ts");
+const { PEOPLE_IDS } = await mod("shared/data/seed.ts");
+const sample = JSON.parse(readFileSync(join(root, "web/public/demo/collected-sample.json"), "utf8"));
 
 let failed = 0;
 const check = (name, ok, detail = "") => { console.log((ok ? "PASS  " : "FAIL  ") + name + (detail ? "  (" + detail + ")" : "")); if (!ok) failed++; };

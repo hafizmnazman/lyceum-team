@@ -13,8 +13,8 @@ import { join } from "node:path";
 import puppeteer from "puppeteer-core";
 import { ROOT, fontFaceCss, fontsReady, rootVarsCss } from "./lib/theme-node.mjs";
 import { claimsRegister, figureProblems, readFigures } from "./lib/claims-node.mjs";
-import { PAIN_STATS } from "../src/data/painStats.ts";
-import { PROOF } from "../src/data/proof.ts";
+import { PAIN_STATS } from "../shared/data/painStats.ts";
+import { PROOF } from "../shared/data/proof.ts";
 
 const OUT = join(ROOT, "docs/presentation/lyceum-brief.pdf");
 const previewAt = process.argv.indexOf("--preview");
@@ -22,7 +22,7 @@ const PREVIEW_DIR = previewAt > 0 ? process.argv[previewAt + 1] : null;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const dataUri = (file, type) => "data:" + type + ";base64," + readFileSync(join(ROOT, file)).toString("base64");
-const mascot = (who, pose = "resting") => dataUri("public/brand/mascots/" + who + "-" + pose + ".svg", "image/svg+xml");
+const mascot = (who, pose = "resting") => dataUri("web/public/brand/mascots/" + who + "-" + pose + ".svg", "image/svg+xml");
 const png = (file) => { const b = readFileSync(join(ROOT, file)); return { src: "data:image/png;base64," + b.toString("base64"), w: b.readUInt32BE(16), h: b.readUInt32BE(20) }; };
 /** A real screenshot at a width in mm, optionally cropped to a region given in the image's own pixels. */
 function shot(file, widthMm, alt, area = {}) {
@@ -51,7 +51,7 @@ const REVIEW = [
 const PEOPLE_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>`;
 
 const PAGES = 3;
-const mast = `<header class="mast"><span class="wordmark"><img src="${dataUri("public/brand/mark.svg", "image/svg+xml")}" alt="">Lyceum</span><span class="mast-meta" data-ref>Project brief · 22 October 2026</span></header>`;
+const mast = `<header class="mast"><span class="wordmark"><img src="${dataUri("web/public/brand/mark.svg", "image/svg+xml")}" alt="">Lyceum</span><span class="mast-meta" data-ref>Project brief · 22 October 2026</span></header>`;
 const foot = (n, left) => `<footer class="foot"><span>${left}</span><span class="page-number">${n} / ${PAGES}</span></footer>`;
 
 const page1 = `<section class="page">

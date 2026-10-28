@@ -1,6 +1,6 @@
 // The contrast check (plan Section 6, package A1). Fails when:
 //   1. a ratio in docs/design/colour-scheme-audit-2026-10-22.md (or the plan's
-//      Section 6.2 table) no longer holds for the values in src/theme/tokens.ts,
+//      Section 6.2 table) no longer holds for the values in shared/theme/tokens.ts,
 //      or a pair the audit says fails starts passing (its rule would be stale);
 //   2. a colour is written by hand outside tokens.ts: a hex value, a bare hex
 //      colour handed to pptxgenjs or an Office file, or an rgb() or hsl() value;
@@ -9,7 +9,7 @@
 //      not a token;
 //   4. a hand-written rule in global.css uses lime outside a forest context.
 // One exception, approved by the owner on 22 October 2026 (docs/lyceum-depth-plan.md Section 3.2, CLAUDE.md):
-// a third-party mark under public/brand/partners/ keeps its owner's colours, so parts 2 and 3 leave that folder
+// a third-party mark under web/public/brand/partners/ keeps its owner's colours, so parts 2 and 3 leave that folder
 // alone; nothing in it is used for Lyceum's own surfaces, and a hex anywhere else still fails.
 // Usage: node scripts/contrast-check.mjs
 
@@ -78,8 +78,8 @@ for (const [fg, bg, stated, rule] of PAIRS) {
 const SCANNED = new Set([".ts", ".tsx", ".css", ".mjs", ".js", ".cjs", ".html", ".svg"]);
 const SKIP = [
   /^docs\/history\//, /^docs\/review\//, // kept as written
-  /^src\/theme\/tokens\.ts$/, // the source
-  /^public\/brand\//, /^docs\/presentation\/.*\.svg$/, /^\.github\/readme\/.*\.svg$/, /\.generated\./, // generated outputs, checked in part 3
+  /^shared\/theme\/tokens\.ts$/, // the source
+  /^web\/public\/brand\//, /^docs\/presentation\/.*\.svg$/, /^\.github\/readme\/.*\.svg$/, /\.generated\./, // generated outputs, checked in part 3
   /^scripts\/gen-demo-files\.mjs$/, // writes a stand-in for a lecturer's own Office file, with Office's default theme (docs/decisions.md)
 ];
 const listed = spawnSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 });
@@ -97,9 +97,9 @@ const GEN_START = "/* BEGIN GENERATED TOKENS", GEN_END = "/* END GENERATED TOKEN
 let scannedLines = 0;
 for (const file of files) {
   let text = readFileSync(join(ROOT, file), "utf8");
-  if (file === "src/theme/global.css") {
+  if (file === "web/src/theme/global.css") {
     const a = text.indexOf(GEN_START), b = text.indexOf(GEN_END);
-    if (a < 0 || b < 0) problems.push("src/theme/global.css has lost its generated block markers.");
+    if (a < 0 || b < 0) problems.push("web/src/theme/global.css has lost its generated block markers.");
     else text = text.slice(0, a) + text.slice(a, b).replace(/[^\n]/g, "") + text.slice(b); // keep line numbers, blank the generated block
   }
   const lines = text.split(/\r?\n/);
@@ -117,15 +117,15 @@ for (const file of files) {
 const gen = spawnSync(process.execPath, [join(ROOT, "scripts/gen-theme-css.mjs"), "--check"], { cwd: ROOT, encoding: "utf8" });
 if (gen.status !== 0) problems.push((gen.stderr || gen.stdout).trim());
 const tokenHex = new Set(Object.values(C).map((h) => h.toUpperCase()));
-const PARTNER_MARKS = /^public\/brand\/partners\//; // the owners' colours, by the exception above
-const generated = [...new Set(listed.stdout.split("\0").filter(Boolean))].filter((p) => /^(public\/brand\/.*\.svg|docs\/presentation\/.*\.svg|\.github\/readme\/.*\.svg|.*\.generated\.[a-z]+)$/.test(p) && !PARTNER_MARKS.test(p) && existsSync(join(ROOT, p)));
+const PARTNER_MARKS = /^web\/public\/brand\/partners\//; // the owners' colours, by the exception above
+const generated = [...new Set(listed.stdout.split("\0").filter(Boolean))].filter((p) => /^(web\/public\/brand\/.*\.svg|docs\/presentation\/.*\.svg|\.github\/readme\/.*\.svg|.*\.generated\.[a-z]+)$/.test(p) && !PARTNER_MARKS.test(p) && existsSync(join(ROOT, p)));
 for (const file of generated) {
   const found = readFileSync(join(ROOT, file), "utf8").match(/#[0-9a-fA-F]{6}\b/g) ?? [];
   for (const hex of new Set(found)) if (!tokenHex.has(hex.toUpperCase())) problems.push("Generated " + file + " uses " + hex + ", which is not a token.");
 }
 
 // ---------- 4. lime only on forest (audit Section 2, first rule) ----------
-const css = readFileSync(join(ROOT, "src/theme/global.css"), "utf8");
+const css = readFileSync(join(ROOT, "web/src/theme/global.css"), "utf8");
 const handWritten = css.slice(css.indexOf(GEN_END) + GEN_END.length);
 const FOREST_CONTEXT = /on-forest|forest|lime|app-header|header-|landing-bar|wordmark/;
 for (const m of handWritten.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {

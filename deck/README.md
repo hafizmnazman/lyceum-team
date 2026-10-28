@@ -7,7 +7,7 @@ deck/
   index.html            the slides and their speaker notes
   deck.css              the layout, on the tokens only
   deck.js               the keys, the scaling, the film
-  theme.generated.css   written by scripts/gen-deck.mjs from src/theme/tokens.ts and the bundled fonts
+  theme.generated.css   written by scripts/gen-deck.mjs from shared/theme/tokens.ts and the bundled fonts
   media/loop90.mp4      the 90-second film, rendered in video/ (package A7); not committed
   export/               the PDF, the PPTX and the slide images; not committed
 ```

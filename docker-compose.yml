@@ -1,0 +1,17 @@
+# Lyceum's local services, each bound to this computer only.
+#   searxng:  keyless web search for agent web search (Watch > Research run).       npm run search:up
+# Stop it: npm run services:down. The database is Supabase: npm run db:up starts a local one (Supabase CLI), or set
+# DATABASE_URL in api/.env to the cloud project.
+services:
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: lyceum-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080" # this computer only; nothing else on the network can use it
+    volumes:
+      - ./searxng:/etc/searxng # settings.yml turns on the JSON output Lyceum reads
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-lyceum-local-only-change-me}
+

@@ -1,4 +1,4 @@
-// Generate the sample intake files (spec Section 10) into public/demo/:
+// Generate the sample intake files (spec Section 10) into web/public/demo/:
 //   results.xlsx          CS310 term results for 38 students, five outcomes, three
 //                         without a mark on CLO3: sample, synthetic (depth plan 8.4)
 //   results-prior.xlsx    CS310's results for the prior term, the same shape
@@ -18,11 +18,11 @@
 
 import { writeFileSync, mkdirSync } from "node:fs";
 import { crc32 } from "node:zlib";
-import { PRIOR_COS, PRIOR_SURVEY_RESPONSES } from "../src/data/sample-course/surveys.ts";
-import { SCALE_LABELS } from "../src/lib/surveys.ts";
-import { RESULTS_HEADER, RESULTS_NOW, RESULTS_PRIOR } from "../src/data/sample-course/results.ts";
+import { PRIOR_COS, PRIOR_SURVEY_RESPONSES } from "../shared/data/sample-course/surveys.ts";
+import { SCALE_LABELS } from "../shared/lib/surveys.ts";
+import { RESULTS_HEADER, RESULTS_NOW, RESULTS_PRIOR } from "../shared/data/sample-course/results.ts";
 
-const OUT = "public/demo";
+const OUT = "web/public/demo";
 mkdirSync(OUT, { recursive: true });
 
 // ---------------------------------------------------------------- stored zip
@@ -90,7 +90,7 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 // ---------------------------------------------------------------- results.xlsx, results-prior.xlsx
 // CS310 Data Visualisation, one row per student, headers a lecturer would actually write (percent marks, a remarks column
-// the intake ignores), from src/data/sample-course/results.ts. A student without a mark has a blank or "ABS" in the cell;
+// the intake ignores), from shared/data/sample-course/results.ts. A student without a mark has a blank or "ABS" in the cell;
 // a blank is written as no cell at all, as a spreadsheet saves it.
 function resultsWorkbook(sheetName, header, rows) {
   const colRef = (c) => String.fromCharCode(65 + c);

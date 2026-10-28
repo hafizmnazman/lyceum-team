@@ -1,9 +1,9 @@
-// Builds public/demo/collected-sample.json, the dated saved sample used by the
+// Builds web/public/demo/collected-sample.json, the dated saved sample used by the
 // self-driving demo and by rehearsals without network access. Input: a raw
 // Greenhouse Job Board API response (jobs?content=true) saved to disk.
 //   node scripts/gen-collected-sample.mjs <board.json> [board-token] [retrievedAt ISO]
 import { readFileSync, writeFileSync } from "node:fs";
-import { normaliseGreenhouseJob } from "../src/lib/collect.ts";
+import { normaliseGreenhouseJob } from "../shared/lib/collect.ts";
 
 const [, , input, board = "stripe", retrievedAt = new Date().toISOString()] = process.argv;
 if (!input) { console.error("Usage: node scripts/gen-collected-sample.mjs <board.json> [board] [retrievedAt]"); process.exit(1); }
@@ -31,5 +31,5 @@ const sample = {
   label: "Saved sample: real postings from the " + board + " Greenhouse board, retrieved " + retrievedAt.slice(0, 10) + " and truncated for the demo",
   board, retrievedAt, postings,
 };
-writeFileSync(new URL("../public/demo/collected-sample.json", import.meta.url), JSON.stringify(sample, null, 2), "utf8");
+writeFileSync(new URL("../web/public/demo/collected-sample.json", import.meta.url), JSON.stringify(sample, null, 2), "utf8");
 console.log("wrote " + postings.length + " sample postings: " + postings.map((p) => p.title).join(" | "));

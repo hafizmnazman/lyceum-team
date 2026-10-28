@@ -1,8 +1,8 @@
 // Generate an original, royalty-free ambient bed for the demo, written to
-// public/demo-music.wav. It is synthesised from scratch (a calm four-chord pad
+// web/public/demo-music.wav. It is synthesised from scratch (a calm four-chord pad
 // progression with a soft sub bass and a sparse bell arpeggio), so it carries no
 // copyright, needs no attribution, and cannot be flagged. Deterministic: same
-// output every run. The user can still drop their own public/demo-music.mp3 to
+// output every run. The user can still drop their own web/public/demo-music.mp3 to
 // override it (audio.ts prefers the mp3).
 //
 // Run with:  node scripts/gen-music.mjs   (or npm run gen:music)

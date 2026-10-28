@@ -1,0 +1,427 @@
+// Editable slide decks generated from saved data (plan Section 11, first step:
+// reviewed content, deterministic template rendering, editable export). The
+// generator writes no words of its own: every line comes from the saved session
+// (on the sample course, slides written for the prototype and labelled sample),
+// the course record, the evidence receipts and the brief. The renderer is
+// pptxgenjs, loaded on demand so the main bundle stays small. Teaching packs use
+// five slide masters with the institution's brand (depth plan Section 5.2); the
+// meeting brief keeps the plain renderer.
+
+import { z } from "zod";
+import type { CLO, CourseDefinition, EvidenceBrief, EvidenceSource, InstitutionProfile, Person, SkillMapping, SkillMention, SlideSuggestion, Subject, TeachingSession } from "../types.ts";
+import { RECOMMENDATION_LABEL, STAGE_LABEL, evidenceReport, skillKey, type EvidenceReport } from "./evidence.ts";
+import { bareHex } from "../theme/tokens.ts";
+import { DEMO_LINE } from "../data/sample-course/index.ts";
+import { BODY_PT, LAYOUT, footerText, isForest, masterOf, type Box } from "./deckLayout.ts";
+import { downloadBytes } from "./download.ts";
+
+export interface DeckTable { header: string[]; rows: string[][]; widths?: number[] }
+/** One series, one hue, labels on the bars: the count over the reviewed denominator, with the axis ending at that denominator. */
+export interface DeckChart { categories: string[]; values: number[]; max: number; caption: string }
+export type DeckMaster = "TITLE" | "SECTION" | "CONTENT" | "TWO_COLUMN" | "CLOSING";
+export interface DeckSlide {
+  title: string; subtitle?: string; paragraphs?: string[]; bullets?: string[]; table?: DeckTable; chart?: DeckChart; notes?: string; kind?: "title" | "content";
+  master?: DeckMaster; right?: string[]; placeholder?: string; alt?: string; // a second column; a labelled placeholder figure; a figure's alt text
+}
+/** The institution's look on a teaching pack: its mark (a PNG, because pptxgenjs documents SVG only for the newest PowerPoint) when
+ *  the profile shows it, and the line every content slide carries. On the sample course the line is the demo line. */
+export interface Brand { institution: string; mark: { data: string; alt: string; aspect: number } | null; footer: string; lead: string; sample: boolean }
+export interface DeckSpec { fileName: string; title: string; author: string; generatedAt: string; footer: string; slides: DeckSlide[]; brand?: Brand }
+export const OUTLINE_LABEL = "Outline pack: the lecturer's slides are not written yet.";
+/** The line every slide of a pack carries when its slide text was drafted by the model, in place of DECK_FOOTER. */
+export const PRISM_FOOTER = "Slide text drafted by the model (Prism) for the lecturer to check; editable.";
+
+// ---------- Prism: suggestions on the lecturer's own slides, or a plan without them ----------
+/** What Prism reads: the session, its outcomes, the course topic it teaches with its activities, readings and misconceptions,
+ *  and the employer evidence mapped to its outcomes with one quotation each. Prism suggests; the lecturer writes the slides. */
+export interface SlideRequest {
+  course: string; topic: string; minutes: number; activity: string; learningCheck: string;
+  outcomes: Array<{ label: string; text: string }>; topicNotes: { activities: string; readings: string; misconceptions: string[] };
+  evidence: Array<{ skill: string; postings: number; eligible: number; quote: string }>;
+}
+/** The request with the lecturer's deck (each slide's text, in order) or null for a plan, and the titles of the slides Lyceum
+ *  builds from the record, which a suggestion may tell the lecturer to add. */
+export interface SuggestionRequest extends SlideRequest { deck: string[] | null; toAdd: string[] }
+export function slideRequest(subject: Subject, session: TeachingSession, clos: CLO[], definition: CourseDefinition | null | undefined, report: EvidenceReport, mentions: SkillMention[]): SlideRequest {
+  const topic = definition?.topics.find((t) => t.id === session.topicId) ?? definition?.topics.find((t) => t.week === session.week);
+  return {
+    course: subject.id + " " + subject.title, topic: session.topic, minutes: session.minutes, activity: session.activity, learningCheck: session.learningCheck,
+    outcomes: clos.filter((c) => session.cloIds.includes(c.id)).map((c) => ({ label: c.label ?? c.id, text: c.text })),
+    topicNotes: { activities: topic?.activities ?? "", readings: topic?.readings ?? "", misconceptions: topic?.misconceptions ?? [] },
+    evidence: report.rows.filter((r) => r.postings > 0 && r.mapping?.cloIds.some((id) => session.cloIds.includes(id))).slice(0, 5).map((r) => ({ skill: r.skill, postings: r.postings,
+      eligible: report.eligible, quote: mentions.find((m) => m.subjectId === subject.id && skillKey(m.skill) === r.key)?.excerpt ?? "" })),
+  };
+}
+/** The record-built slides of every pack, by title: the "slides to add" a suggestion may point at. */
+export const SLIDES_TO_ADD = ["Learning outcomes for this session", "Why this matters: what employers ask for", "Learning activity", "Check for understanding", "Resources and references"];
+// ponytail: 60 slides of 800 characters (about 12,000 tokens) is what Prism reads; a longer deck is cut, so split it if needed.
+export const MAX_DECK_SLIDES = 60, MAX_SLIDE_CHARS = 800;
+
+const ModelSuggestion = z.object({
+  kind: z.string().transform((k) => k.toLowerCase().trim()),
+  slide: z.number().int().nullable().catch(null), after: z.boolean().catch(false),
+  minutes: z.number().positive().nullable().catch(null), outcome: z.string().trim().nullable().catch(null),
+  text: z.string().trim().min(8).max(500), why: z.string().trim().min(4).max(600),
+  cites: z.string().nullable().catch(null).transform((c) => (c ? c.toLowerCase().trim() : null)),
+});
+type Suggested = Omit<SlideSuggestion, "id" | "status">;
+const DECK_KINDS = ["add", "change", "remove", "reorder", "layout", "pacing"], CITES = ["outcome", "misconception", "evidence", "session"];
+const has = (haystack: string, needle: string) => Boolean(needle.trim()) && haystack.toLowerCase().includes(needle.trim().toLowerCase());
+/** Keep the suggestions that hold up against the request, at most fifteen. On a deck: a known kind at a slide that exists
+ *  (a new slide goes after slide 0 to N). Without one: plan segments with minutes. Every suggestion but layout and pacing
+ *  advice cites a record, and the record must be in its reason: an outcome by label, a recorded misconception's words, or an
+ *  employer skill by name; "session" is the session's own activity or check. */
+export function readSlideSuggestions(raw: unknown, request: SuggestionRequest): Suggested[] {
+  const list = raw && typeof raw === "object" && Array.isArray((raw as { suggestions?: unknown }).suggestions) ? (raw as { suggestions: unknown[] }).suggestions : [];
+  const n = request.deck?.length ?? 0, labels = request.outcomes.map((o) => o.label);
+  const out: Suggested[] = [];
+  for (const entry of list) {
+    const parsed = ModelSuggestion.safeParse(entry);
+    if (!parsed.success) continue;
+    const d = parsed.data, kind = d.kind as SlideSuggestion["kind"];
+    const outcome = d.outcome ? labels.find((l) => l.toLowerCase() === d.outcome!.toLowerCase()) ?? null : null;
+    if (request.deck) {
+      if (!DECK_KINDS.includes(kind)) continue;
+      const where = d.slide;
+      if (kind === "add" ? where === null || where < 0 || where > n : kind === "change" || kind === "remove" || kind === "reorder" ? where === null || where < 1 || where > n : where !== null && (where < 1 || where > n)) continue;
+    } else if (kind !== "segment" || d.minutes === null || d.minutes > request.minutes) continue;
+    const cites = d.cites && CITES.includes(d.cites) ? (d.cites as SlideSuggestion["cites"]) : null;
+    const grounded = cites === "outcome" ? labels.some((l) => has(d.why, l)) || outcome !== null
+      : cites === "misconception" ? request.topicNotes.misconceptions.some((m) => has(d.why, m.slice(0, 40)))
+      : cites === "evidence" ? request.evidence.some((e) => has(d.why, e.skill))
+      : cites === "session" ? Boolean(request.activity.trim() || request.learningCheck.trim())
+      : kind === "layout" || kind === "pacing";
+    if (!grounded) continue;
+    out.push({ kind, slide: request.deck ? d.slide : null, after: kind === "add", minutes: request.deck ? null : d.minutes, outcome, text: d.text, why: d.why, cites });
+    if (out.length === 15) break;
+  }
+  return out;
+}
+
+const percent = (x: number | null) => (x === null ? "Unknown" : Math.round(x * 1000) / 10 + "%");
+const name = (people: Person[], id: string) => people.find((p) => p.id === id)?.name ?? id;
+const safeFile = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+/** An ISO time as the day a reader says, "22 October 2026", the same in the browser and in Node. */
+export const dayOf = (iso: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); return m ? Number(m[3]) + " " + MONTHS[Number(m[2]) - 1] + " " + m[1] : iso; };
+export const DECK_FOOTER = "Generated by Lyceum from saved data; editable; no AI-written text.";
+
+/** The meeting brief as slides: decision, evidence base, the table, coverage, options, limitations, receipts. */
+export function briefDeck(subject: Subject, brief: EvidenceBrief, report: EvidenceReport, sources: EvidenceSource[], mentions: SkillMention[], outcomes: CLO[], people: Person[], generatedAt: string): DeckSpec {
+  const courseSources = sources.filter((s) => s.subjectId === subject.id && !s.duplicateOf);
+  const postings = courseSources.filter((s) => s.kind === "job-posting");
+  const dates = postings.map((s) => s.sourceDate).filter(Boolean).sort();
+  const collected = postings.filter((s) => s.provenance === "collected");
+  const labels = [...new Set(collected.map((s) => s.collection?.label ?? "collected on request"))];
+  const label = (id: string) => outcomes.find((c) => c.id === id)?.label ?? id;
+  const top = report.rows.filter((r) => r.postings > 0).slice(0, 8);
+  const status = (shortfall: boolean | null) => (shortfall === null ? "Not assessed" : shortfall ? "Below target" : "At or above target");
+  const options: Array<keyof typeof RECOMMENDATION_LABEL> = ["keep", "refresh", "revise"];
+  const slides: DeckSlide[] = [
+    { kind: "title", title: subject.id + " " + subject.title, subtitle: "Evidence brief for the programme meeting",
+      paragraphs: ["Prepared by " + name(people, brief.createdBy) + " on " + dayOf(brief.createdAt) + ".", "Lecturer-controlled preparation. This brief does not attest institutional approval."],
+      notes: "Open with the decision you are asking for, then the evidence base. Every quotation in the receipts was confirmed against its source." },
+    { title: "Decision requested", paragraphs: [RECOMMENDATION_LABEL[brief.recommendation] + ".", brief.notes || "No notes recorded."],
+      notes: "State the recommendation in one sentence, then what it costs in hours and what you want decided." },
+    { title: "Evidence base", bullets: [
+      report.eligible + " reviewed job postings in the denominator, from " + report.organisations + " employers.",
+      "Publication dates as supplied: " + (dates.length ? dates[0] + " to " + dates[dates.length - 1] : "not supplied") + ".",
+      collected.length + " collected on request (" + (labels.join("; ") || "none") + "), " + (postings.length - collected.length) + " lecturer-supplied, " + report.contextual + " contextual documents.",
+      "Excluded: " + report.unreviewed + " unreviewed postings and " + report.duplicates + " duplicate copies.",
+      report.trendNote,
+    ], notes: "The denominator is the lecturer's reviewed sample, not the labour market." },
+    { title: "What employers ask for", table: top.length ? {
+      header: ["Skill", "Postings", "Share", "95% interval", "Coverage today", "Target", "Status"], widths: [2.2, 1.1, 0.9, 1.5, 1.3, 1.0, 1.4],
+      rows: top.map((r) => [r.skill, r.postings + " of " + report.eligible, percent(r.share), r.interval ? percent(r.interval.low) + " to " + percent(r.interval.high) : "Unknown", STAGE_LABEL[r.stage], STAGE_LABEL[r.target], status(r.shortfall)]),
+    } : undefined, paragraphs: top.length ? undefined : ["No requirement has been quoted from a reviewed posting yet."],
+      notes: "Counts over reviewed postings with a Wilson interval. Never a score." },
+    { title: "The same counts as a picture", chart: top.length ? { categories: top.map((r) => r.skill), values: top.map((r) => r.postings), max: report.eligible,
+        caption: "Postings quoting each skill, out of " + report.eligible + " reviewed postings. The axis ends at the denominator; the intervals are in the table." } : undefined,
+      paragraphs: top.length ? undefined : ["No requirement has been quoted from a reviewed posting yet."],
+      notes: "One series, one colour, the count written on each bar. Bar length is the count over the reviewed denominator, not a market share." },
+    { title: "Coverage against targets", paragraphs: [report.targetCoverage
+        ? "Target coverage index: " + percent(report.targetCoverage.value) + " over " + report.targetCoverage.knownSkills + " skills with a reviewed stage and target; " + percent(report.targetCoverage.unknownWeightShare) + " of the quoted demand weight has an unknown stage or target."
+        : report.coverageNote],
+      bullets: report.rows.filter((r) => r.mapping).slice(0, 8).map((r) => r.skill + ": " + STAGE_LABEL[r.stage] + ", target " + STAGE_LABEL[r.target] + ". Outcomes: " + (r.mapping!.cloIds.map(label).join(", ") || "none") + ". Evidence: " + (r.mapping!.evidence || "not cited") + "."),
+      notes: "Coverage stages are the lecturer's reviewed judgement with cited course evidence." },
+    { title: "Options considered", bullets: options.map((o) => RECOMMENDATION_LABEL[o] + (o === brief.recommendation ? " (recommended)" : "")).concat(brief.recommendation === "undecided" ? ["No recommendation yet (recommended): the meeting weighs the options above."] : []),
+      notes: "Keeping the course unchanged is a valid option." },
+    { title: "Limitations", bullets: [
+      "A convenience sample chosen by the lecturer; shares and intervals describe the recorded set, not the labour market.",
+      "Coverage stages are reviewed judgement, not mastery.",
+      "No learning impact is estimated. Nothing in this brief changes the course by itself.",
+    ] },
+  ];
+  for (const source of courseSources.slice(0, 10)) {
+    const quotes = mentions.filter((m) => m.sourceId === source.id);
+    slides.push({ title: "Receipt: " + source.title, bullets: [
+      (source.organisation || "Organisation not named") + ". Published " + (source.sourceDate || "date not supplied") + ". Recorded " + source.addedAt + (source.collection ? " from " + source.collection.label : ", lecturer-supplied") + ".",
+      source.url ? "Link: " + source.url : "No link supplied.",
+      ...(quotes.length ? quotes.slice(0, 6).map((m) => "\"" + m.excerpt.replace(/\s+/g, " ") + "\" (" + m.skill + ", " + m.requirement + ")") : ["No requirement quoted yet."]),
+    ], notes: "Every quotation above exists verbatim in the retained posting text." });
+  }
+  if (courseSources.length > 10) slides.push({ title: "Further receipts", bullets: courseSources.slice(10).map((s) => s.title + " (" + (s.organisation || "organisation not named") + ")") });
+  return { fileName: safeFile(subject.id) + "-meeting-brief.pptx", title: subject.id + " evidence brief", author: name(people, brief.createdBy), generatedAt, footer: DECK_FOOTER, slides };
+}
+
+/** The brand a course's packs carry. The institution's mark and the demo line go on the sample course's packs: the demo line names
+ *  CS310 and says its slides are synthetic, and every surface that shows the mark carries it (depth plan Section 3.3). A lecturer's
+ *  own course keeps the plain line. `markData` is the wide PNG as base64; the mark appears only when the profile shows it. */
+export function brandFor(institution: InstitutionProfile, definition: CourseDefinition | null | undefined, subject: Subject, week: number, markData: string | null): Brand {
+  const sample = Boolean(definition?.sample);
+  const aspect = markData ? pngAspect(markData) : null;
+  return {
+    institution: institution.name, sample, lead: subject.id + " · week " + week,
+    mark: sample && institution.showMark && markData && aspect ? { data: markData, alt: institution.mark.alt, aspect } : null,
+    footer: sample ? DEMO_LINE : DECK_FOOTER,
+  };
+}
+/** A PNG's width over its height, read from the IHDR chunk at the start of its base64. */
+export function pngAspect(base64: string): number | null {
+  const head = base64.replace(/^(data:)?image\/png;base64,/, "").slice(0, 44);
+  const table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const bytes: number[] = [];
+  for (let i = 0; i + 3 < head.length; i += 4) {
+    const n = [0, 1, 2, 3].map((k) => table.indexOf(head[i + k])).reduce((acc, v) => (acc << 6) | Math.max(0, v), 0);
+    bytes.push((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  }
+  if (bytes.length < 24 || String.fromCharCode(...bytes.slice(12, 16)) !== "IHDR") return null;
+  const word = (o: number) => ((bytes[o] << 24) >>> 0) + (bytes[o + 1] << 16) + (bytes[o + 2] << 8) + bytes[o + 3];
+  const w = word(16), h = word(20);
+  return w > 0 && h > 0 ? w / h : null;
+}
+
+/** A teaching pack for one saved session (depth plan Section 5.2). With the session's own slides: a title slide, those slides,
+ *  the evidence, the check for understanding, the resources and a closing slide. A sample session without slides: an outline
+ *  pack built from the topic record and labelled so. A lecturer's session without slides: outcomes, the evidence behind them,
+ *  the activity, the check and the resources. Every slide has a unique title and notes. */
+export function sessionDeck(subject: Subject, session: TeachingSession, clos: CLO[], report: EvidenceReport, mentions: SkillMention[], sources: EvidenceSource[], people: Person[], generatedAt: string,
+  context: { definition?: CourseDefinition | null; brand?: Brand | null } = {}): DeckSpec {
+  const linked = clos.filter((c) => session.cloIds.includes(c.id));
+  const label = (c: CLO) => c.label ?? c.id;
+  const relevant = report.rows.filter((r) => r.mapping && r.mapping.cloIds.some((id) => session.cloIds.includes(id)));
+  const quoteFor = (skill: string) => {
+    const mention = mentions.find((m) => m.subjectId === subject.id && skillKey(m.skill) === skillKey(skill));
+    const source = mention && sources.find((s) => s.id === mention.sourceId);
+    return mention && source ? "\"" + mention.excerpt.replace(/\s+/g, " ") + "\" (" + (source.organisation || source.title) + ")" : null;
+  };
+  const byPrism = session.slidesBy === "prism" && Boolean(session.slides?.length);
+  const baseBrand = context.brand ?? { institution: "", mark: null, footer: DECK_FOOTER, lead: subject.id + " · week " + session.week, sample: false };
+  // On the sample course the demo line stays, and the model's line follows it.
+  const brand = byPrism ? { ...baseBrand, footer: baseBrand.sample ? baseBrand.footer + " " + PRISM_FOOTER : PRISM_FOOTER } : baseBrand;
+  const topic = context.definition?.topics.find((t) => t.id === session.topicId) ?? context.definition?.topics.find((t) => t.week === session.week);
+  const next = context.definition?.topics.filter((t) => t.week !== null && t.week > session.week).sort((a, b) => a.week! - b.week!)[0];
+  const outcomes: DeckSlide = { title: "Learning outcomes for this session", bullets: linked.length ? linked.map((c) => label(c) + ": " + c.text) : ["No course outcome linked yet. Link one in the teaching plan."],
+    notes: "Say what students will be able to do by the end, in their words." };
+  const evidence: DeckSlide = { title: "Why this matters: what employers ask for", bullets: relevant.length
+      ? relevant.slice(0, 6).flatMap((r) => [r.skill + ": " + r.postings + " of " + report.eligible + " reviewed postings" + (r.interval ? " (" + percent(r.interval.low) + " to " + percent(r.interval.high) + ")" : "") + ". Coverage today: " + STAGE_LABEL[r.stage] + "; target: " + STAGE_LABEL[r.target] + ".", ...(quoteFor(r.skill) ? ["  " + quoteFor(r.skill)] : [])])
+      : ["No evidence is linked to these outcomes yet. Map skills to outcomes in Report and regenerate."],
+    notes: "Counts are over the lecturer's reviewed postings, with an interval. The quotations are exact." };
+  const check: DeckSlide = { title: "Check for understanding", paragraphs: [session.learningCheck || "Add how you will check their learning."], notes: "State what you will look for in an answer or demonstration." };
+  const resources: DeckSlide = { title: "Resources and references", paragraphs: [session.resources || "No resources recorded."], notes: "Links and readings as saved in the session." };
+  const closing: DeckSlide = { master: "CLOSING", title: "Outcomes revisited, and next week",
+    bullets: [...linked.map((c) => label(c) + ": " + c.text), next ? "Next week: " + next.title : "Next: the examination period"],
+    notes: "Ask one student to say, in their own words, which outcome today served. Then name next week's topic." };
+  const cover: DeckSlide = { kind: "title", title: subject.id + " week " + session.week + ": " + session.topic, subtitle: session.minutes + " minutes. " + subject.title,
+    // A sample session was written for the prototype, not by the person on its record, so its cover names no one.
+    paragraphs: [session.sample ? "A sample session, generated on " + dayOf(generatedAt) + "." : "Prepared by " + name(people, session.updatedBy) + " on " + dayOf(generatedAt) + ".",
+      session.sample ? (session.slides?.length ? "Sample slides, written for this prototype and labelled synthetic." : "An outline pack built from the sample course record.")
+        : byPrism ? "The teaching slides were drafted by the model (Prism) from the session and the course record; check and edit them before teaching." : "Editable teaching pack generated from the saved session and the course evidence."],
+    notes: session.sample ? "A sample session written for this prototype. Edit it, or write your own." : "Teaching pack for the session. Edit freely; it is yours." };
+  let slides: DeckSlide[];
+  if (session.slides?.length) {
+    slides = [cover, ...session.slides.map((s): DeckSlide => ({
+      title: s.title, bullets: s.bullets, notes: s.notes || "Speaker notes not written yet.",
+      master: s.section ? "SECTION" : s.right?.length ? "TWO_COLUMN" : "CONTENT", right: s.right,
+      table: s.figure?.kind === "table" ? { header: s.figure.header, rows: s.figure.rows } : undefined,
+      placeholder: s.figure?.kind === "placeholder" ? s.figure.label : undefined,
+      alt: s.figure?.kind === "table" ? s.figure.alt : s.figure?.kind === "placeholder" ? s.figure.label : undefined,
+    })), evidence, check, resources, closing];
+  } else if (session.sample) {
+    const parts = (topic?.activities ?? session.activity).split(/(?<=\.)\s+/).filter(Boolean).slice(0, 2);
+    slides = [cover, outcomes,
+      { title: "This week, in outline", paragraphs: [OUTLINE_LABEL], bullets: [...parts, ...(topic?.readings || session.resources ? ["Reading: " + (topic?.readings || session.resources)] : [])].slice(0, 3),
+        notes: OUTLINE_LABEL + " The outline is built from the topic's activities and readings in the course record." },
+      evidence, closing];
+  } else {
+    slides = [cover, outcomes, evidence,
+      { title: "Learning activity", paragraphs: [session.activity || "Add an activity students will take part in."], notes: "Describe what students do, not only what you present." },
+      check, resources];
+  }
+  return { fileName: safeFile(subject.id) + "-week-" + session.week + "-teaching-pack.pptx", title: subject.id + " week " + session.week + " teaching pack",
+    author: session.sample ? "Lyceum prototype (sample)" : name(people, session.updatedBy), generatedAt, footer: brand.footer, slides, brand };
+}
+
+/** A session's pack as the generator builds it under one course version (depth plan Section 6.2): that version's outcome
+ *  snapshot and record, with the evidence report over those outcomes, so two versions' packs compare record by record. */
+export function packUnderVersion(subject: Subject, session: TeachingSession, version: { cloSnapshot: CLO[]; definition?: CourseDefinition | null },
+  evidence: { sources: EvidenceSource[]; mentions: SkillMention[]; mappings: SkillMapping[] }, people: Person[], generatedAt: string, brand: Brand | null): DeckSpec {
+  const clos = version.cloSnapshot.filter((c) => c.subjectId === subject.id);
+  const report = evidenceReport(subject.id, evidence.sources, evidence.mentions, evidence.mappings, clos);
+  return sessionDeck(subject, session, clos, report, evidence.mentions, evidence.sources, people, generatedAt, { definition: version.definition ?? null, brand });
+}
+
+// ---------- rendering ----------
+interface PptxSlide { addText: (text: unknown, options: Record<string, unknown>) => void; addTable: (rows: unknown[], options: Record<string, unknown>) => void; addChart: (type: unknown, data: unknown[], options: Record<string, unknown>) => void; addNotes: (notes: string) => void; background: Record<string, unknown> }
+interface PptxInstance { layout: string; author: string; title: string; ChartType: Record<string, unknown>; ShapeType: Record<string, unknown>; addSlide: (props?: { masterName?: string }) => PptxSlide;
+  defineSlideMaster: (props: Record<string, unknown>) => void; writeFile: (options: { fileName: string }) => Promise<string>; write: (options: { outputType: string }) => Promise<unknown> }
+type PptxCtor = new () => PptxInstance;
+async function loadPptx(): Promise<PptxCtor> {
+  const mod = (await import("pptxgenjs")) as unknown as { default?: PptxCtor } & PptxCtor;
+  return (mod.default ?? mod) as PptxCtor;
+}
+// Colours come from the theme tokens. The decks name Calibri, which every PowerPoint has, because pptxgenjs
+// cannot embed the bundled faces and a lecturer's machine may not have them (docs/decisions.md).
+const FOREST = bareHex("forest"), INK = bareHex("ink"), MUTED = bareHex("ink2"), PAPER = bareHex("white"), PANEL = bareHex("tint2"), BAR = bareHex("emerald"), ON_FOREST = bareHex("onForest"), RULE = bareHex("border"), TINT = bareHex("tint1");
+const FACE = "Calibri";
+
+export async function renderDeck(spec: DeckSpec, Pptx: PptxCtor): Promise<PptxInstance> {
+  return spec.brand ? renderBranded(spec, Pptx) : renderPlain(spec, Pptx);
+}
+
+/** A teaching pack on five slide masters (depth plan Section 5.2). Each master holds the title placeholder, the brand (the mark
+ *  with its alt text, on a white plate on forest masters and top right on white ones), the footer with the course, the week and
+ *  the brand's line, and the slide number. The body is placed by the layout rules the preview shares (lib/deckLayout.ts),
+ *  after the title, so the reading order is title, body, figure. Shapes come from the ShapeType constants, never preset
+ *  strings (pptxgenjs issue 1449), and every text box shrinks to fit rather than clip. */
+function renderBranded(spec: DeckSpec, Pptx: PptxCtor): PptxInstance {
+  const pptx = new Pptx();
+  pptx.layout = "LAYOUT_16x9";
+  pptx.author = spec.author;
+  pptx.title = spec.title;
+  const brand = spec.brand!;
+  const at = (b: Box) => ({ x: b.x, y: b.y, w: b.w, h: b.h });
+  const mark = (box: Box) => {
+    const m = brand.mark!, w = Math.min(box.w, box.h * m.aspect), h = w / m.aspect;
+    return { image: { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h, data: "image/png;base64," + m.data.replace(/^(data:)?image\/png;base64,/, ""), altText: m.alt } };
+  };
+  const footer = footerText(spec);
+  const define = (name: DeckMaster, background: string, titleBox: Box, titleSize: number) => {
+    const forest = isForest(name), tone = forest ? ON_FOREST : MUTED;
+    pptx.defineSlideMaster({
+      title: name, background: { color: background },
+      objects: [
+        { placeholder: { options: { name: "title", type: "title", ...at(titleBox), fontFace: FACE, fontSize: titleSize, bold: true, color: forest ? PAPER : FOREST, valign: name === "TITLE" ? "bottom" : "middle", fit: "shrink" }, text: "" } },
+        ...(brand.mark ? (forest ? [{ rect: { ...at(LAYOUT.markPlate), fill: { color: PAPER }, line: { color: PAPER } } }, mark(LAYOUT.markOnPlate)] : [mark(LAYOUT.markCorner)]) : []),
+        { text: { text: footer, options: { ...at(LAYOUT.footer), fontFace: FACE, fontSize: 9, color: tone, valign: "top" } } },
+      ],
+      slideNumber: { ...at(LAYOUT.slideNumber), fontFace: FACE, fontSize: 9, color: tone, align: "right" },
+    });
+  };
+  const contentTitle = brand.mark ? LAYOUT.title : LAYOUT.titleWide;
+  define("TITLE", FOREST, LAYOUT.coverTitle, 34);
+  define("SECTION", TINT, LAYOUT.sectionTitle, 32);
+  define("CONTENT", PAPER, contentTitle, 28);
+  define("TWO_COLUMN", PAPER, contentTitle, 28);
+  define("CLOSING", FOREST, LAYOUT.title, 28);
+  spec.slides.forEach((slide) => {
+    const master = masterOf(slide), forest = isForest(master), color = forest ? ON_FOREST : INK, quiet = forest ? ON_FOREST : MUTED;
+    const s = pptx.addSlide({ masterName: master });
+    s.addText(slide.title, { placeholder: "title" });
+    const runs = (items: string[] | undefined) => (items ?? []).map((text) => ({ text: text.trim(), options: { bullet: !text.startsWith("  "), indentLevel: text.startsWith("  ") ? 1 : 0, breakLine: true, color: text.startsWith("  ") ? quiet : color } }));
+    const box = (content: unknown, b: Box) => s.addText(content, { ...at(b), fontFace: FACE, fontSize: BODY_PT, color, valign: "top", paraSpaceAfter: 6, fit: "shrink" });
+    if (master === "TITLE") box([slide.subtitle, ...(slide.paragraphs ?? [])].filter(Boolean).join("\n"), LAYOUT.coverBody);
+    else if (master === "TWO_COLUMN") { box(runs(slide.bullets), LAYOUT.left); box(runs(slide.right), LAYOUT.right); }
+    else {
+      const figure = Boolean(slide.table || slide.placeholder || slide.chart);
+      const content = [...(slide.paragraphs ?? []).map((text) => ({ text, options: { breakLine: true, color } })), ...runs(slide.bullets)];
+      if (content.length) box(content, master === "SECTION" ? LAYOUT.sectionBody : figure ? LAYOUT.bodyAboveFigure : LAYOUT.body);
+      if (slide.table) {
+        const rows = [slide.table.header.map((text) => ({ text, options: { bold: true, fill: { color: PANEL }, color: FOREST } })), ...slide.table.rows];
+        s.addTable(rows, { ...at(LAYOUT.figure), fontSize: 14, fontFace: FACE, color: INK, border: { type: "solid", pt: 0.5, color: RULE }, valign: "middle", autoPage: false });
+      } else if (slide.placeholder) {
+        s.addText(slide.placeholder, { ...at(LAYOUT.figure), shape: pptx.ShapeType.rect, fill: { color: TINT }, line: { color: RULE, width: 1, dashType: "dash" }, fontFace: FACE, fontSize: BODY_PT, color: MUTED, align: "center", valign: "middle", fit: "shrink" });
+      } else if (slide.chart) {
+        s.addChart(pptx.ChartType.bar, [{ name: "Postings", labels: slide.chart.categories, values: slide.chart.values }], {
+          ...at(LAYOUT.figure), barDir: "bar", chartColors: [BAR], showLegend: false, showTitle: false, showValue: true, dataLabelColor: INK, dataLabelFontSize: 14, dataLabelFontFace: FACE,
+          catAxisLabelColor: INK, catAxisLabelFontSize: 14, catAxisLabelFontFace: FACE, catAxisOrientation: "maxMin", valAxisHidden: true, valAxisMinVal: 0, valAxisMaxVal: Math.max(1, slide.chart.max),
+          valGridLine: { style: "none" }, catGridLine: { style: "none" }, altText: slide.alt ?? slide.chart.caption });
+      }
+    }
+    s.addNotes(slide.notes || "Speaker notes not written yet.");
+  });
+  return pptx;
+}
+
+function renderPlain(spec: DeckSpec, Pptx: PptxCtor): PptxInstance {
+  const pptx = new Pptx();
+  pptx.layout = "LAYOUT_16x9";
+  pptx.author = spec.author;
+  pptx.title = spec.title;
+  spec.slides.forEach((slide, index) => {
+    const s = pptx.addSlide();
+    if (slide.kind === "title") {
+      s.background = { color: FOREST };
+      s.addText(slide.title, { x: 0.6, y: 1.4, w: 8.8, h: 1.3, fontSize: 34, bold: true, color: PAPER, fontFace: FACE, valign: "bottom", fit: "shrink" });
+      if (slide.subtitle) s.addText(slide.subtitle, { x: 0.6, y: 2.8, w: 8.8, h: 0.7, fontSize: 20, color: ON_FOREST, fontFace: FACE, fit: "shrink" });
+      if (slide.paragraphs?.length) s.addText(slide.paragraphs.join("\n"), { x: 0.6, y: 3.6, w: 8.8, h: 1.2, fontSize: 14, color: ON_FOREST, fontFace: FACE, valign: "top", fit: "shrink" });
+      s.addText(spec.footer, { x: 0.6, y: 5.05, w: 8.8, h: 0.35, fontSize: 10, color: ON_FOREST, fontFace: FACE });
+    } else {
+      s.background = { color: PAPER };
+      s.addText(slide.title, { x: 0.5, y: 0.3, w: 9, h: 0.8, fontSize: 26, bold: true, color: FOREST, fontFace: FACE, valign: "middle", fit: "shrink" });
+      let y = 1.25;
+      if (slide.paragraphs?.length) {
+        const h = slide.table || slide.bullets?.length ? 1.0 : 3.7;
+        s.addText(slide.paragraphs.join("\n\n"), { x: 0.5, y, w: 9, h, fontSize: 16, color: INK, fontFace: FACE, valign: "top", fit: "shrink" });
+        y += h + 0.1;
+      }
+      if (slide.table) {
+        const rows = [slide.table.header.map((text) => ({ text, options: { bold: true, fill: { color: PANEL }, color: FOREST } })), ...slide.table.rows];
+        const widths = slide.table.widths ?? slide.table.header.map(() => 9 / slide.table!.header.length);
+        s.addTable(rows, { x: 0.5, y, w: 9, colW: widths, fontSize: 11, fontFace: FACE, color: INK, border: { type: "solid", pt: 0.5, color: RULE }, valign: "middle", autoPage: false });
+      } else if (slide.bullets?.length) {
+        s.addText(slide.bullets.map((text) => ({ text, options: { bullet: !text.startsWith("  "), breakLine: true, color: text.startsWith("  ") ? MUTED : INK, indentLevel: text.startsWith("  ") ? 1 : 0 } })),
+          { x: 0.5, y, w: 9, h: 5.0 - y, fontSize: 14, fontFace: FACE, valign: "top", paraSpaceAfter: 6, fit: "shrink" });
+      }
+      if (slide.chart) {
+        s.addChart(pptx.ChartType.bar, [{ name: "Postings", labels: slide.chart.categories, values: slide.chart.values }], {
+          x: 0.5, y, w: 9, h: 4.5 - y, barDir: "bar", chartColors: [BAR], barGapWidthPct: 60, showLegend: false, showTitle: false,
+          showValue: true, dataLabelColor: INK, dataLabelFontSize: 11, dataLabelFontFace: "Calibri", dataLabelPosition: "outEnd", dataLabelFormatCode: "0",
+          catAxisLabelColor: INK, catAxisLabelFontSize: 12, catAxisLabelFontFace: "Calibri", catAxisOrientation: "maxMin", catAxisLineShow: false,
+          valAxisHidden: true, valAxisMinVal: 0, valAxisMaxVal: Math.max(1, slide.chart.max), valGridLine: { style: "none" }, catGridLine: { style: "none" },
+        });
+        s.addText(slide.chart.caption, { x: 0.5, y: 4.6, w: 9, h: 0.45, fontSize: 11, color: MUTED, fontFace: FACE, valign: "top" });
+      }
+      s.addText(spec.footer + "  " + (index + 1) + " / " + spec.slides.length, { x: 0.5, y: 5.15, w: 9, h: 0.3, fontSize: 9, color: MUTED, fontFace: FACE });
+    }
+    if (slide.notes) s.addNotes(slide.notes);
+  });
+  return pptx;
+}
+/** pptxgenjs 4.0.1 writes a slide-master content-type override for every slide, naming master parts the file does not hold
+ *  (issue 1449, in docs/research/slides-items-and-surveys-tech-2026-10-22.md). The proof found it in our packs, so every deck
+ *  passes through this repair, which drops each override whose part is not in the file and changes nothing else. */
+export async function repairPptx(bytes: Uint8Array): Promise<{ bytes: Uint8Array; dropped: string[] }> {
+  const mod = (await import("jszip")) as unknown as { default?: ZipCtor } & ZipCtor;
+  const JSZip = (mod.default ?? mod) as ZipCtor;
+  const zip = await JSZip.loadAsync(bytes);
+  const types = zip.file("[Content_Types].xml");
+  if (!types) return { bytes, dropped: [] };
+  const dropped: string[] = [];
+  const fixed = (await types.async("string")).replace(/<Override PartName="([^"]+)"[^>]*\/>/g, (whole, part: string) => {
+    if (zip.file(part.replace(/^\//, ""))) return whole;
+    dropped.push(part);
+    return "";
+  });
+  if (!dropped.length) return { bytes, dropped };
+  zip.file("[Content_Types].xml", fixed);
+  return { bytes: await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" }), dropped };
+}
+interface ZipFile { async: (type: "string") => Promise<string> }
+interface ZipInstance { file: { (path: string): ZipFile | null; (path: string, content: string): void }; generateAsync: (o: { type: "uint8array"; compression: string }) => Promise<Uint8Array> }
+interface ZipCtor { loadAsync: (bytes: Uint8Array) => Promise<ZipInstance> }
+
+/** Browser: build, repair and download the deck. */
+export async function downloadDeck(spec: DeckSpec): Promise<void> {
+  downloadBytes(spec.fileName, await deckBytes(spec), "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+}
+/** Browser or Node: the deck as bytes, for the course file. */
+export async function deckBytes(spec: DeckSpec): Promise<Uint8Array> {
+  const pptx = await renderDeck(spec, await loadPptx());
+  return (await repairPptx((await pptx.write({ outputType: "uint8array" })) as Uint8Array)).bytes;
+}
+/** Node: build the deck as a buffer, for proofs. */
+export async function deckBuffer(spec: DeckSpec): Promise<Uint8Array> {
+  const pptx = await renderDeck(spec, await loadPptx());
+  return (await repairPptx((await pptx.write({ outputType: "nodebuffer" })) as Uint8Array)).bytes;
+}

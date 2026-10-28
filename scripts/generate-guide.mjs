@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { SECTION_GUIDES, REMAINING_WORK } from "../src/app/sectionGuides.ts";
+import { SECTION_GUIDES, REMAINING_WORK } from "../web/src/app/sectionGuides.ts";
 
 const lines = [
   "# Lyceum: lecturer and section guide", "",

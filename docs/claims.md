@@ -1,6 +1,6 @@
 # Lyceum: claims register
 
-Every figure shown on a Lyceum surface (the landing page, the deck, the brief, the poster, the film and the README) appears here once: the words it is shown in, its source and link, the research note or record that checked it, and the date. A figure that is not here does not ship. `src/prove-journey.ts` fails if a landing figure is missing from this file or a quoted clause is missing from its note; the deck, brief, poster and film generators fail on any number that is not a row here (the last section says which check covers which surface). The wording was checked row by row against the notes on 22 October 2026 (`docs/review/astra-claims-audit-2026-10-22.md`); each change it led to is in `docs/decisions.md`.
+Every figure shown on a Lyceum surface (the landing page, the deck, the brief, the poster, the film and the README) appears here once: the words it is shown in, its source and link, the research note or record that checked it, and the date. A figure that is not here does not ship. `tests/prove-journey.ts` fails if a landing figure is missing from this file or a quoted clause is missing from its note; the deck, brief, poster and film generators fail on any number that is not a row here (the last section says which check covers which surface). The wording was checked row by row against the notes on 22 October 2026 (`docs/review/astra-claims-audit-2026-10-22.md`); each change it led to is in `docs/decisions.md`.
 
 Keys, as in the research notes: **P** a primary document fetched and quoted; **S** a reputable secondary source; **V** vendor material, said so beside the figure; **M** measured by this project, with the record that holds the measurement.
 
@@ -22,11 +22,11 @@ The 39% is the average that the employers in the Forum's survey expect for 2025 
 
 | Claim | Figure | Shown as | Record | Key | Checked on |
 |:--|:--|:--|:--|:--|:--|
-| `proof-checks` | 259 | 259 automated checks passed on 23 October 2026, plus four headless browser runs | `npm run prove:all` (twenty-four suites, listed with their counts in `src/data/suites.ts` and on the Evaluation page) and the four smokes, the verification table of 22 October in [as-built.md](as-built.md), section 5 | M | 22 October 2026 |
+| `proof-checks` | 259 | 259 automated checks passed on 23 October 2026, plus four headless browser runs | `npm run prove:all` (twenty-four suites, listed with their counts in `shared/data/suites.ts` and on the Evaluation page) and the four smokes, the verification table of 22 October in [as-built.md](as-built.md), section 5 | M | 22 October 2026 |
 | `proof-live-board` | 727 | 727 real postings fetched live from one employer's public board on request, 9 October 2026 | The Stripe board on Greenhouse through the local API: [the 9 October as-built report](history/lyceum-v3-as-built-2026-10-09.md) and the execution record in [lyceum-improvement-plan.md](lyceum-improvement-plan.md), Section 30 | M | 9 October 2026 |
-| `proof-no-keys` | 0 | 0 AI keys needed; the core is deterministic, and file parsing and live collection use the local API | Every proof and smoke runs with no key set; the agents default to fixture mode (`src/agents/mode.ts`) | M | 22 October 2026 |
-| `tour-length` | about 7 minutes | Watch the tour, about 7 minutes | `tourMinutes()` in `src/demo/script.ts`, computed from the tour's own pacing: 393 seconds at full speed after A6 set the term at the Course step and on the results file (382 after the A4 rewrite); a live fetch can add a little | M | 22 October 2026 |
-| `proof-no-paraphrase` | 0 | 0 paraphrases accepted as evidence; a quotation must match its source text or it is rejected | `src/prove-evidence.ts`, `src/prove-research.ts` and the curriculum smoke's rejected misquote | M | 22 October 2026 |
+| `proof-no-keys` | 0 | 0 AI keys needed; the core is deterministic, and file parsing and live collection use the local API | Every proof and smoke runs with no key set; the agents default to fixture mode (`shared/agents/mode.ts`) | M | 22 October 2026 |
+| `tour-length` | about 7 minutes | Watch the tour, about 7 minutes | `tourMinutes()` in `web/src/demo/script.ts`, computed from the tour's own pacing: 393 seconds at full speed after A6 set the term at the Course step and on the results file (382 after the A4 rewrite); a live fetch can add a little | M | 22 October 2026 |
+| `proof-no-paraphrase` | 0 | 0 paraphrases accepted as evidence; a quotation must match its source text or it is rejected | `tests/prove-evidence.ts`, `tests/prove-research.ts` and the curriculum smoke's rejected misquote | M | 22 October 2026 |
 
 ## The deck, the brief and the poster
 
@@ -37,7 +37,7 @@ Package A6. The deck carries five figures in all (plan Section 14): the receipt'
 | `deck-receipt` | 1 of 9 | 1 of 9 reviewed postings, beside one exact sentence from Stripe's Data Analyst, Intern posting (published 2026-10-01, retrieved 2026-10-09) | The tour's end state, `mcp/sample-workspace.json`: the saved sample of Stripe's public Greenhouse board, 10 postings kept for CS310, 1 a duplicate, 9 reviewed | `scripts/gen-deck.mjs` checks the sentence against its source text and its confirmed quotation, the employer, the title, both dates, the link, the fingerprint and the denominator | M | 22 October 2026 |
 | `deck-trl` | TRL 6; TRL 7 next | Software TRL 6, "Prototype implementations of the software demonstrated on full-scale realistic problems", self-assessed, in a relevant environment of real postings from a real public board, a sample course outline and a lecturer persona; TRL 7 needs one department running it for a term inside its LMS | NASA ESTO, technology readiness levels, the software column (<https://esto.nasa.gov/trl/>) | [hackastone-and-competitors-2026-10-22.md](research/hackastone-and-competitors-2026-10-22.md), Section 2 | P | 22 October 2026 |
 
-The relevant environment says a sample course outline, not a real syllabus: the outline in `public/demo` is generated by `scripts/gen-demo-files.mjs` (docs/decisions.md).
+The relevant environment says a sample course outline, not a real syllabus: the outline in `web/public/demo` is generated by `scripts/gen-demo-files.mjs` (docs/decisions.md).
 
 ## The film
 
@@ -62,15 +62,15 @@ Each quotation is word for word from the note named, which quotes the document a
 
 | Claim | Landing page | Deck | Brief | Poster | Film | README | Checked by |
 |:--|:--|:--|:--|:--|:--|:--|:--|
-| `world-skills-and-approval` | yes | slide 3 | page 1 | yes | Afternoon, beat 2 | yes | `src/prove-journey.ts` (landing), `scripts/gen-deck.mjs` (slides and the PDF read back), `scripts/gen-brief-pdf.mjs`, `scripts/gen-poster.mjs`, `video/remotion/scripts/sync.mjs` (captions and the counting graphics) |
-| `asia-talent-shortage` | yes | no | page 1 | no | no | no | `src/prove-journey.ts`, `scripts/gen-brief-pdf.mjs` |
-| `malaysia-underemployment` | yes | no | page 1 | no | no | no | `src/prove-journey.ts`, `scripts/gen-brief-pdf.mjs` |
+| `world-skills-and-approval` | yes | slide 3 | page 1 | yes | Afternoon, beat 2 | yes | `tests/prove-journey.ts` (landing), `scripts/gen-deck.mjs` (slides and the PDF read back), `scripts/gen-brief-pdf.mjs`, `scripts/gen-poster.mjs`, `video/remotion/scripts/sync.mjs` (captions and the counting graphics) |
+| `asia-talent-shortage` | yes | no | page 1 | no | no | no | `tests/prove-journey.ts`, `scripts/gen-brief-pdf.mjs` |
+| `malaysia-underemployment` | yes | no | page 1 | no | no | no | `tests/prove-journey.ts`, `scripts/gen-brief-pdf.mjs` |
 | `deck-receipt` | no | slide 1 | page 1 | yes | both cuts, beat 3 | no | `scripts/gen-deck.mjs` and `video/remotion/scripts/sync.mjs` check the sentence, its posting and the denominator against `mcp/sample-workspace.json`; `scripts/gen-poster.mjs` checks the figure against this row |
 | `deck-trl` | no | slide 8 | page 2 | yes | Afternoon, beat 6 | no | `scripts/gen-deck.mjs`, `scripts/gen-brief-pdf.mjs`, `scripts/gen-poster.mjs`, `video/remotion/scripts/sync.mjs` |
-| `proof-checks` | yes | slide 8 | page 2 | yes | Afternoon, beat 6 | yes | `src/prove-journey.ts` (the figure equals the suites' total), the generators above |
-| `proof-live-board` | yes | no | no | yes | no | no | `src/prove-journey.ts`, `scripts/gen-poster.mjs` |
-| `proof-no-keys` | yes | no | no | yes | no | no | `src/prove-journey.ts`, `scripts/gen-poster.mjs` |
-| `proof-no-paraphrase` | yes | no | no | yes | no | no | `src/prove-journey.ts`, `scripts/gen-poster.mjs` |
-| `tour-length` | yes | no | no | no | no | yes | `src/prove-journey.ts` (the figure equals `tourMinutes()`) |
+| `proof-checks` | yes | slide 8 | page 2 | yes | Afternoon, beat 6 | yes | `tests/prove-journey.ts` (the figure equals the suites' total), the generators above |
+| `proof-live-board` | yes | no | no | yes | no | no | `tests/prove-journey.ts`, `scripts/gen-poster.mjs` |
+| `proof-no-keys` | yes | no | no | yes | no | no | `tests/prove-journey.ts`, `scripts/gen-poster.mjs` |
+| `proof-no-paraphrase` | yes | no | no | yes | no | no | `tests/prove-journey.ts`, `scripts/gen-poster.mjs` |
+| `tour-length` | yes | no | no | no | no | yes | `tests/prove-journey.ts` (the figure equals `tourMinutes()`) |
 
 A digit on the deck, the brief or the poster that is not one of these figures sits in an element marked as a reference (a date, an id, a clause, a product's name, the numbers of NASA's readiness scale), and the generators fail on any other. The film's sync fails on any digit in a caption that the four film rows do not hold. Screenshots show the app's own numbers from the dated saved sample, labelled as the sample; they are records, not claims.

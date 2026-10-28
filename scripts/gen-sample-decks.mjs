@@ -11,9 +11,9 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadWorkspace } from "../mcp/workspace.ts";
 import { SAMPLE_PATH } from "../mcp/sample.ts";
-import { PEOPLE } from "../src/data/seed.ts";
-import { evidenceReport } from "../src/lib/evidence.ts";
-import { brandFor, briefDeck, deckBuffer, sessionDeck } from "../src/lib/slides.ts";
+import { PEOPLE } from "../shared/data/seed.ts";
+import { evidenceReport } from "../shared/lib/evidence.ts";
+import { brandFor, briefDeck, deckBuffer, sessionDeck } from "../shared/lib/slides.ts";
 
 const OUT = new URL("../docs/presentation/", import.meta.url);
 const loaded = loadWorkspace(SAMPLE_PATH);
@@ -25,7 +25,7 @@ const brief = d.evidenceBriefs.filter((b) => b.subjectId === "CS310").at(-1);
 // The tour's own session, not one of the term's sample sessions (depth plan Section 5.1), branded the way the app brands it.
 const session = d.teachingPlans.find((p) => p.subjectId === "CS310").sessions.find((s) => !s.sample);
 const definition = d.courseDefinitions.CS310 ?? null;
-const markFile = new URL("../public" + (d.institution.mark.wide ?? d.institution.mark.png), import.meta.url);
+const markFile = new URL("../web/public" + (d.institution.mark.wide ?? d.institution.mark.png), import.meta.url);
 const markData = existsSync(markFile) ? readFileSync(markFile).toString("base64") : null;
 const briefSpec = briefDeck(subject, brief, report, d.evidenceSources, d.skillMentions, clos, PEOPLE, at);
 const packSpec = sessionDeck(subject, session, clos, report, d.skillMentions, d.evidenceSources, PEOPLE, at,

@@ -1,12 +1,12 @@
 // The partner mark (depth plan Section 3.2): the owner's utp.svg, supplied at the repository root on
-// 22 October 2026, copied byte for byte into public/brand/partners/ (the one folder whose files keep their
+// 22 October 2026, copied byte for byte into web/public/brand/partners/ (the one folder whose files keep their
 // owners' colours, docs/brand-use.md) and rasterised there for the teaching pack, which places a PNG because
 // pptxgenjs documents SVG support only for the newest desktop PowerPoint.
-//   public/brand/partners/utp.svg        the copy the app and the pack read
-//   public/brand/partners/utp-1024.png   the pack's masters
-//   public/brand/partners/utp-256.png    the survey page and the screens
-//   public/brand/partners/utp-wide.png   the slides' corners: the drawing with its viewBox fitted to its own bounds
-//   public/brand/partners/manifest.json  the copy's fingerprint, so a changed mark without new PNGs is drift
+//   web/public/brand/partners/utp.svg        the copy the app and the pack read
+//   web/public/brand/partners/utp-1024.png   the pack's masters
+//   web/public/brand/partners/utp-256.png    the survey page and the screens
+//   web/public/brand/partners/utp-wide.png   the slides' corners: the drawing with its viewBox fitted to its own bounds
+//   web/public/brand/partners/manifest.json  the copy's fingerprint, so a changed mark without new PNGs is drift
 // The root utp.svg is ignored by git (.gitignore): the tracked copy under partners/ is the one the build uses.
 // Usage: node scripts/gen-partner-marks.mjs [--check]
 //   --check exits 1 when the copy differs from the root file (when present), or a PNG or the manifest is
@@ -20,7 +20,7 @@ import { pathToFileURL } from "node:url";
 import { ROOT } from "./lib/theme-node.mjs";
 
 const check = process.argv.includes("--check");
-const OUT = join(ROOT, "public/brand/partners");
+const OUT = join(ROOT, "web/public/brand/partners");
 const SOURCE = join(ROOT, "utp.svg"), COPY = join(OUT, "utp.svg"), MANIFEST = join(OUT, "manifest.json");
 const SIZES = [1024, 256];
 const pngPath = (size) => join(OUT, "utp-" + size + ".png");
@@ -37,19 +37,19 @@ function pngSize(path) {
 
 if (check) {
   const drift = [];
-  if (!existsSync(COPY)) drift.push("public/brand/partners/utp.svg (missing)");
+  if (!existsSync(COPY)) drift.push("web/public/brand/partners/utp.svg (missing)");
   else {
     const copy = readFileSync(COPY);
-    if (existsSync(SOURCE) && !normalised(readFileSync(SOURCE)).equals(normalised(copy))) drift.push("public/brand/partners/utp.svg differs from the owner's utp.svg");
+    if (existsSync(SOURCE) && !normalised(readFileSync(SOURCE)).equals(normalised(copy))) drift.push("web/public/brand/partners/utp.svg differs from the owner's utp.svg");
     const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, "utf8")) : null;
-    if (!manifest) drift.push("public/brand/partners/manifest.json (missing)");
+    if (!manifest) drift.push("web/public/brand/partners/manifest.json (missing)");
     else if (manifest.utp?.sha256 !== sha256(normalised(copy))) drift.push("the PNGs were rendered from another version of the mark");
     for (const size of SIZES) {
       const got = existsSync(pngPath(size)) ? pngSize(pngPath(size)) : null;
-      if (!got || got.width !== size || got.height !== size) drift.push("public/brand/partners/utp-" + size + ".png (" + (got ? got.width + " by " + got.height : "missing") + ")");
+      if (!got || got.width !== size || got.height !== size) drift.push("web/public/brand/partners/utp-" + size + ".png (" + (got ? got.width + " by " + got.height : "missing") + ")");
     }
     const wide = existsSync(WIDE) ? pngSize(WIDE) : null;
-    if (!wide || wide.width !== WIDE_WIDTH || wide.height !== manifest?.utp?.wide?.height) drift.push("public/brand/partners/utp-wide.png (" + (wide ? wide.width + " by " + wide.height : "missing") + ")");
+    if (!wide || wide.width !== WIDE_WIDTH || wide.height !== manifest?.utp?.wide?.height) drift.push("web/public/brand/partners/utp-wide.png (" + (wide ? wide.width + " by " + wide.height : "missing") + ")");
   }
   if (drift.length) { console.error("The partner mark is missing or has drifted (run node scripts/gen-partner-marks.mjs):\n  " + drift.join("\n  ")); process.exit(1); }
   console.log("The partner mark matches: the copy, " + (SIZES.length + 1) + " PNGs and the manifest.");
@@ -93,4 +93,4 @@ try {
 }
 writeFileSync(MANIFEST, JSON.stringify({ utp: { source: "utp.svg, supplied by the owner on 22 October 2026", sha256: sha256(normalised(svg)), png: SIZES.map((size) => "utp-" + size + ".png"),
   wide: { file: "utp-wide.png", width: WIDE_WIDTH, height: wideHeight } } }, null, 2) + "\n");
-console.log("Wrote public/brand/partners/: the mark, " + (SIZES.length + 1) + " PNGs and the manifest.");
+console.log("Wrote web/public/brand/partners/: the mark, " + (SIZES.length + 1) + " PNGs and the manifest.");

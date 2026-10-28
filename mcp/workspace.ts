@@ -7,17 +7,17 @@
 
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, isAbsolute } from "node:path";
-import { PEOPLE, SEED_RESULT_UPLOADS } from "../src/data/seed.ts";
-import { DEMO_LINE } from "../src/data/sample-course/index.ts";
-import { loopState, termWindow } from "../src/app/loop.ts";
-import { obeReport } from "../src/lib/attainment.ts";
-import { courseInformationMarkdown, manifestMarkdown, obeReportMarkdown, type CourseFileInput, type CourseFilePack } from "../src/lib/courseFile.ts";
-import type { AppState } from "../src/app/store.ts";
-import { courseDefinition, curriculumMarkdown } from "../src/lib/curriculum.ts";
-import { evidenceMarkdown, evidenceReport, meetingBriefMarkdown, RECOMMENDATION_LABEL } from "../src/lib/evidence.ts";
-import { brandFor, deckBuffer, sessionDeck } from "../src/lib/slides.ts";
-import { MAX_BACKUP_BYTES, parseWorkspaceBackup, type WorkspaceBackup } from "../src/lib/workspaceBackup.ts";
-import type { BriefRecommendation, Person, Subject } from "../src/types.ts";
+import { PEOPLE, SEED_RESULT_UPLOADS } from "../shared/data/seed.ts";
+import { DEMO_LINE } from "../shared/data/sample-course/index.ts";
+import { loopState, termWindow } from "../web/src/app/loop.ts";
+import { obeReport } from "../shared/lib/attainment.ts";
+import { courseInformationMarkdown, manifestMarkdown, obeReportMarkdown, type CourseFileInput, type CourseFilePack } from "../shared/lib/courseFile.ts";
+import type { AppState } from "../web/src/app/store.ts";
+import { courseDefinition, curriculumMarkdown } from "../shared/lib/curriculum.ts";
+import { evidenceMarkdown, evidenceReport, meetingBriefMarkdown, RECOMMENDATION_LABEL } from "../shared/lib/evidence.ts";
+import { brandFor, deckBuffer, sessionDeck } from "../shared/lib/slides.ts";
+import { MAX_BACKUP_BYTES, parseWorkspaceBackup, type WorkspaceBackup } from "../shared/lib/workspaceBackup.ts";
+import type { BriefRecommendation, Person, Subject } from "../shared/types.ts";
 
 export type Loaded = { ok: true; backup: WorkspaceBackup; path: string } | { ok: false; error: string };
 
@@ -167,7 +167,7 @@ export async function writeTeachingPack(backup: WorkspaceBackup, courseId: strin
   if (!chosen) return fail("No session " + session + " in " + subject.id + ". Sessions: " + (sessions.map((s) => s.id + " (week " + s.week + ", " + s.topic + ")").join("; ") || "none saved") + ".");
   const report = evidenceReport(subject.id, d.evidenceSources, d.skillMentions, d.skillMappings, clos);
   const definition = d.courseDefinitions[subject.id] ?? null;
-  const markFile = new URL("../public" + (d.institution.mark.wide ?? d.institution.mark.png), import.meta.url);
+  const markFile = new URL("../web/public" + (d.institution.mark.wide ?? d.institution.mark.png), import.meta.url);
   const markData = existsSync(markFile) ? readFileSync(markFile).toString("base64") : null;
   const spec = sessionDeck(subject, chosen, clos, report, d.skillMentions, d.evidenceSources, PEOPLE, backup.exportedAt,
     { definition, brand: brandFor(d.institution, definition, subject, chosen.week, markData) });
