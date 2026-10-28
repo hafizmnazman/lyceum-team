@@ -377,7 +377,7 @@ export function authRoutes(app: Hono, getStore: () => Promise<AuthStore>, option
   }));
 }
 
-async function originGuard(c: Context, next: () => Promise<void>) {
+export async function originGuard(c: Context, next: () => Promise<void>) {
   const origin = c.req.header("origin");
   if (c.req.method !== "GET" && origin && !LOCAL_ORIGIN.test(origin)) return c.json({ error: "Requests that change an account must come from this computer's own pages." }, 403);
   await next();

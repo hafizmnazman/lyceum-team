@@ -55,8 +55,13 @@ has real data; the demo runs on the fixtures.
       citing only confirmed quotations.
 
 ### Scheduling and running in the background
-- [ ] **Watch on a schedule.** A server-side job per course (weekly or per term) that runs collection and agent search,
-      stores the run, and shows "new since last run" on Watch. Today it runs only when the lecturer asks.
+- [x] **Watch on a schedule** (`feat/scheduled-watch`). A signed-in lecturer saves the Watch form's source (Greenhouse or
+      Lever board, or an agent search brief) as a schedule every 1 to 90 days. The API checks every 15 minutes
+      (`server/watch.ts`, `LYCEUM_WATCH=off` to stop it), claims each due schedule so it runs once, and keeps each run,
+      failures included, in `watch_runs` (last 10 per course; migration 002). Watch lists the runs and how many postings
+      are not yet imported; Open loads a run into the usual results table to import. Run now runs it on request. Demo
+      personas have no account, so the panel asks them to sign in. Email when a run finds something is still open (see
+      People and sharing).
 - [ ] **Agent runs on the server, not in the tab.** Persist each run (status, steps, tool calls, cost) so a run survives a
       closed tab and can be audited; show it on the agent's card. Retries, a per-run token budget, a usage log.
 

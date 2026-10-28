@@ -34,6 +34,8 @@ schema, add the next file (`002_what_it_does.sql`); never edit one that has alre
 | `sessions` | One row per signed-in browser: the SHA-256 of its cookie token (never the token), the account and the expiry |
 | `workspaces` | One row per account: its workspace as JSON (`jsonb`), and a version number that stops two windows saving over each other |
 | `auth_events` | Every sign up, sign in, failed sign in and sign out, with the method, the reason, the IP and the browser |
+| `watch_schedules` | One row per account and course being watched: the board or agent brief, keywords, every how many days, and the next run (`server/watch.ts`) |
+| `watch_runs` | Each scheduled run: when, the source, ok or failed with the error, the source's total and the postings kept (`jsonb`); the last 10 per course are kept |
 | `schema_migrations` | Which migration files have run, and when |
 
 An account whose onboarding is unfinished (`onboarded_at` empty) is deleted when its owner signs out or cancels, and one

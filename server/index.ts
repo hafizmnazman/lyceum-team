@@ -14,6 +14,7 @@ import { serve, type HttpBindings } from "@hono/node-server";
 import { parseSheet } from "./parse/sheet.ts";
 import { parsePdf } from "./parse/pdf.ts";
 import { parseDocx, parsePptx } from "./parse/office.ts";
+import { startWatching, watchRoutes } from "./watch.ts";
 import { agentModel, proposeMappings, proposeQuotes, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
 import { CollectError, collectBoard } from "./collect.ts";
 import { filterPostings } from "../src/lib/collect.ts";
@@ -55,6 +56,9 @@ app.use("/api/*", cors());
 const database = postgresDb(DATABASE_URL); // one pool; it connects when first asked and again after Postgres restarts
 let opening: Promise<AuthStore> | null = null;
 const getStore = () => (opening ??= AuthStore.open(database).catch((err) => { opening = null; throw err; }));
+// Watching on a schedule (server/watch.ts): each signed-in account's courses, checked every 15 minutes.
+watchRoutes(app, getStore, database);
+if (process.env.LYCEUM_WATCH !== "off") startWatching(database);
 authRoutes(app, getStore, {
   appUrl: process.env.APP_URL || "http://localhost:5173",
   google: { clientId: process.env.GOOGLE_CLIENT_ID ?? "", clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "" },

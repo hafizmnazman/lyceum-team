@@ -276,6 +276,22 @@ async function postProposals<T>(path: "quotes" | "mappings", request: unknown): 
 export const fetchQuoteProposals = (request: QuoteRequest) => postProposals<MentionProposal>("quotes", request);
 export const fetchMappingSuggestions = (request: MappingRequest) => postProposals<MappingSuggestion>("mappings", request);
 
+// ---------- Watch on a schedule (server/watch.ts): the signed-in account's schedule and runs for one course ----------
+export interface WatchSchedule { subjectId: string; provider: "greenhouse" | "lever" | "agent"; board: string; query: string; inText: boolean; everyDays: number; nextRunAt: string }
+export interface WatchRun { id: number; subjectId: string; ranAt: string; provider: string; board: string; status: "ok" | "failed"; error: string | null; total: number; postings: CollectedPosting[] }
+type WatchAnswer = { schedule?: WatchSchedule | null; runs?: WatchRun[]; run?: WatchRun; error?: string };
+/** One call to the watch API; any failure comes back as an error to show, never thrown. */
+export async function watchApi(subjectId: string, method: "GET" | "PUT" | "DELETE" | "POST", path = "", body?: unknown, timeoutMs = 30000): Promise<WatchAnswer & { ok: boolean }> {
+  try {
+    const res = await withTimeout(fetch("/api/watch/" + encodeURIComponent(subjectId) + path, { method, headers: body ? { "content-type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined }), timeoutMs);
+    const answer = ((await res.json().catch(() => null)) ?? {}) as WatchAnswer;
+    return { ...answer, ok: res.ok, error: res.ok ? undefined : answer.error ?? "Watching answered HTTP " + res.status + "." };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error && err.message === "timeout" ? "The run is taking long; it continues on the server. Refresh in a while." : "The local API is not reachable. Start it with npm run dev." };
+  }
+}
+
 // ---------- onboarding: read a course outline (server/outline.ts) ----------
 const OUTLINE_TIMEOUT_MS = 180000;
 /** Parse the lecturer's outline on the local API, then ask the model in .env what it states. The proposal is reviewed before anything saves. */

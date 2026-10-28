@@ -2589,6 +2589,13 @@ export async function runCollection(subjectId: SubjectId, input: { provider: Col
   return { ok: false, error: result.error };
 }
 export function clearCollection() { set({ collectRun: null }); }
+/** Open a scheduled run (server/watch.ts) as the course's research run, so its postings are imported the same way. */
+export function openWatchRun(subjectId: SubjectId, run: { provider: string; board: string; ranAt: string; total: number; postings: CollectedPosting[] }, query: string, inText: boolean) {
+  const provider = run.provider as CollectionProvider;
+  set({ collectRun: { subjectId, provider, board: run.board, query, inText, status: "done", postings: run.postings, retrievedAt: run.ranAt, cached: false, total: run.total,
+    error: null, label: (SOURCE_POLICIES[provider]?.name ?? provider) + " \"" + run.board + "\" (scheduled run)", endpoint: null, bytes: null, durationMs: null,
+    log: [clock() + " Opened the scheduled run of " + run.ranAt.slice(0, 16).replace("T", " ") + ": " + run.postings.length + " of " + run.total + " postings kept. Nothing is imported until you choose."] } });
+}
 /** Keep chosen postings as sources. Each is a receipt with its link, publication date and retrieval time; it counts only after review. */
 export function importCollectedPostings(subjectId: SubjectId, postingIds: string[]): SaveResult & { imported?: number; skipped?: number } {
   if (!mayPlan(subjectId)) return { ok: false, error: "Only an assigned lecturer or coordinator can import evidence for this course." };

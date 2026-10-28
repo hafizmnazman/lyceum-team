@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  addProposals, clearCollection, clearProposals, definitionForCourse, navigate, confirmProposals, dismissProposal, downloadPack, evidenceTrendNote, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
+  addProposals, openWatchRun, clearCollection, clearProposals, definitionForCourse, navigate, confirmProposals, dismissProposal, downloadPack, evidenceTrendNote, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
   scanForRequirements, selectBrief, sendEvidenceBrief, setSkillLexicon, setSourcesReviewed, type AppState,
 } from "../../app/store.ts";
 import { briefDeck } from "../../lib/slides.ts";
@@ -16,7 +16,7 @@ import type { BriefRecommendation, CollectionProvider, MentionRequirement, Perso
 import { Button, Disclosure, Field, Input, Select, Tag, Textarea } from "../primitives/index.tsx";
 import { Meter, SourcePane } from "../primitives/loop.tsx";
 import { useUnsavedEditor } from "../useUnsavedEditor.ts";
-import { fetchQuoteProposals } from "../../agents/client.ts";
+import { fetchQuoteProposals, watchApi, type WatchRun, type WatchSchedule } from "../../agents/client.ts";
 import { quoteRequest } from "../../lib/proposals.ts";
 
 type Props = { state: AppState; person: Person; subject: Subject; mayEdit: boolean };
@@ -66,6 +66,7 @@ export function ResearchRun({ state, subject, mayEdit }: Props) {
         {agent ? <Button onClick={() => navigate("settings")}>Agent settings</Button> : null}
         {run ? <Button onClick={() => { clearCollection(); setSelected([]); setMessage(""); }}>Clear results</Button> : null}
       </div>
+      {provider !== "sample" ? <WatchPanel state={state} subject={subject} imported={imported} source={{ provider, board: agent ? brief : board, query, inText }} sourceOk={boardOk} /> : null}
       {agent && agentMissing?.length ? <p className="form-error">Agent search is not set up yet. Add {agentMissing.join(", ")} to .env (see Settings), or choose another source.</p> : null}
       {message ? <p role="alert" className="form-error">{message}</p> : null}
       {run ? <div data-demo-id="collect-log"><div className="button-row"><h4>Collection log</h4>{run.status === "running" ? <Tag tone="warn">Fetching now</Tag> : run.status === "failed" ? <Tag tone="danger">Failed</Tag> : run.provider === "sample" ? <Tag>Saved sample, no network</Tag> : run.provider === "agent" ? <Tag tone="accent">Found by the agent, read live</Tag> : run.cached ? <Tag tone="accent">Local cache of a live fetch</Tag> : <Tag tone="ok">Fetched live</Tag>}</div>
@@ -96,6 +97,60 @@ export function ResearchRun({ state, subject, mayEdit }: Props) {
       </div> : null}
     </> : <p className="muted">Only assigned lecturers and coordinators can run a collection for this course.</p>}
   </section>;
+}
+
+const when = (at: string) => new Date(at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+/** Watch on a schedule (server/watch.ts): the server runs this source every few days and keeps each run; the lecturer opens a
+ *  run and imports what it wants, as after a run by hand. Needs a signed-in account, since the server does the watching. */
+function WatchPanel({ state, subject, imported, source, sourceOk }: { state: AppState; subject: Subject; imported: Set<string>;
+  source: { provider: CollectionProvider; board: string; query: string; inText: boolean }; sourceOk: boolean }) {
+  const [schedule, setSchedule] = useState<WatchSchedule | null>(null);
+  const [runs, setRuns] = useState<WatchRun[]>([]);
+  const [everyDays, setEveryDays] = useState(7);
+  const [busy, setBusy] = useState("");
+  const [message, setMessage] = useState("");
+  const signedIn = Boolean(state.account);
+  useEffect(() => {
+    if (!signedIn) return;
+    void watchApi(subject.id, "GET").then((r) => { if (r.ok) { setSchedule(r.schedule ?? null); setRuns(r.runs ?? []); if (r.schedule) setEveryDays(r.schedule.everyDays); } else setMessage(r.error ?? ""); });
+  }, [signedIn, subject.id]);
+  if (!signedIn) return <p className="muted" data-demo-id="watch-schedule">Watching on a schedule needs a signed-in account: the server runs it while Lyceum is closed.</p>;
+  const act = async (label: string, call: () => ReturnType<typeof watchApi>, done: string) => {
+    setBusy(label); setMessage("");
+    const r = await call();
+    setBusy("");
+    if (!r.ok) { setMessage(r.error ?? ""); return; }
+    if ("schedule" in r) setSchedule(r.schedule ?? null);
+    if (r.runs) setRuns(r.runs);
+    setMessage(done);
+  };
+  const open = async (run: WatchRun) => {
+    const full = run.postings.length || run.status === "failed" ? run : (await watchApi(subject.id, "GET", "/runs/" + run.id)).run;
+    if (full) openWatchRun(subject.id, full, schedule?.query ?? "", schedule?.inText ?? false);
+  };
+  const latest = runs[0];
+  const fresh = latest ? latest.postings.filter((p) => !imported.has(p.id)).length : 0;
+  return <div className="curriculum-object" data-demo-id="watch-schedule">
+    <div className="section-heading"><div><h4>Watch on a schedule</h4>
+      <p className="muted">{schedule
+        ? "Watching " + (schedule.provider === "agent" ? "with the agent: \"" + schedule.board + "\"" : SOURCE_POLICIES[schedule.provider].name + " \"" + schedule.board + "\"") + " every " + schedule.everyDays + " days. Next run " + when(schedule.nextRunAt) + "."
+        : "Run this source every few days on the server, even while Lyceum is closed. Each run is kept; you open it and import what you want."}</p></div></div>
+    <div className="button-row">
+      <Field label="Every (days)"><Input type="number" min={1} max={90} value={everyDays} onChange={(e) => setEveryDays(Number(e.target.value))} style={{ width: 90 }} /></Field>
+      <Button variant={schedule ? undefined : "primary"} data-demo-id="watch-save" loading={busy === "save"} disabled={!sourceOk} onClick={() => void act("save",
+        () => watchApi(subject.id, "PUT", "", { ...source, everyDays }), "Saved. The first run is due now; it runs within 15 minutes, or run it now.")}>{schedule ? "Update the schedule" : "Watch this source"}</Button>
+      {schedule ? <>
+        <Button data-demo-id="watch-run-now" loading={busy === "run"} onClick={() => void act("run", () => watchApi(subject.id, "POST", "/run", undefined, 7 * 60 * 1000), "Run finished.")}>Run now</Button>
+        <Button variant="quiet" loading={busy === "stop"} onClick={() => void act("stop", async () => ({ ...(await watchApi(subject.id, "DELETE")), schedule: null }), "Stopped watching. Past runs are kept.")}>Stop watching</Button>
+      </> : null}
+    </div>
+    {message ? <p role="status" className="save-status">{message}</p> : null}
+    {latest ? <p className="save-status" data-demo-id="watch-new">{latest.status === "failed" ? "The last run, " + when(latest.ranAt) + ", failed: " + latest.error
+      : fresh + " new " + (fresh === 1 ? "posting" : "postings") + ", not yet imported, in the run of " + when(latest.ranAt) + "."}</p> : null}
+    {runs.length ? <ul className="source-list">{runs.map((r) => <li key={r.id}><strong>{when(r.ranAt)}</strong>
+      <span>{r.status === "failed" ? "Failed: " + r.error : r.postings.length ? r.postings.length + " of " + r.total + " postings kept" : r.total + " postings at the source"}</span>
+      {r.status === "ok" ? <Button variant="quiet" data-demo-id={"watch-open-" + r.id} onClick={() => void open(r)}>Open</Button> : null}</li>)}</ul> : null}
+  </div>;
 }
 
 /** Report, Quote: name the skills, scan the kept postings, and judge each proposed sentence beside its source. */
