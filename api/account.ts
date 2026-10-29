@@ -3,6 +3,7 @@
 // and the account's workspace, saved in the backup format and checked by the same validator as a restored backup,
 // with a version number so two windows cannot silently overwrite each other. Tables: supabase/migrations/.
 
+import { isCountry, type Country } from "../shared/lib/compliance.ts";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -20,6 +21,7 @@ export interface User {
   personId: string;
   institution: string;
   jobRole: JobRole | null;
+  country: Country | null;
   onboarded: boolean;
 }
 export class AccountError extends Error {
@@ -82,13 +84,16 @@ const toUser = (row: Row, email: string): User => ({
   jobRole: JOB_ROLES.includes(row.job_role as JobRole)
     ? (row.job_role as JobRole)
     : null,
+  country: isCountry(row.country) ? row.country : null,
   onboarded: row.onboarded_at != null,
 });
 export function profileError(input: {
   name?: string;
   institution?: string;
   jobRole?: string;
+  country?: string;
 }): string | null {
+  if (input.country !== undefined && !isCountry(input.country)) return "Choose your country.";
   if (
     input.name !== undefined &&
     (!input.name.trim() || input.name.trim().length > 100)
@@ -132,17 +137,18 @@ export class AccountStore {
   }
   async updateProfile(
     user: User,
-    input: { name?: string; institution?: string; jobRole?: string },
+    input: { name?: string; institution?: string; jobRole?: string; country?: string },
   ): Promise<User> {
     const error = profileError(input);
     if (error) throw new AccountError(400, error);
     await this.db.query(
-      "UPDATE profiles SET name = COALESCE($1, name), institution = COALESCE($2, institution), job_role = COALESCE($3, job_role) WHERE id = $4",
+      "UPDATE profiles SET name = COALESCE($1, name), institution = COALESCE($2, institution), job_role = COALESCE($3, job_role), country = COALESCE($5, country) WHERE id = $4",
       [
         input.name?.trim() ?? null,
         input.institution?.trim() ?? null,
         input.jobRole ?? null,
         user.id,
+        input.country ?? null,
       ],
     );
     return this.user(user.id, user.email);
@@ -235,6 +241,7 @@ const publicUser = (u: User) => ({
   personId: u.personId,
   institution: u.institution,
   jobRole: u.jobRole,
+  country: u.country,
   onboarded: u.onboarded,
 });
 const bearer = (c: Context) =>
@@ -305,6 +312,7 @@ export function accountRoutes(app: Hono, store: AccountStore, deps: AuthDeps) {
             name: opt(b.name),
             institution: opt(b.institution),
             jobRole: opt(b.jobRole),
+            country: opt(b.country),
           }),
         ),
       });

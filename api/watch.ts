@@ -8,7 +8,7 @@ import type { Db } from "./db.ts";
 import { type AuthDeps, signedInAs } from "./account.ts";
 import { collectBoard } from "./collect.ts";
 import { liveDeps, loadAgentSettings, runAgentSearch } from "./agentSearch.ts";
-import { describePosting, newContext, recordedChat, recordProposals } from "./record.ts";
+import { countryOf, describePosting, newContext, recordedChat, recordProposals } from "./record.ts";
 import { BOARD_TOKEN, filterPostings } from "../shared/lib/collect.ts";
 import { missingSettings } from "../shared/lib/agentSettings.ts";
 import type { CollectedPosting } from "../shared/types.ts";
@@ -94,7 +94,7 @@ export const liveCollector = (db: Db | null = null): Collector => async (s, user
     const settings = await loadAgentSettings(), missing = missingSettings(settings);
     if (missing.length) throw new Error("Agent search is not set up: add " + missing.join(", ") + " to .env.");
     // ponytail: shares no lock with a search run by hand; two at once only cost two model runs.
-    const ctx = newContext("scout", "watch (scheduled)", userId, s.subjectId), chat = recordedChat(db, settings, ctx);
+    const ctx = newContext("scout", "watch (scheduled)", userId, s.subjectId, await countryOf(db, userId)), chat = recordedChat(db, settings, ctx);
     const result = await runAgentSearch(s.board, liveDeps(settings, chat), settings, () => undefined, AbortSignal.timeout(AGENT_RUN_MS));
     return { total: result.postings.length, postings: await recordProposals(db, ctx, filterPostings(result.postings, s.query, s.inText), describePosting) };
   }

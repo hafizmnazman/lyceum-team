@@ -10,11 +10,13 @@ import { ArrowLeft, ArrowRight, Check, Copy, FileUp, Plus, X } from "lucide-reac
 import { JOB_ROLE_LABEL, JOB_ROLES } from "../../app/account.ts";
 import { readOutlineFile, sendVerdict } from "../../../../shared/agents/client.ts";
 import { applyOnboardingOutline, completeOnboarding, createCourseWorkspace, saveOnboardingProfile, signOutAccount, useStore } from "../../app/store.ts";
-import { ASSISTANT_OUTLINE_PROMPT, BLOOM_LEVELS, jsonFromReply, readProposal, type OutlineProposal } from "../../../../shared/lib/outline.ts";
+import { assistantOutlinePrompt, BLOOM_LEVELS, jsonFromReply, readProposal, type OutlineProposal } from "../../../../shared/lib/outline.ts";
 import type { BloomLevel } from "../../../../shared/types.ts";
 import { HOST_NAME, MascotChat } from "../mascots/index.tsx";
 import { Button, Field, Input, Tag, Textarea } from "../primitives/index.tsx";
 import { Dropdown } from "../primitives/Dropdown.tsx";
+import { COUNTRIES, RULESETS, isCountry } from "../../../../shared/lib/compliance.ts";
+import { DataNotice } from "./DataAndAi.tsx";
 import { Segmented } from "../primitives/Segmented.tsx";
 
 const STEPS = ["About you", "Your course", "Its outline"] as const;
@@ -60,6 +62,7 @@ export function OnboardingScreen() {
   const [name, setName] = useState(me?.name ?? "");
   const [institution, setInstitution] = useState(state.institution.name === "My institution" ? "" : state.institution.name);
   const [jobRole, setJobRole] = useState<string>(state.account?.user.jobRole ?? "");
+  const [country, setCountry] = useState<string>(state.account?.user.country ?? "");
   const [programme, setProgramme] = useState(state.programme.title === "My programme" ? "" : state.programme.title);
   // the course
   const [code, setCode] = useState("");
@@ -94,7 +97,8 @@ export function OnboardingScreen() {
 
   async function saveProfile() {
     setBusy(true); setError("");
-    const result = await saveOnboardingProfile({ name, institution, programme, jobRole });
+    if (!country) { setError("Choose the country you teach in."); return; }
+    const result = await saveOnboardingProfile({ name, institution, programme, jobRole, country });
     setBusy(false);
     if (result.ok) moveTo(1); else setError(result.error);
   }
@@ -120,7 +124,7 @@ export function OnboardingScreen() {
     setNote("Read your assistant's reply: " + o.outcomes.length + " outcomes and " + o.topics.length + " topics. Lyceum did not see your outline, so check every outcome against it.");
   }
   async function copyPrompt() {
-    try { await navigator.clipboard.writeText(ASSISTANT_OUTLINE_PROMPT); setCopied(true); setTimeout(() => setCopied(false), 2500); }
+    try { await navigator.clipboard.writeText(assistantOutlinePrompt(isCountry(country) ? country : null)); setCopied(true); setTimeout(() => setCopied(false), 2500); }
     catch { setError("Copying was blocked by the browser. Select the prompt and copy it by hand."); }
   }
   /** A proposal, from either reader, into the form: fields only fill when empty, rows replace what was proposed before. */
@@ -219,6 +223,8 @@ export function OnboardingScreen() {
             <Field label="Your role"><Dropdown value={jobRole} onChange={setJobRole} options={JOB_ROLES.map((r) => ({ value: r, label: JOB_ROLE_LABEL[r] }))} /></Field>
             <Field label="Institution"><Input autoComplete="organization" value={institution} onChange={(e) => setInstitution(e.target.value)} required maxLength={200} placeholder="e.g. Universiti Teknologi PETRONAS" /></Field>
             <Field label="Programme" hint="The degree your courses belong to."><Input value={programme} onChange={(e) => setProgramme(e.target.value)} required maxLength={200} placeholder="e.g. Bachelor of Computer Science" /></Field>
+            <Field label="Country you teach in" hint="The helpers follow its accreditation framework and data rules."><Dropdown value={country} onChange={setCountry} options={COUNTRIES.map((c) => ({ value: c, label: RULESETS[c].label }))} /></Field>
+            <DataNotice />
             {error ? <p role="alert" className="form-error">{error}</p> : null}
             <div className="button-row"><Button type="submit" variant="primary" loading={busy}>Continue <ArrowRight size={15} /></Button><Button variant="quiet" onClick={() => void cancel()}>Cancel sign-up</Button></div>
           </form> : null}
@@ -246,7 +252,7 @@ export function OnboardingScreen() {
                   <Button onClick={() => void copyPrompt()}>{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "Prompt copied" : "Copy the prompt"}</Button>
                   <details className="text-[13px] [&_summary]:cursor-pointer [&_summary]:text-emerald-text">
                     <summary>See the prompt</summary>
-                    <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-white p-3 text-[12px] leading-[1.5] whitespace-pre-wrap">{ASSISTANT_OUTLINE_PROMPT}</pre>
+                    <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-white p-3 text-[12px] leading-[1.5] whitespace-pre-wrap">{assistantOutlinePrompt(isCountry(country) ? country : null)}</pre>
                   </details>
                 </div>
                 <Textarea aria-label="Your assistant's reply" rows={4} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Paste the assistant's reply here, all of it" maxLength={200_000} />

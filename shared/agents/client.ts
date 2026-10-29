@@ -14,6 +14,7 @@
 import type { CLO, CollectedPosting, CollectionProvider, DraftItem, IntakeInterpretation, SlideSuggestion, ParsedDoc, Subject, UploadedFileKind } from "../types.ts";
 import { SOURCE_POLICIES, filterPostings } from "../lib/collect.ts";
 import { interpretLocally } from "./intakeLocal.ts";
+import { withoutStudentIdentity } from "../lib/compliance.ts";
 import type { OutlineProposal } from "../lib/outline.ts";
 import type { RevisionRequest, RevisionSuggestion } from "../lib/revision.ts";
 import type { MappingRequest, MappingSuggestion, QuoteRequest } from "../lib/proposals.ts";
@@ -123,13 +124,16 @@ export async function interpretDoc(
   subjects: Subject[],
   clos: CLO[],
 ): Promise<InterpretOutcome> {
+  // The model reads marks, never who earned them (shared/lib/compliance.ts).
+  const { doc: safe, removed } = withoutStudentIdentity(doc);
+  const said = removed.length ? ["Removed before the model read the file: " + removed.join(", ") + ". Rows are numbered Student 1, 2, ... instead."] : [];
   try {
     const res = await withTimeout(
       fetch("/api/agent/intake", {
         method: "POST",
         headers: await agentHeaders(),
         body: JSON.stringify({
-          doc,
+          doc: safe,
           subjects: subjects.map((s) => ({ id: s.id, title: s.title, cloIds: s.cloIds })),
           clos: clos.map((c) => ({ id: c.id, subjectId: c.subjectId, text: c.text })),
         }),
@@ -139,7 +143,7 @@ export async function interpretDoc(
     if (!res.ok) throw new Error(`agent ${res.status}`);
     const body = (await res.json()) as { interpretation?: IntakeInterpretation; fallback?: boolean };
     if (!body.interpretation) throw new Error("no interpretation");
-    return { interp: body.interpretation, via: body.fallback ? "fallback" : "live" };
+    return { interp: { ...body.interpretation, notes: [...said, ...(body.interpretation.notes ?? [])] }, via: body.fallback ? "fallback" : "live" };
   } catch {
     return { interp: interpretLocally(doc, subjects, clos), via: "fallback" };
   }

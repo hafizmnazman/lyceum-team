@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ASSISTANT_OUTLINE_PROMPT, inDocument, jsonFromReply, outlineDefinition, readProposal } from "../shared/lib/outline.ts";
+import { assistantOutlinePrompt, inDocument, jsonFromReply, outlineDefinition, readProposal } from "../shared/lib/outline.ts";
 import { readOutline, OUTLINE_PROMPT } from "../api/outline.ts";
 import { settingsFromEnv } from "../shared/lib/agentSettings.ts";
 
@@ -51,7 +51,9 @@ test("a reply wrapped in a code fence or a sentence still reads; no JSON is an e
 });
 
 test("the lecturer's own assistant gets the same instructions, and its chat reply reads like the server's", () => {
-  assert.ok(ASSISTANT_OUTLINE_PROMPT.startsWith(OUTLINE_PROMPT), "one set of instructions, so the two readers cannot drift");
+  assert.ok(assistantOutlinePrompt(null).startsWith(OUTLINE_PROMPT), "one set of instructions, so the two readers cannot drift");
+  assert.match(assistantOutlinePrompt("MY"), /Malaysia[\s\S]*COPPA/, "the country's framework travels with the copied prompt");
+  assert.doesNotMatch(assistantOutlinePrompt(null), /Malaysia/, "no country, no country's rules");
   const reply = 'Sure! Here is the outline:\n```json\n{"code":"CS101","title":"Intro","outcomes":[{"text":"Explain the role of variables in a program.","bloom":"Understand"}],"topics":[{"title":"Variables","hours":3,"week":1,"outcomes":[1]}]}\n```\nLet me know if you need changes.';
   const p = readProposal(jsonFromReply(reply), "", "your assistant's reply");
   assert.equal(p.code, "CS101");
@@ -75,7 +77,7 @@ test("the accepted rows become the course's first version with its term, through
   const { openAccountWorkspace, createCourseWorkspace, applyOnboardingOutline, getState, definitionForCourse } = await import("../web/src/app/store.ts");
   const { loopState, termWindow } = await import("../web/src/app/loop.ts");
   const { parseWorkspaceBackup, serializeWorkspaceBackup } = await import("../shared/lib/workspaceBackup.ts");
-  const user = { id: "7a1b2c3d-0000-4000-8000-000000000000", email: "aina@example.edu", name: "Dr Aina", personId: "U-7a1b2c3d", institution: "UTP", jobRole: "lecturer" as const, onboarded: false };
+  const user = { id: "7a1b2c3d-0000-4000-8000-000000000000", email: "aina@example.edu", name: "Dr Aina", personId: "U-7a1b2c3d", institution: "UTP", jobRole: "lecturer" as const, country: "MY" as const, onboarded: false };
   openAccountWorkspace(user, null);
   const made = createCourseWorkspace({ code: "CS101", title: "Introduction to Programming", programmeTitle: "Computing", year: 1, semester: 1 });
   assert.equal(made.ok, true);

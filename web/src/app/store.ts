@@ -109,6 +109,7 @@ import { DECISION_OUTCOMES, NOTE_MAX, OUTCOME_LABEL, briefDecisionState } from "
 import { courseVersionIds, stepDef, stepForTab, taughtVersionId, termWindow, type CourseStep, type ReportTab } from "./loop.ts";
 export { REPORT_TABS, type ReportTab } from "./loop.ts";
 import { hashFor, type CourseRoute } from "./routes.ts";
+import { isCountry, type Country } from "../../../shared/lib/compliance.ts";
 import { ITEMS, itemsForCLOs } from "../../../shared/data/items.ts";
 import { DEMO_INSTITUTION } from "../../../shared/data/institution.ts";
 import { institutionError } from "../../../shared/lib/institution.ts";
@@ -941,7 +942,7 @@ export async function completeOnboarding(): Promise<SaveResult> {
   return { ok: true };
 }
 /** Onboarding's first step: the person's name, role and institution (kept on the account) and their programme. */
-export async function saveOnboardingProfile(input: { name: string; institution: string; programme: string; jobRole?: string }): Promise<SaveResult> {
+export async function saveOnboardingProfile(input: { name: string; institution: string; programme: string; jobRole?: string; country?: string }): Promise<SaveResult> {
   const account = state.account;
   if (!account) return { ok: false, error: "Sign in first." };
   const name = input.name.trim(), institution = input.institution.trim(), programme = input.programme.trim();
@@ -949,8 +950,10 @@ export async function saveOnboardingProfile(input: { name: string; institution: 
   if (!institution || institution.length > 200) return { ok: false, error: "Enter your institution's name." };
   if (!programme || programme.length > 200) return { ok: false, error: "Enter the programme your courses belong to." };
   if (input.jobRole !== undefined && !input.jobRole) return { ok: false, error: "Choose your role." };
+  if (input.country !== undefined && !isCountry(input.country)) return { ok: false, error: "Choose the country you teach in." };
   let user = account.user;
-  const changes = { ...(name !== user.name ? { name } : {}), ...(institution !== user.institution ? { institution } : {}), ...(input.jobRole && input.jobRole !== user.jobRole ? { jobRole: input.jobRole } : {}) };
+  const changes = { ...(name !== user.name ? { name } : {}), ...(institution !== user.institution ? { institution } : {}), ...(input.jobRole && input.jobRole !== user.jobRole ? { jobRole: input.jobRole } : {}),
+    ...(input.country && input.country !== user.country ? { country: input.country as Country } : {}) };
   if (Object.keys(changes).length) {
     const saved = await updateProfile(changes);
     if (!saved.ok) return saved;

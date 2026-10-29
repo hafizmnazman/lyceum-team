@@ -85,6 +85,7 @@ function ItemView({ item, n, label, checks, people, onEdit }: { item: DraftItem;
     {item.graderInfo !== undefined ? <p className="muted"><strong>For the marker:</strong> {item.graderInfo || "yours to write"}</p> : null}
     <ul className="item-lint" aria-label={"The lint for question " + (n + 1)}>{checks.map((c) => <li key={c.rule} className={c.ok ? "is-ok" : "is-fail"}>
       {c.ok ? <Check size={13} aria-hidden="true" /> : <X size={13} aria-hidden="true" />}<span className="sr-only">{c.ok ? "Passes: " : "Fails: "}</span>{c.rule}{c.note ? ": " + c.note : ""}</li>)}</ul>
+    {item.aiUse ? <p className="muted text-[13px]">AI use, declared in the export: {item.aiUse}</p> : null}
     {onEdit ? <Button variant="quiet" onClick={onEdit}>Edit item</Button> : null}
   </article>;
 }

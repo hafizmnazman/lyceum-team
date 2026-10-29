@@ -294,6 +294,7 @@ export interface DraftItem {
   reviewedBy: PersonId | null; reviewedAt: string | null;
   proposalId?: string; // a model item: the id the API recorded Prism's proposal under (api/record.ts), for the lecturer's verdict
   edited?: boolean; // a model item the lecturer changed after Prism drafted it
+  aiUse?: string; // a model item: its AI use citation (shared/lib/compliance.ts aiCitation), declared in every export
 }
 /** One of Prism's suggestions. On a deck: where (slide N, or a new slide after N; 0 is before the first), what to do and why.
  *  Without a deck: a segment of the session's plan, with its minutes and outcome. why cites a record (cites), except layout
@@ -303,6 +304,7 @@ export interface SlideSuggestion {
   slide: number | null; after: boolean; minutes: number | null; outcome: string | null;
   text: string; why: string; cites: "outcome" | "misconception" | "evidence" | "session" | null;
   status: "open" | "done" | "dismissed"; reason?: string; proposalId?: string;
+  aiUse?: string; // its AI use citation (shared/lib/compliance.ts aiCitation)
 }
 /** One round of suggestions: on the deck the lecturer uploaded (its slides' text), or a plan when there was none. */
 export interface SlideRound { id: string; at: string; by: PersonId; deck: { fileName: string; slides: string[] } | null; suggestions: SlideSuggestion[] }
@@ -570,6 +572,7 @@ export interface CourseDefinition {
   slt?: StudentLearningTime;
   source?: string; // where a sample record's content was modelled from
   sample?: boolean; // a labelled fixture written for the prototype
+  aiUse?: string[]; // the AI use citations of Quill's suggestions applied to this version, printed in its export
 }
 /** A rubric: four levels in the VALUE rubrics' grid shape, with our own descriptors (depth plan Section 4.2). */
 export interface Rubric {

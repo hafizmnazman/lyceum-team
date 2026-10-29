@@ -159,6 +159,22 @@ has real data; the demo runs on the fixtures.
         (only if offline dev or keyless CI needs it; MinIO's community edition stopped shipping images in late 2025).
         Supabase Storage is S3-compatible too, so a switch would be an endpoint change; R2 stays the pick for no egress.
 
+### Compliance (designed 29 October 2026, by grilling; research in `docs/research/education-compliance-2026-10-28.md`)
+- [x] **Country on the profile** (`supabase/migrations/20261030100000_country.sql`): asked at onboarding, editable in
+      Settings → Data & AI, a banner on Home until set. Malaysia, Singapore, UK, US, EU, Australia, India or Other.
+- [x] **The country's rules in every prompt** (`shared/lib/compliance.ts`, added once in `api/record.ts` `withContext`): its
+      accreditation framework, data law, no student personal data, use only the material given; Scout prefers vacancies in
+      that country. The copied "Use your own AI" prompt carries the same block. A demo persona follows Malaysia's rules.
+- [x] **AI use citations** in UTM Circular 3/2024's form on Prism's items and slide suggestions and Quill's applied
+      changes, and an "AI use statement" in the items and course outline exports.
+- [x] **Student identity out of Intake**: name, matric/ID, email, IC and phone columns removed (browser and API) before the
+      model reads a results file; the upload notes say what was removed.
+- [x] **Data notice** in onboarding and the **Data & AI** section in Settings (services and regions, retention, no
+      training, the 72-hour/7-day breach aim, the country's rules with sources). A summary, not a legal document.
+- [ ] **AI use statement in the teaching-pack .pptx** and the course file manifest.
+- [ ] **Privacy notice, terms and a DPA template** for procurement: need a legal entity and a lawyer.
+- [ ] **Rules for more countries**, each from a dated research note, never from memory.
+
 ### Front end
 - [ ] **Move the styles to Tailwind.** Started on `main`: Tailwind 4 beside `global.css` (in a lower cascade layer, no
       preflight), the theme generated from `tokens.ts` with only token colours, and global.css's breakpoints as `narrow:`,

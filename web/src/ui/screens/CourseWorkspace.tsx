@@ -353,6 +353,7 @@ function SuggestionList({ subject, session, round }: { subject: Subject; session
   const mark = (x: SlideSuggestion, status: SlideSuggestion["status"], why?: string) => { markSlideSuggestion(subject.id, session.id, round.id, x.id, status, why); setDismissing(null); setReason(""); };
   return <div className="suggestion-round">
     <p className="muted">{dayOf(round.at)} · {round.deck ? round.deck.fileName + ", " + plural(round.deck.slides.length, "slide", "slides") : "A plan, without slides"} · {done} done, {open} open</p>
+    {round.suggestions[0]?.aiUse ? <p className="muted text-[13px]">AI use, to declare in your slides: {round.suggestions[0].aiUse}</p> : null}
     <ol className="ladder-list">{round.suggestions.map((x) => <li key={x.id} className={"curriculum-object" + (x.status === "open" ? "" : " is-off")}>
       <p><Tag>{where(x)}</Tag> {x.kind === "segment" ? null : <Tag tone="neutral">{x.kind}</Tag>} {x.status === "open" ? null : <Tag tone={x.status === "done" ? "ok" : "warn"}>{x.status === "done" ? "Done" : "Dismissed"}</Tag>} {x.text}</p>
       <p className="muted">{x.cites ? CITE_LABEL[x.cites] + ": " : ""}{x.why}{x.reason ? " · Dismissed because: " + x.reason : ""}</p>

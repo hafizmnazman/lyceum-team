@@ -4,15 +4,33 @@
 // helpers carry on: a lost log row never costs the lecturer a suggestion.
 import { randomUUID } from "node:crypto";
 import type { Db } from "./db.ts";
-import { openAiChat, type Chat } from "./agentSearch.ts";
+import { openAiChat, type Chat, type ChatMessage } from "./agentSearch.ts";
 import type { AgentSettings } from "../shared/lib/agentSettings.ts";
 import type { CollectedPosting } from "../shared/types.ts";
+import { isCountry, promptContext, type Country } from "../shared/lib/compliance.ts";
 
 export type Helper = "folio" | "scout" | "atlas" | "lens" | "quill" | "prism" | "sandbox" | "settings";
-/** Who asked, for what: one per API request. userId is null for a demo persona (no account). */
-export interface CallContext { requestId: string; helper: Helper; route: string; userId: string | null; subjectId: string | null }
-export const newContext = (helper: Helper, route: string, userId: string | null, subjectId: string | null): CallContext =>
-  ({ requestId: randomUUID(), helper, route, userId, subjectId: subjectId?.trim().slice(0, 40) || null });
+/** Who asked, for what: one per API request. userId is null for a demo persona (no account). country: the rules the
+ *  prompt carries (shared/lib/compliance.ts), null until the account has set one. */
+export interface CallContext { requestId: string; helper: Helper; route: string; userId: string | null; subjectId: string | null; country: Country | null }
+export const newContext = (helper: Helper, route: string, userId: string | null, subjectId: string | null, country: Country | null = null): CallContext =>
+  ({ requestId: randomUUID(), helper, route, userId, subjectId: subjectId?.trim().slice(0, 40) || null, country });
+
+/** The account's country from its profile; a demo persona works at the demo's Malaysian campus. */
+export async function countryOf(db: Db | null, userId: string | null): Promise<Country | null> {
+  if (userId === null) return "MY";
+  if (!db) return null;
+  const c = (await db.query("SELECT country FROM profiles WHERE id = $1", [userId]).catch(() => ({ rows: [] as Array<{ country?: unknown }> }))).rows[0]?.country;
+  return isCountry(c) ? c : null;
+}
+
+/** Every helper's system prompt ends with the country's context and the grounding rules; a settings test is left alone. */
+export function withContext(messages: ChatMessage[], ctx: CallContext): ChatMessage[] {
+  if (ctx.helper === "settings") return messages;
+  const block = promptContext(ctx.country, ctx.helper), i = messages.findIndex((m) => m.role === "system");
+  if (i < 0) return [{ role: "system", content: block }, ...messages];
+  return messages.map((m, j) => (j === i ? { ...m, content: m.content + "\n\n" + block } as ChatMessage : m));
+}
 
 const PAUSE_MS = 60_000;
 const KEEP_CONTENT_DAYS = 30;
@@ -36,8 +54,8 @@ const unreadable = (content: string | null) => !/\{[\s\S]*\}/.test(content ?? ""
 
 /** The model client, recording each call it makes under ctx. */
 export function recordedChat(db: Db | null, s: AgentSettings, ctx: CallContext, chat: Chat = openAiChat(s)): Chat {
-  return async (messages, tools) => {
-    const started = Date.now();
+  return async (asked, tools) => {
+    const started = Date.now(), messages = withContext(asked, ctx);
     const row = (status: string, error: string | null, reply: unknown, usage?: { promptTokens: number | null; completionTokens: number | null; cost: number | null }) =>
       write(db, "INSERT INTO agent_calls (request_id, helper, route, user_id, demo, subject_id, provider, model, prompt_tokens, completion_tokens, cost, duration_ms, status, error, prompt, reply) "
         + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",

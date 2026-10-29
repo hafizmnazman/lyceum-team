@@ -1,3 +1,4 @@
+import { aiUseStatement } from "./compliance.ts";
 import type { BloomLevel, CLO, CourseBrief, CourseDefinition, CourseTopic, CurriculumDraft, StudentLearningTime, Subject, TeachingPlan, TestDraft } from "../types.ts";
 
 export const BLOOM_LEVELS = ["Remember", "Understand", "Apply", "Analyse", "Evaluate", "Create"] as const;
@@ -356,5 +357,6 @@ export function curriculumMarkdown(subject: Subject, definition: CourseDefinitio
   if (draft) lines.push("## Revision rationale", "", draft.reason || "Not supplied", "Effective term: " + (draft.effectiveTerm || "Not supplied"), "");
   const issues = validateCourseDefinition(definition, subject.id);
   lines.push("## Checks and limitations", "", ...(issues.length ? issues.map(i => "- " + i.severity + ": " + i.message) : ["No configured constraint issues detected. Academic quality requires review."]), "");
+  lines.push(...aiUseStatement(definition.aiUse ?? []));
   return lines.join("\n");
 }

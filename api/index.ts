@@ -27,7 +27,8 @@ import { ENV_PATH, liveDeps, loadAgentSettings, runAgentSearch, TOOLS, type Chat
 import { searchWeb } from "./webTools.ts";
 import { readOutline, MAX_OUTLINE_CHARS } from "./outline.ts";
 import { AccountStore, accountRoutes, requireUser, signedInAs, supabaseDeps, type AuthDeps } from "./account.ts";
-import { clearOldContent, newContext, recordedChat, describePosting, recordProposals, recordVerdict, VERDICTS, type Helper, type Offer, type Verdict } from "./record.ts";
+import { aiCitation, withoutStudentIdentity } from "../shared/lib/compliance.ts";
+import { clearOldContent, countryOf, newContext, recordedChat, describePosting, recordProposals, recordVerdict, VERDICTS, type Helper, type Offer, type Verdict } from "./record.ts";
 import type { MentionProposal } from "../shared/lib/evidence.ts";
 import type { MappingSuggestion } from "../shared/lib/proposals.ts";
 import type { RevisionSuggestion } from "../shared/lib/revision.ts";
@@ -74,8 +75,10 @@ setInterval(purgePending, 60 * 60 * 1000).unref();
 // Every model call is recorded (api/record.ts): by whom (the session's token, or nobody for a demo persona), for which
 // course (the x-lyceum-course header the browser sends), through which helper. What was sent and came back is cleared
 // after 30 days, hourly; the rest stays for the metrics.
-const callContext = async (c: Context, helper: Helper) =>
-  newContext(helper, c.req.path, (await signedInAs(c, authDeps).catch(() => null))?.id ?? null, c.req.header("x-lyceum-course") ?? null);
+const callContext = async (c: Context, helper: Helper) => {
+  const userId = (await signedInAs(c, authDeps).catch(() => null))?.id ?? null;
+  return newContext(helper, c.req.path, userId, c.req.header("x-lyceum-course") ?? null, await countryOf(database, userId));
+};
 const chatFor = async (c: Context, helper: Helper, s: AgentSettings) => recordedChat(database, s, await callContext(c, helper));
 /** A route's recorded context and model client together, when the route also records what the helper offers. */
 const recording = async (c: Context, helper: Helper, s: AgentSettings) => { const ctx = await callContext(c, helper); return { ctx, chat: recordedChat(database, s, ctx) }; };
@@ -203,8 +206,9 @@ app.post("/api/agent/revision", async (c) => {
   if (missing.length) return c.json({ error: "Suggestions need the model set up: add " + missing.join(", ") + " to .env (see Settings)." }, 400);
   try {
     const { ctx, chat } = await recording(c, "quill", s);
-    return c.json({ suggestions: await recordProposals(database, ctx, await suggestRevision(s, request, chat), (r: RevisionSuggestion) =>
-      ({ kind: "revision", summary: r.kind + ": " + (r.kind === "add-topic" ? r.title : r.text), payload: r })) });
+    const suggestions = await recordProposals(database, ctx, await suggestRevision(s, request, chat), (r: RevisionSuggestion) =>
+      ({ kind: "revision", summary: r.kind + ": " + (r.kind === "add-topic" ? r.title : r.text), payload: r }));
+    return c.json({ suggestions: suggestions.map((r) => ({ ...r, aiUse: aiCitation(s.model, new Date()) })) });
   } catch (err) {
     console.error("revision suggestions failed:", err);
     return c.json({ error: "The model could not suggest changes: " + (err instanceof Error ? err.message : String(err)).slice(0, 300) }, 502);
@@ -222,8 +226,9 @@ function proposalRoute<B, T extends object>(path: string, helper: Helper, valid:
     if (missing.length) return c.json({ error: "This needs the model set up: add " + missing.join(", ") + " to .env (see Settings)." }, 400);
     try {
       const { ctx, chat } = await recording(c, helper, s);
-      const offers = await run(s, body, chat);
-      return c.json({ [path]: describe ? await recordProposals(database, ctx, offers, describe) : offers });
+      const offers = await run(s, body, chat), kept = describe ? await recordProposals(database, ctx, offers, describe) : offers;
+      // What Prism drafts goes to students, so each carries the citation the lecturer declares it with.
+      return c.json({ [path]: helper === "prism" ? kept.map((o) => ({ ...o, aiUse: aiCitation(s.model, new Date()) })) : kept });
     } catch (err) {
       console.error(path + " proposals failed:", err);
       return c.json({ error: "The model could not propose " + path + ": " + (err instanceof Error ? err.message : String(err)).slice(0, 300) }, 502);
@@ -373,6 +378,9 @@ app.post("/api/agent/intake", async (c) => {
   if (missing.length) return c.json({ fallback: true });
   try {
     const payload = (await c.req.json()) as Parameters<typeof runIntakeLLM>[1];
+    // The browser already strips student identity; a caller that did not is stripped here too (shared/lib/compliance.ts).
+    const doc = payload.doc as { pages?: unknown; tables?: unknown } | null;
+    if (doc && Array.isArray(doc.pages) && Array.isArray(doc.tables)) payload.doc = withoutStudentIdentity(doc as Parameters<typeof withoutStudentIdentity>[0]).doc;
     const interpretation = await runIntakeLLM(s, payload, await chatFor(c, "folio", s));
     if (!interpretation) return c.json({ fallback: true });
     return c.json({ interpretation });

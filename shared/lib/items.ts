@@ -5,6 +5,7 @@
 // not on this machine) and the rubric grid as spreadsheet rows. An item is drafted for the lecturer's review; the app never
 // marks one approved, and a template never writes the key: a deterministic generator cannot know what is true.
 
+import { aiUseStatement } from "./compliance.ts";
 import { z } from "zod";
 import type { BloomLevel, CourseDefinition, CourseOutcome, DraftItem, Person, Rubric, TeachingSession } from "../types.ts";
 import { bloomOf } from "./outline.ts";
@@ -313,6 +314,7 @@ export function itemsMarkdown(items: DraftItem[], ctx: ItemContext, misconceptio
     if (item.graderInfo !== undefined) lines.push("For the marker: " + (item.graderInfo || "nothing written yet"));
     lines.push("", "Lint: " + (passes(checks) ? "every rule passes." : checks.filter((c) => !c.ok).map((c) => c.rule + (c.note ? " (" + c.note + ")" : "")).join("; ") + "."), "");
   });
+  lines.push(...aiUseStatement(items.map((i) => i.aiUse)));
   return lines.join("\n");
 }
 

@@ -6,6 +6,7 @@
 // model returned, and onboarding, which turns the accepted rows into the course's first version.
 
 import { z } from "zod";
+import { promptContext, type Country } from "./compliance.ts";
 import type { BloomLevel, CourseDefinition, CourseOutcome, CourseTopic } from "../types.ts";
 
 export const BLOOM_LEVELS: BloomLevel[] = ["Remember", "Understand", "Apply", "Analyse", "Evaluate", "Create"];
@@ -39,7 +40,9 @@ export const OUTLINE_PROMPT = [
 ].join("\n");
 /** The same instructions for an assistant the lecturer runs themselves (ChatGPT, Claude, Gemini...): they attach or paste
  *  their outline under it, and paste the whole reply back into onboarding, where readProposal checks it like any other. */
-export const ASSISTANT_OUTLINE_PROMPT = OUTLINE_PROMPT + "\nReply with that JSON in a single code block. The course outline is attached, or pasted below this line.\n\n";
+/** The prompt the lecturer copies into their own assistant: the same instructions and the same country context as Folio's. */
+export const assistantOutlinePrompt = (country: Country | null) => OUTLINE_PROMPT + "\n\n" + promptContext(country, "folio") +
+  "\n\nReply with that JSON in a single code block. The course outline is attached, or pasted below this line.\n\n";
 
 export interface OutlineOutcome { text: string; bloom: BloomLevel; inDocument: boolean; proposalId?: string }
 export interface OutlineTopic { title: string; hours: number | null; week: number | null; outcomes: number[]; proposalId?: string } // outcomes: 1-based, into the outcomes list

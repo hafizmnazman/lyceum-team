@@ -91,8 +91,8 @@ function DefinitionSummary({ definition }: { definition: CourseDefinition }) {
 const SUGGESTION_LABEL: Record<RevisionSuggestion["kind"], string> = { "edit-outcome": "Reword", "add-outcome": "Add outcome", "add-topic": "Add topic" };
 /** Quill reads the open revision and the skills the course is behind on, and suggests single changes. Applying one edits the
  *  revision in this editor only; saving, checking and adopting stay the lecturer's. */
-function QuillSuggestions({ state, subject, definition, onApply }: { state: AppState; subject: Subject; definition: CourseDefinition; onApply: (s: RevisionSuggestion) => void }) {
-  const [list, setList] = useState<Array<RevisionSuggestion & Proposed> | null>(null);
+function QuillSuggestions({ state, subject, definition, onApply }: { state: AppState; subject: Subject; definition: CourseDefinition; onApply: (s: RevisionSuggestion & { aiUse?: string }) => void }) {
+  const [list, setList] = useState<Array<RevisionSuggestion & Proposed & { aiUse?: string }> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const request = revisionRequest(subject.id, definition, evidenceReportForCourse(subject.id), state.skillMentions);
@@ -113,6 +113,7 @@ function QuillSuggestions({ state, subject, definition, onApply }: { state: AppS
     {list?.length ? <ol className="ladder-list">{list.map((s, i) => { const g = gap(s.skill); return <li key={i} className="curriculum-object">
       <p><Tag>{SUGGESTION_LABEL[s.kind]}{s.kind === "edit-outcome" ? " " + s.outcome : ""}</Tag> {s.kind === "add-topic" ? <><strong>{s.title}</strong> · {s.hours} h{s.outcomes.length ? " · " + s.outcomes.join(", ") : ""}</> : <><strong>{s.text}</strong> · {s.bloom}</>}</p>
       <p className="muted">{s.reason}</p>
+      {s.aiUse ? <p className="muted text-[13px]">AI use, declared in the export: {s.aiUse}</p> : null}
       {g ? <p className="muted">{g.skill}: {g.postings} of {g.eligible} reviewed postings{g.quote ? <>, e.g. “{g.quote}”</> : null}</p> : <p className="muted">Not tied to a quoted skill.</p>}
       <div className="button-row"><Button onClick={() => { onApply(s); void sendVerdict(s.proposalId, "accepted"); drop(i); }}>Apply to the revision</Button><Button variant="quiet" onClick={() => { void sendVerdict(s.proposalId, "dismissed"); drop(i); }}>Dismiss</Button></div>
     </li>; })}</ol> : null}
@@ -197,7 +198,7 @@ function RevisionEditor({ state, subject, draft, baseline, mayEdit }: Props & {
     {stale ? <p role="alert" className="form-error">The active course version changed. Export this candidate, discard it and start from the current version.</p> : null}
     {feedback ? <div role="status" tabIndex={-1} ref={alertRef} className="save-status">{feedback}</div> : null}
     {mayEdit && !stale ? <QuillSuggestions state={state} subject={subject} definition={definition}
-      onApply={(s) => setDefinition(d => applySuggestion(d, s, subject.id, crypto.randomUUID()))} /> : null}
+      onApply={(s) => setDefinition(d => { const next = applySuggestion(d, s, subject.id, crypto.randomUUID()); return s.aiUse ? { ...next, aiUse: [...new Set([...(d.aiUse ?? []), s.aiUse])] } : next; })} /> : null}
     <fieldset disabled={!mayEdit || stale} className="curriculum-fields">
       <section className="workspace-panel"><h3>Course brief</h3>
         <Field label="Course title"><Input value={definition.title} maxLength={200} data-demo-id="curriculum-title" onChange={e => setDefinition({ ...definition, title: e.target.value })} /></Field>

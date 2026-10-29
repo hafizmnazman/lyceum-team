@@ -4,6 +4,7 @@ import type { AuthChangeEvent } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase.ts";
 import { setSessionToken } from "../../../shared/agents/client.ts";
 import type { JobRole } from "../../../shared/types.ts";
+import type { Country } from "../../../shared/lib/compliance.ts";
 export { JOB_ROLES, JOB_ROLE_LABEL, type JobRole } from "../../../shared/types.ts";
 export interface AccountUser {
   id: string;
@@ -12,6 +13,7 @@ export interface AccountUser {
   personId: string;
   institution: string;
   jobRole: JobRole | null;
+  country: Country | null;
   onboarded: boolean;
 }
 type Result<T> =
@@ -173,6 +175,7 @@ export const updateProfile = (input: {
   name?: string;
   institution?: string;
   jobRole?: string;
+  country?: Country;
 }) => call<{ user: AccountUser }>("PATCH", "/api/me", input);
 /** Onboarding is finished: from now on the account counts. */
 export const markOnboarded = () =>

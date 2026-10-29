@@ -89,6 +89,10 @@ export function InboxScreen() {
   return (
     <Page wide>
       <PageHead title={`Good day, ${person.name.split(" ").slice(-1)[0]}`} />
+      {state.account && !state.account.user.country ? <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-warn bg-warn-soft px-4 py-3" data-demo-id="home-country">
+        <span><strong>Which country do you teach in?</strong> Until you say, the helpers follow general rules only, not your country's accreditation framework and data law.</span>
+        <Button variant="primary" onClick={() => navigate("settings")}>Choose in Settings <ArrowRight size={15} /></Button>
+      </div> : null}
 
       {brief ? <section className="workspace-panel" data-demo-id="inbox-brief" aria-labelledby="inbox-brief-title">
         <div className="section-heading"><div><h2 id="inbox-brief-title">Evidence brief: {brief.subjectId}</h2>

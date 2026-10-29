@@ -39,7 +39,8 @@ test("every call is a row: who, which helper, the model, tokens, cost, time, and
   assert.deepEqual([rows[0].provider, rows[0].model, rows[0].prompt_tokens, rows[0].completion_tokens, Number(rows[0].cost)], ["openrouter", "some/model", 120, 30, 0.0004]);
   assert.equal(rows[2].cost, null, "no cost the provider did not report");
   assert.match(String(rows[3].error), /401/);
-  assert.deepEqual(rows[0].prompt, [{ role: "user", content: "draft" }]);
+  assert.deepEqual((rows[0].prompt as Array<{ role: string; content: string }>)[1], { role: "user", content: "draft" });
+  assert.match((rows[0].prompt as Array<{ role: string; content: string }>)[0].content, /^Context from Lyceum:/, "what was recorded is what the model was sent, context included");
   assert.ok(rows.every((r) => typeof r.duration_ms === "number"));
   const scout = recordedChat(db, s, newContext("scout", "/api/agent-search", null, null), async () => ({ content: null, tool_calls: [{ id: "1", type: "function", function: { name: "web_search", arguments: "{}" } }] }));
   await scout([{ role: "user", content: "find" }], [{ type: "function", function: { name: "web_search", description: "", parameters: {} } }]);

@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { ENV, MODEL_PROVIDERS, SEARCH_ENV, SEARCH_PROVIDERS, type PublicAgentSettings } from "../../../../shared/lib/agentSettings.ts";
 import { Button, Page, PageHead, Spinner, Tag } from "../primitives/index.tsx";
+import { DataAndAiPanel } from "./DataAndAi.tsx";
 
 type Loaded = { settings: PublicAgentSettings; missing: string[]; path: string };
 type TestResult = { ok: boolean; detail?: string; error?: string } | null;
@@ -34,8 +35,9 @@ export function SettingsScreen() {
 
   return (
     <Page>
-      <PageHead title="Settings" context="The model and search provider behind agent web search, on Watch's research run. Any provider with an OpenAI-compatible API and tool calling can drive the agent."
+      <PageHead title="Settings" context="Your country and how your data is handled, then the model and search provider behind the helpers. Any provider with an OpenAI-compatible API and tool calling can drive them."
         actions={<Button disabled={Boolean(busy)} onClick={() => void reload()}>Reload from .env</Button>} />
+      <DataAndAiPanel />
       {error ? <p role="alert" className="form-error">{error}</p> : null}
       {s && loaded ? <>
         <p className="muted">
