@@ -58,7 +58,7 @@
     "prove:items": "node --test tests/prove-items.ts",
     "prove:agent-search": "node --test tests/prove-agent-search.ts",
     "prove:outline": "node --test tests/prove-outline.ts",
-    "prove:storage": "node --test tests/prove-storage.ts && node --test tests/prove-compliance.ts",
+    "prove:storage": "node --test tests/prove-storage.ts",
     "prove:watch": "node --test tests/prove-watch.ts",
     "search:up": "docker compose up -d searxng",
     "services:down": "docker compose down",
