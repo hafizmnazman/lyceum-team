@@ -154,9 +154,12 @@ has real data; the demo runs on the fixtures.
         Supabase Storage is S3-compatible too, so a switch would be an endpoint change; R2 stays the pick for no egress.
 
 ### Front end
-- [ ] **Move the styles to Tailwind.** `web/src/theme/global.css` is about 2,600 lines of hand-written CSS with tokens in
-      `shared/theme/tokens.ts` and `gen:theme`. Map the tokens into the Tailwind theme first, then move one screen at a time,
-      deleting its CSS as it goes, and keep `check:contrast` passing.
+- [ ] **Move the styles to Tailwind.** Started on `main`: Tailwind 4 beside `global.css` (in a lower cascade layer, no
+      preflight), the theme generated from `tokens.ts` with only token colours, and global.css's breakpoints as `narrow:`,
+      `phone:` and `short:` (`web/src/theme/index.css`). Moved: the landing page's own blocks, sign in, onboarding.
+      Next, each single-screen block when that screen is next changed (Inbox, CurriculumWorkspace, EvidenceWorkspace,
+      Office, ObeReport, CourseWorkspace, StepFrame, CourseRecord...), deleting its CSS as it goes; primitives, the shell,
+      shared rules, SVG and print stay as CSS. Keep `check:contrast` passing.
 
 ## Next
 
@@ -175,6 +178,12 @@ has real data; the demo runs on the fixtures.
       (sign in, onboarding, Settings, Home) have not been checked in a browser by the tooling.
 
 ## Done
+
+### `main`
+- [x] Onboarding: read the outline with your own AI as well as by upload. "Use your own AI" shows the same prompt the server
+      model gets (`ASSISTANT_OUTLINE_PROMPT`, `shared/lib/outline.ts`) to copy into ChatGPT, Claude or Gemini with the
+      outline; the pasted reply is checked by the same `readProposal`, with no model on the server. Lyceum never sees the
+      document that way, so no outcome is marked as in it or reworded (`npm run prove:outline`).
 
 ### `feat/onboarding-auth`
 - [x] Onboarding: import the course outline (PDF or Word). The model proposes outcomes with Bloom levels, topics with hours,

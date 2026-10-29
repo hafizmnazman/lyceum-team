@@ -6,15 +6,16 @@
 // the account count) and opens the course. Cancelling, or signing out first, deletes the account.
 
 import { useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, ArrowRight, Check, FileUp, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, FileUp, Plus, X } from "lucide-react";
 import { JOB_ROLE_LABEL, JOB_ROLES } from "../../app/account.ts";
 import { readOutlineFile, sendVerdict } from "../../../../shared/agents/client.ts";
 import { applyOnboardingOutline, completeOnboarding, createCourseWorkspace, saveOnboardingProfile, signOutAccount, useStore } from "../../app/store.ts";
-import { BLOOM_LEVELS } from "../../../../shared/lib/outline.ts";
+import { ASSISTANT_OUTLINE_PROMPT, BLOOM_LEVELS, jsonFromReply, readProposal, type OutlineProposal } from "../../../../shared/lib/outline.ts";
 import type { BloomLevel } from "../../../../shared/types.ts";
 import { HOST_NAME, MascotChat } from "../mascots/index.tsx";
 import { Button, Field, Input, Tag, Textarea } from "../primitives/index.tsx";
 import { Dropdown } from "../primitives/Dropdown.tsx";
+import { Segmented } from "../primitives/Segmented.tsx";
 
 const STEPS = ["About you", "Your course", "Its outline"] as const;
 // proposalId and from: a row Folio proposed, with what it proposed, so creating the course can record the lecturer's verdict.
@@ -79,6 +80,10 @@ export function OnboardingScreen() {
   const [teachingWeeks, setTeachingWeeks] = useState("");
   const [credits, setCredits] = useState("");
   const [plos, setPlos] = useState<string[]>([]);
+  // or the lecturer's own assistant reads it: they copy the prompt out and paste its reply back in
+  const [importWay, setImportWay] = useState<"file" | "assistant">("file");
+  const [reply, setReply] = useState("");
+  const [copied, setCopied] = useState(false);
   if (!me) return null;
 
   function moveTo(next: number) {
@@ -93,17 +98,37 @@ export function OnboardingScreen() {
     setBusy(false);
     if (result.ok) moveTo(1); else setError(result.error);
   }
-  /** The lecturer's outline, read by the model: every proposal fills a field or a row that stays editable. */
+  /** The lecturer's outline, read by the model on the server: every proposal fills a field or a row that stays editable. */
   async function importOutline(file: File) {
     setReading(true); setError(""); setNote("");
     const r = await readOutlineFile(file);
     setReading(false);
-    if (!r.ok) { setError(r.error); return; }
+    if (!r.ok) { setError(r.error + (/model set up/.test(r.error) ? " Or choose Use your own AI." : "")); return; }
     const o = r.outline;
+    fillFrom(o, true);
+    const reworded = o.outcomes.filter((x) => !x.inDocument).length;
+    setNote("Read " + o.source + ": " + o.outcomes.length + " outcomes and " + o.topics.length + " topics proposed" + (reworded ? ", " + reworded + " of the outcomes reworded by the model, so check those against your outline" : "") + (r.truncated ? ". The file is long, so only its first part was read" : "") + ".");
+  }
+  /** The reply from the lecturer's own assistant, checked like the server's. Lyceum never saw the outline itself, so no
+   *  outcome is marked as in it or reworded: the lecturer checks each one. Nothing was recorded, so no verdicts follow. */
+  function readReply() {
+    setError(""); setNote("");
+    let o: OutlineProposal;
+    try { o = readProposal(jsonFromReply(reply), "", "your assistant's reply"); } catch { setError("That reply has no outline in it. Paste the assistant's whole answer, including the code block."); return; }
+    if (!o.outcomes.length && !o.topics.length && !o.code && !o.title) { setError("The reply was read, but it names no course, outcomes or topics. Check the assistant had your outline, then paste its answer again."); return; }
+    fillFrom(o, false);
+    setNote("Read your assistant's reply: " + o.outcomes.length + " outcomes and " + o.topics.length + " topics. Lyceum did not see your outline, so check every outcome against it.");
+  }
+  async function copyPrompt() {
+    try { await navigator.clipboard.writeText(ASSISTANT_OUTLINE_PROMPT); setCopied(true); setTimeout(() => setCopied(false), 2500); }
+    catch { setError("Copying was blocked by the browser. Select the prompt and copy it by hand."); }
+  }
+  /** A proposal, from either reader, into the form: fields only fill when empty, rows replace what was proposed before. */
+  function fillFrom(o: OutlineProposal, checked: boolean) {
     if (o.code && !code) setCode(o.code);
     if (o.title && !title) setTitle(o.title);
     setSource(o.source);
-    const outcomeRows = o.outcomes.map((x): OutcomeRow => ({ key: ++rowKey, text: x.text, bloom: x.bloom, keep: true, inDocument: x.inDocument, proposalId: x.proposalId }));
+    const outcomeRows = o.outcomes.map((x): OutcomeRow => ({ key: ++rowKey, text: x.text, bloom: x.bloom, keep: true, inDocument: checked ? x.inDocument : null, proposalId: x.proposalId }));
     const topicRows = o.topics.map((t): TopicRow => ({ key: ++rowKey, title: t.title, hours: t.hours === null ? "" : String(t.hours), week: t.week, outcomes: t.outcomes, keep: true, proposalId: t.proposalId }));
     setOutcomes(outcomeRows.map((r) => ({ ...r, from: outcomeSig(r) })));
     setTopics(topicRows.map((r) => ({ ...r, from: topicSig(r) })));
@@ -112,8 +137,6 @@ export function OnboardingScreen() {
     if (o.teachingWeeks) setTeachingWeeks(String(o.teachingWeeks));
     if (o.credits) setCredits(String(o.credits));
     setPlos(o.programmeOutcomes);
-    const reworded = o.outcomes.filter((x) => !x.inDocument).length;
-    setNote("Read " + o.source + ": " + o.outcomes.length + " outcomes and " + o.topics.length + " topics proposed" + (reworded ? ", " + reworded + " of the outcomes reworded by the model, so check those against your outline" : "") + (r.truncated ? ". The file is long, so only its first part was read" : "") + ".");
   }
   function toOutline() {
     setError("");
@@ -161,7 +184,7 @@ export function OnboardingScreen() {
   const lines = step === 0
     ? ["Welcome, " + (name.split(" ").slice(-1)[0] || "there") + ". I'm " + HOST_NAME + ". Three short steps and your workspace is ready.", "Your institution and programme name the records you make, such as briefs, decks and course files."]
     : step === 1
-      ? ["Have a course outline? Upload it and I'll read its outcomes and topics for you to check.", "The term dates every record in the loop. Where your graduates go is what I search the web for on Watch."]
+      ? ["Have a course outline? Upload it, or let your own AI assistant read it, and I'll fill in its outcomes and topics for you to check.", "The term dates every record in the loop. Where your graduates go is what I search the web for on Watch."]
       : ["Check each outcome. A green tag means its words are in your outline; an amber one means it was reworded, so read it against yours.", "Untick anything you don't want. You can change all of it later in Update."];
 
   const narrow = useSyncExternalStore(watchNarrow, isNarrow, () => false);
@@ -203,13 +226,32 @@ export function OnboardingScreen() {
           {step === 1 ? <form className={"grid gap-3 short:gap-2 [&_.control]:min-h-11 [&_.field-hint]:mt-1 [&_.field-label]:mb-1 [&_.form-field]:mb-1 short:[&_.form-field]:mb-0 [&>p]:mx-0 [&>p]:-mt-2 [&>p]:mb-0" + (direction === "back" ? " animate-step-back" : " animate-step-forward")} onSubmit={(e) => { e.preventDefault(); toOutline(); }}>
             <h1 id="onboarding-title" className={TITLE}>Your first course</h1>
             <p className="muted">A personal course workspace in {state.programme.title}. It is yours to prepare; it is not an official approval.</p>
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border-2 border-dashed border-border bg-tint-1 px-3.5 py-3">
-              <div className="grid min-w-0 flex-[1_1_260px] gap-0.5">
+            <div className="grid gap-3 rounded-xl border-2 border-dashed border-border bg-tint-1 px-3.5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <strong>Import your course outline</strong>
-                <span className="muted">PDF or Word. The model set up in Settings reads its outcomes and topics; you check every one before it is saved.</span>
+                <Segmented label="How to read your outline" value={importWay} onChange={(v) => { setImportWay(v); setError(""); }}
+                  options={[{ value: "file", label: "Upload a file" }, { value: "assistant", label: "Use your own AI" }]} />
               </div>
-              <input ref={fileInput} type="file" accept=".pdf,.docx" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void importOutline(f); }} />
-              <Button loading={reading} onClick={() => fileInput.current?.click()}><FileUp size={16} /> {reading ? "Reading your outline..." : source ? "Import another" : "Choose a file"}</Button>
+              {importWay === "file" ? <div className="flex flex-wrap items-center justify-between gap-4">
+                <span className="muted min-w-0 flex-[1_1_260px]">PDF or Word. The model set up in Settings reads its outcomes and topics; you check every one before it is saved.</span>
+                <input ref={fileInput} type="file" accept=".pdf,.docx" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void importOutline(f); }} />
+                <Button loading={reading} onClick={() => fileInput.current?.click()}><FileUp size={16} /> {reading ? "Reading your outline..." : source ? "Import another" : "Choose a file"}</Button>
+              </div> : <div className="grid gap-2.5">
+                <ol className="muted m-0 grid gap-1 pl-5">
+                  <li>Copy the prompt and paste it into ChatGPT, Claude, Gemini or any assistant you use.</li>
+                  <li>Attach your outline there, or paste its text under the prompt.</li>
+                  <li>Copy the assistant's whole reply and paste it below.</li>
+                </ol>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <Button onClick={() => void copyPrompt()}>{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "Prompt copied" : "Copy the prompt"}</Button>
+                  <details className="text-[13px] [&_summary]:cursor-pointer [&_summary]:text-emerald-text">
+                    <summary>See the prompt</summary>
+                    <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-white p-3 text-[12px] leading-[1.5] whitespace-pre-wrap">{ASSISTANT_OUTLINE_PROMPT}</pre>
+                  </details>
+                </div>
+                <Textarea aria-label="Your assistant's reply" rows={4} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Paste the assistant's reply here, all of it" maxLength={200_000} />
+                <Button className="justify-self-start" variant="primary" disabled={!reply.trim()} onClick={readReply}>Read the reply <ArrowRight size={15} /></Button>
+              </div>}
             </div>
             {note ? <p role="status" className="save-status pop-in">{note}</p> : null}
             <div className="form-grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] narrow:grid-cols-1">

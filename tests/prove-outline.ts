@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { inDocument, jsonFromReply, outlineDefinition, readProposal } from "../shared/lib/outline.ts";
+import { ASSISTANT_OUTLINE_PROMPT, inDocument, jsonFromReply, outlineDefinition, readProposal } from "../shared/lib/outline.ts";
 import { readOutline, OUTLINE_PROMPT } from "../api/outline.ts";
 import { settingsFromEnv } from "../shared/lib/agentSettings.ts";
 
@@ -48,6 +48,15 @@ test("a reply wrapped in a code fence or a sentence still reads; no JSON is an e
   assert.deepEqual(jsonFromReply('Here it is:\n```json\n{"title":"A"}\n```'), { title: "A" });
   assert.deepEqual(jsonFromReply('Sure! {"title":"B"} Hope that helps.'), { title: "B" });
   assert.throws(() => jsonFromReply("I could not find an outline."), /did not return an outline/);
+});
+
+test("the lecturer's own assistant gets the same instructions, and its chat reply reads like the server's", () => {
+  assert.ok(ASSISTANT_OUTLINE_PROMPT.startsWith(OUTLINE_PROMPT), "one set of instructions, so the two readers cannot drift");
+  const reply = 'Sure! Here is the outline:\n```json\n{"code":"CS101","title":"Intro","outcomes":[{"text":"Explain the role of variables in a program.","bloom":"Understand"}],"topics":[{"title":"Variables","hours":3,"week":1,"outcomes":[1]}]}\n```\nLet me know if you need changes.';
+  const p = readProposal(jsonFromReply(reply), "", "your assistant's reply");
+  assert.equal(p.code, "CS101");
+  assert.equal(p.outcomes.length, 1);
+  assert.deepEqual(p.topics[0].outcomes, [1]);
 });
 
 test("readOutline sends the document as data with the prompt, and returns the checked proposal", async () => {
