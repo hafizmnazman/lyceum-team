@@ -100,18 +100,31 @@ export async function searchOne(provider: SearchProviderId, s: SearchSettings, q
 export interface ChainResult { hits: SearchHit[]; provider: SearchProviderId | null; skipped: Array<{ provider: SearchProviderId; why: string }> }
 /** The chain: the primary, then each fallback, skipping those missing a key and moving on when one fails or finds
  *  nothing. Fails only when every usable provider failed. */
-export async function searchWeb(s: SearchSettings, query: string, time: TimeFilter | null, count = 8, one: typeof searchOne = searchOne): Promise<ChainResult> {
+// A provider that could not be reached or was limiting us is benched for a few minutes, so one that is down (DuckDuckGo
+// stops answering an address that searched too often) does not cost every later search its full timeout.
+const BENCH_MS = 5 * 60 * 1000;
+const benched = new Map<SearchProviderId, { until: number; why: string }>();
+const benchable = (why: string) => /could not be reached|HTTP (403|429|202)|limiting|too many|timed out|timeout/i.test(why);
+/** For the proofs: no provider benched. */
+export const clearBench = () => benched.clear();
+
+export async function searchWeb(s: SearchSettings, query: string, time: TimeFilter | null, count = 8, one: typeof searchOne = searchOne, now = Date.now): Promise<ChainResult> {
   const skipped: ChainResult["skipped"] = [];
   let answered = false; // a provider that worked but found nothing: the search ran, there is just nothing to show
   for (const link of searchChain(s)) {
     if (!link.usable) { skipped.push({ provider: link.id, why: "needs " + link.missing.join(", ") }); continue; }
+    const bench = benched.get(link.id);
+    if (bench && bench.until > now()) { skipped.push({ provider: link.id, why: bench.why + " (skipped for a few minutes)" }); continue; }
     try {
       const hits = await one(link.id, s, query, time, count);
+      benched.delete(link.id);
       if (hits.length) return { hits, provider: link.id, skipped };
       answered = true;
       skipped.push({ provider: link.id, why: "no results" });
     } catch (err) {
-      skipped.push({ provider: link.id, why: err instanceof Error ? err.message : String(err) });
+      const why = err instanceof Error ? err.message : String(err);
+      if (benchable(why)) benched.set(link.id, { until: now() + BENCH_MS, why });
+      skipped.push({ provider: link.id, why });
     }
   }
   if (answered) return { hits: [], provider: null, skipped };

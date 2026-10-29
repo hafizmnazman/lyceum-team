@@ -12,3 +12,25 @@ search:
   formats:
     - html
     - json
+  # An engine that is rate limited once is benched for an hour by default, which on a laptop doing a few agent searches
+  # leaves nothing to search with. Bench it for five minutes instead.
+  suspended_times:
+    SearxEngineAccessDenied: 600
+    SearxEngineCaptcha: 600
+    SearxEngineTooManyRequests: 300
+    cf_SearxEngineCaptcha: 600
+    cf_SearxEngineAccessDenied: 600
+    recaptcha_SearxEngineCaptcha: 600
+
+# The defaults search with Brave, DuckDuckGo and Google CSE only; each limits automated searches from one address within
+# minutes (29 October 2026: Brave and Google CSE answered "too many requests", DuckDuckGo stopped answering at all). These
+# general engines answered from the same address and spread the load, so one engine benched still leaves others.
+engines:
+  - name: bing
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: startpage
+    disabled: false

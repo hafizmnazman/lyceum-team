@@ -5,8 +5,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runAgentSearch, type AgentDeps, type Chat, type ToolCall } from "../api/agentSearch.ts";
-import { assertPublicUrl, extractJobPosting, isPublicAddress, parseDuckDuckGo, readPage, searchWeb, ToolError, type ReadPage } from "../api/webTools.ts";
+import { pageKind, runAgentSearch, shortenOldResults, type AgentDeps, type Chat, type ToolCall } from "../api/agentSearch.ts";
+import { assertPublicUrl, clearBench, extractJobPosting, isPublicAddress, parseDuckDuckGo, readPage, searchWeb, ToolError, type ReadPage } from "../api/webTools.ts";
 import { missingSettings, publicSettings, settingsFromEnv, type TimeFilter } from "../shared/lib/agentSettings.ts";
 import type { CollectedPosting } from "../shared/types.ts";
 import { runIntakeLLM, streamAgentLLM } from "../api/llm.ts";
@@ -166,6 +166,21 @@ test("the chain: a failing or empty provider falls through to the next, one miss
   assert.deepEqual((await searchWeb(s.search, "q", null, 8, async () => [])).hits, [], "nothing found anywhere is an empty answer, not an error");
 });
 
+test("a provider that cannot be reached is skipped for five minutes, then tried again", async () => {
+  clearBench();
+  const s = settingsFromEnv({ LYCEUM_SEARCH_PROVIDER: "duckduckgo", LYCEUM_SEARCH_FALLBACK: "brave", BRAVE_API_KEY: "k" });
+  let clock = 0, ddgCalls = 0;
+  const one = async (id: string) => { if (id === "duckduckgo") { ddgCalls++; throw new ToolError("DuckDuckGo could not be reached."); } return [{ title: id, url: "https://b.example/j", snippet: "" }]; };
+  await searchWeb(s.search, "q", null, 8, one, () => clock);
+  const second = await searchWeb(s.search, "q", null, 8, one, () => clock);
+  assert.equal(ddgCalls, 1, "not waited on again straight away");
+  assert.match(second.skipped[0].why, /skipped for a few minutes/);
+  clock = 5 * 60 * 1000 + 1;
+  await searchWeb(s.search, "q", null, 8, one, () => clock);
+  assert.equal(ddgCalls, 2, "tried again after the bench");
+  clearBench();
+});
+
 test("the agent's time_filter reaches the search: a window, any, or the default from .env", async () => {
   const asked: Array<TimeFilter | null | undefined> = [];
   const chat = scripted([[call("1", "web_search", { query: "a", time_filter: "week" }), call("2", "web_search", { query: "b", time_filter: "any" }), call("3", "web_search", { query: "c" })], "done"]);
@@ -202,4 +217,40 @@ test("intake and the free-text agents run on the same model as agent web search"
   });
   assert.deepEqual(chunks, ["Recommendation: adopt."]);
   await assert.rejects(streamAgentLLM(s, "nope", {}, () => undefined, async () => ({ content: "" })), /unknown agent/);
+});
+
+test("a search result's address says whether it is one vacancy or a list, and vacancies are shown first", async () => {
+  for (const [kind, url] of [
+    ["vacancy", "https://my.linkedin.com/jobs/view/analyst-data-and-analytics-at-hsbc-4482477532"],
+    ["vacancy", "https://jobs.danaher.com/global/en/job/R1320308/Business-Intelligence-Analyst"],
+    ["vacancy", "https://jobs.lever.co/portcast/e66df487-0622-480f-8506-532b3db5db28"],
+    ["vacancy", "https://job-boards.eu.greenhouse.io/binance/jobs/5004445101"],
+    ["listing", "https://www.foundit.my/search/data-analyst-jobs"],
+    ["listing", "https://my.jobstreet.com/career-advice/role/data-analyst/salary/in-kuala-lumpur"],
+    ["listing", "https://my.jobstreet.com/data-analyst-jobs/in-Kuala-Lumpur"],
+    ["other", "https://www.hilti.com/careers"],
+  ] as const) assert.equal(pageKind(url), kind, url);
+  const hits = [{ title: "Data analyst jobs", url: "https://www.foundit.my/search/data-analyst-jobs", snippet: "" },
+    { title: "Data Analyst", url: "https://jobs.danaher.com/global/en/job/R1320308/Data-Analyst", snippet: "" }];
+  let shown = "";
+  const chat: Chat = async (messages) => {
+    const last = messages.at(-1)!;
+    if (last.role === "tool") { shown = last.content; return { content: "done" }; }
+    return { content: null, tool_calls: [{ id: "1", type: "function", function: { name: "web_search", arguments: JSON.stringify({ query: "data analyst" }) } }] };
+  };
+  await runAgentSearch("data analyst", { chat, search: async () => ({ hits, provider: "searxng", skipped: [] }), fetchPage: async () => { throw new Error("no"); }, collect: async () => [] },
+    { maxSteps: 3, maxPostings: 3 }, () => undefined);
+  assert.match(shown, /^1\. \[single vacancy: read it\] Data Analyst/);
+  assert.match(shown, /2\. \[list or guide: skip\]/);
+  assert.match(shown, /1 look like single vacancies: read them/);
+});
+
+test("old tool results are shortened so a long run stays small; the latest four stay whole", () => {
+  const long = "x".repeat(5000);
+  const messages = [{ role: "system" as const, content: "s" }, ...Array.from({ length: 6 }, (_, i) => ({ role: "tool" as const, tool_call_id: String(i), content: long }))];
+  shortenOldResults(messages);
+  const sizes = messages.slice(1).map((m) => m.content.length);
+  assert.ok(sizes[0] < 500 && sizes[1] < 500, "the two oldest are shortened");
+  assert.deepEqual(sizes.slice(2), [5000, 5000, 5000, 5000]);
+  assert.match(messages[1].content, /already read/);
 });

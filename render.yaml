@@ -51,6 +51,8 @@ services:
         value: tavily
       - key: LYCEUM_SEARCH_FALLBACK
         value: duckduckgo
+      - key: LYCEUM_AGENT_MAX_STEPS
+        value: "24" # each kept posting takes about three turns (search, read, save)
       - key: TAVILY_API_KEY
         sync: false
       # Uploaded files in Cloudflare R2 (api/storage.ts); leave them empty and nothing is stored
