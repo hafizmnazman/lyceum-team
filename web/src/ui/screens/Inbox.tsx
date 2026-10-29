@@ -112,7 +112,7 @@ export function InboxScreen() {
           <div className="button-row"><Button variant="primary" onClick={() => navigate(person.orgRole === "management" ? "approval" : person.orgRole === "department" ? "programme" : "guide")}>{person.orgRole === "management" ? "Open the approvals sandbox" : person.orgRole === "department" ? "Open programme" : "Read the guide"}</Button></div>
         </section>}
 
-      <section className={CARD + " grid gap-4 p-5"} aria-labelledby="home-queues-title">
+      <section className={CARD + " grid gap-4 p-5"} aria-labelledby="home-queues-title" data-tour="home-waiting">
         <div className="flex items-center justify-between gap-3">
           <h2 id="home-queues-title" className="m-0 text-[20px]">Waiting on you</h2>
           <Tag tone={waiting.length + unread.length ? "accent" : undefined}>{waiting.length + unread.length} {waiting.length + unread.length === 1 ? "item" : "items"}</Tag>

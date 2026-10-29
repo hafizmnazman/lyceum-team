@@ -26,6 +26,7 @@ import {
 import { NAV_META, screenLabel } from "./nav.ts";
 import { CommandPalette } from "./CommandPalette.tsx";
 import { AgentPanel } from "./AgentPanel.tsx";
+import { PageTour } from "./PageTour.tsx";
 import { Mark } from "../mascots/mark.tsx";
 import { Kbd } from "../primitives/index.tsx";
 import { Tooltip } from "../primitives/Tooltip.tsx";
@@ -247,6 +248,7 @@ export function Shell(props: { children: ReactNode }) {
       {/* ---------- overlays ---------- */}
       {paletteOpen ? <CommandPalette onClose={() => setPaletteOpen(false)} /> : null}
       <AgentPanel />
+      <PageTour />
       {state.toast ? (
         <div className="toast fade-up" role="status" aria-live="polite">
           {state.toast}

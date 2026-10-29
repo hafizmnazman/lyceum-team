@@ -42,7 +42,7 @@ export function StepFrame({ state, step, subject, subjects, helper, children }: 
       <header className={CARD + " mb-6"}>
         <StepPath state={state} subject={subject} subjects={subjects} active={step} />
         <LoopStrip subjectId={subject.id} active={step} />
-        <div className="flex items-start gap-4 border-t-2 border-tint-2 px-6 py-4 narrow:px-4" data-demo-id={speaking ? "helper-" + speaking.helper.who : undefined}>
+        <div className="flex items-start gap-4 border-t-2 border-tint-2 px-6 py-4 narrow:px-4" data-demo-id={speaking ? "helper-" + speaking.helper.who : "step-head"} data-tour="step-head">
           <div className="flex-none narrow:hidden" aria-hidden>
             {speaking ? <Mascot who={speaking.helper.who} mood={mood} size={64} />
               : step === "decide" ? <span className="inline-flex size-16 items-center justify-center rounded-full bg-tint-1 text-emerald-text"><Scale size={32} strokeWidth={2} /></span> : null}
@@ -53,7 +53,7 @@ export function StepFrame({ state, step, subject, subjects, helper, children }: 
             {speaking ? <p className="m-0 text-[14px] text-ink-2"><strong className="text-ink">{speaking.cast.name}</strong>, {speaking.cast.job.toLowerCase()}. {speaking.helper.line}</p>
               : step === "decide" ? <p className="m-0 text-[14px] text-ink-2">People decide here. No helper speaks for them.</p> : null}
           </div>
-          {hasGuide(guideScreen) ? <button type="button" onClick={() => setHelp((v) => !v)} aria-expanded={help} aria-label={(help ? "Close" : "Open") + " the guide to " + def.label}
+          {hasGuide(guideScreen) ? <button type="button" data-tour="step-guide" onClick={() => setHelp((v) => !v)} aria-expanded={help} aria-label={(help ? "Close" : "Open") + " the guide to " + def.label}
             className="inline-flex size-10 flex-none cursor-pointer items-center justify-center rounded-full border-2 border-border bg-white text-ink-2 transition-colors hover:border-forest hover:text-ink">
             {help ? <X size={18} /> : <CircleHelp size={20} />}
           </button> : null}
@@ -61,7 +61,7 @@ export function StepFrame({ state, step, subject, subjects, helper, children }: 
         {help ? <div className="border-t-2 border-tint-2 px-6 py-4 narrow:px-4 [&_.section-help-body]:border-0 [&_.section-help-body]:bg-tint-1"><SectionGuide screen={guideScreen} /></div> : null}
       </header>
       <div className={"grid items-start gap-6" + (step === "history" ? "" : " min-[1200px]:grid-cols-[minmax(0,1fr)_280px]")}>
-        <div className="min-w-0">{children}</div>
+        <div className="min-w-0" data-tour="step-work">{children}</div>
         <StepRail state={state} subjectId={subject.id} step={step} />
       </div>
     </Page>

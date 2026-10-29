@@ -2,6 +2,7 @@ import type { Screen } from "../../app/roles.ts";
 import { SECTION_GUIDES } from "../../app/sectionGuides.ts";
 import { navigate } from "../../app/store.ts";
 import { Button } from "./index.tsx";
+import { showPageTour } from "../shell/PageTour.tsx";
 
 /** A section's guide behind a pill; `label` names the step in view when one guide covers several steps. */
 export function SectionHelp({ screen, label }: { screen: Screen; label?: string }) {
@@ -25,7 +26,10 @@ export function SectionGuide({ screen }: { screen: Screen }) {
       <ol>{guide.steps.map((step) => <li key={step}>{step}</li>)}</ol>
       <p><strong>What you get:</strong> {guide.output}</p>
       <p className="limitation"><strong>Current limit:</strong> {guide.limitation}</p>
-      <Button variant="quiet" onClick={() => navigate("guide")}>All sections & development progress</Button>
+      <div className="button-row">
+        <Button onClick={showPageTour}>Show me around this page</Button>
+        <Button variant="quiet" onClick={() => navigate("guide")}>All sections & development progress</Button>
+      </div>
     </div>
   );
 }
