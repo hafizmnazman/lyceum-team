@@ -9,7 +9,7 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, ArrowRight, Check, Copy, FileUp, Plus, Sparkles, X } from "lucide-react";
 import { JOB_ROLE_LABEL, JOB_ROLES } from "../../app/account.ts";
 import { readOutlineFile, sendVerdict } from "../../../../shared/agents/client.ts";
-import { applyOnboardingOutline, completeOnboarding, createCourseWorkspace, saveOnboardingProfile, signOutAccount, useStore } from "../../app/store.ts";
+import { applyOnboardingOutline, completeOnboarding, createCourseWorkspace, openStep, saveOnboardingProfile, signOutAccount, useStore } from "../../app/store.ts";
 import { assistantOutlinePrompt, BLOOM_LEVELS, jsonFromReply, readProposal, type OutlineProposal } from "../../../../shared/lib/outline.ts";
 import type { BloomLevel } from "../../../../shared/types.ts";
 import { HOST_NAME, MascotChat } from "../mascots/index.tsx";
@@ -184,7 +184,8 @@ export function OnboardingScreen() {
     // The course exists either way, so onboarding is finished; an outline that needs a fix says so on the course (a notice).
     const done = await completeOnboarding();
     setBusy(false);
-    if (!done.ok) setError(done.error);
+    // The outline is in, so the course opens on its first step (Course, done), with Watch as the next one; not on Update.
+    if (done.ok) openStep(created.subjectId, "course"); else setError(done.error);
   }
   /** Leave without an account: a sign up that is not finished is not kept (api/auth.ts deletes it on sign out). */
   async function cancel() {

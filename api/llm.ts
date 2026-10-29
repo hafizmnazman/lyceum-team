@@ -10,13 +10,26 @@ import type { MentionProposal } from "../shared/lib/evidence.ts";
 import { lintItem, passes, readModelItems, type ItemRequest } from "../shared/lib/items.ts";
 import type { DraftItem } from "../shared/types.ts";
 import { MAX_DECK_SLIDES, MAX_SLIDE_CHARS, readSlideSuggestions, type SuggestionRequest } from "../shared/lib/slides.ts";
-import { missingSettings, type AgentSettings } from "../shared/lib/agentSettings.ts";
-import { loadAgentSettings, openAiChat, type Chat, type ToolSpec } from "./agentSearch.ts";
+import { MODEL_PROVIDERS, missingSettings, type AgentSettings, type ModelProviderId } from "../shared/lib/agentSettings.ts";
+import { ENV_PATH, loadAgentSettings, openAiChat, type Chat, type ToolSpec } from "./agentSearch.ts";
+import { readFile } from "node:fs/promises";
+import { parseEnv } from "node:util";
 
 /** The model settings, read again on every call, and the LYCEUM_AGENT_* keys still missing before it can be called. */
 export async function agentModel(): Promise<{ s: AgentSettings; missing: string[] }> {
   const s = await loadAgentSettings();
   return { s, missing: missingSettings(s).filter((k) => k.startsWith("LYCEUM_AGENT")) };
+}
+/** Folio's outline reader: its own model when LYCEUM_OUTLINE_BASE_URL and LYCEUM_OUTLINE_MODEL are set (a fast one, since
+ *  the lecturer waits on it at onboarding), else the agent model above. */
+export async function outlineModel(given?: NodeJS.ProcessEnv): Promise<{ s: AgentSettings; missing: string[] }> {
+  let file: Record<string, string> = {};
+  if (!given) try { file = parseEnv(await readFile(ENV_PATH, "utf8")) as Record<string, string>; } catch { /* the process environment alone */ }
+  const env = given ?? { ...process.env, ...file }; // read again on every request, as the agent settings are
+  const base = await agentModel(), url = env.LYCEUM_OUTLINE_BASE_URL?.trim(), model = env.LYCEUM_OUTLINE_MODEL?.trim();
+  if (!url || !model) return base;
+  const provider = (Object.keys(MODEL_PROVIDERS) as ModelProviderId[]).find((id) => MODEL_PROVIDERS[id].baseUrl && url.startsWith(MODEL_PROVIDERS[id].baseUrl)) ?? "custom";
+  return { s: { ...base.s, model: { provider, baseUrl: url, model, apiKey: env.LYCEUM_OUTLINE_API_KEY?.trim() ?? "" } }, missing: [] };
 }
 
 // ---------- Intake: JSON through a tool call ----------

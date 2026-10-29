@@ -78,7 +78,8 @@ export function readProposal(raw: unknown, document: string, source: string): Ou
 }
 
 /** Pull a JSON object out of a model's reply, which may wrap it in a code fence or a sentence. */
-export function jsonFromReply(reply: string): unknown {
+export function jsonFromReply(raw: string): unknown {
+  const reply = raw.replace(/<think>[\s\S]*?(<\/think>|$)/g, ""); // a reasoning model's thinking, which may hold braces of its own
   const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(reply)?.[1] ?? reply;
   const start = fenced.indexOf("{"), end = fenced.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("The model did not return an outline.");

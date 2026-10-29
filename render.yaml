@@ -39,6 +39,13 @@ services:
         sync: false
       - key: LYCEUM_AGENT_API_KEY
         sync: false
+      # Optional: a fast model just for reading outlines at onboarding (e.g. Groq); the model above is the fallback
+      - key: LYCEUM_OUTLINE_BASE_URL
+        sync: false
+      - key: LYCEUM_OUTLINE_MODEL
+        sync: false
+      - key: LYCEUM_OUTLINE_API_KEY
+        sync: false
       # Web search: no SearXNG here. Tavily when its key is set, else DuckDuckGo (a keyed provider without its key is skipped)
       - key: LYCEUM_SEARCH_PROVIDER
         value: tavily

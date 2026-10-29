@@ -103,3 +103,12 @@ test("the accepted rows become the course's first version with its term, through
   assert.deepEqual(outlineDefinition(def, "CS9", { outcomes: [], topics: [{ title: "T", hours: null, week: null, outcomes: [3] }], credits: null, teachingWeeks: null, contactHours: null, programmeOutcomes: [], targetRoles: "" }).topics[0].cloIds, [],
     "a topic naming an outcome that was not kept links to none");
 });
+
+test("a dedicated outline model is used when set, the agent model otherwise; a reasoning model's thinking is skipped", async () => {
+  const { outlineModel } = await import("../api/llm.ts");
+  const set = await outlineModel({ LYCEUM_OUTLINE_BASE_URL: "https://api.groq.com/openai/v1", LYCEUM_OUTLINE_MODEL: "qwen/x", LYCEUM_OUTLINE_API_KEY: "k" });
+  assert.deepEqual([set.s.model.provider, set.s.model.model, set.s.model.apiKey, set.missing], ["groq", "qwen/x", "k", []]);
+  const unset = await outlineModel({});
+  assert.notEqual(unset.s.model.model, "qwen/x", "no outline model: the agent model reads it");
+  assert.deepEqual(jsonFromReply('<think>maybe {"code":"WRONG"}</think>\n{"code":"CS101"}'), { code: "CS101" });
+});

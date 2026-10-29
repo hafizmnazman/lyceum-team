@@ -34,19 +34,31 @@ export interface ToolSpec { type: "function"; function: { name: string; descript
 export interface ChatUsage { promptTokens: number | null; completionTokens: number | null; cost: number | null }
 export type Chat = (messages: ChatMessage[], tools: ToolSpec[]) => Promise<{ content: string | null; tool_calls?: ToolCall[]; usage?: ChatUsage }>;
 
-const MODEL_TIMEOUT_MS = 120_000;
+const MODEL_TIMEOUT_MS = 120_000, MAX_RATE_WAIT_MS = 60_000;
+/** How long a 429 asks us to wait, from Retry-After or "try again in 6.07s" in the body; null when it does not say, or
+ *  asks for longer than is worth holding a request open. */
+export function retryAfterMs(header: string | null, body: string): number | null {
+  const secs = header && Number.isFinite(Number(header)) ? Number(header) : Number(/try again in ([\d.]+)s/i.exec(body)?.[1] ?? NaN);
+  return Number.isFinite(secs) && secs * 1000 <= MAX_RATE_WAIT_MS ? Math.ceil(secs * 1000) + 250 : null;
+}
 export function openAiChat(s: AgentSettings): Chat {
   const p = s.model, url = p.baseUrl.replace(/\/+$/, "") + "/chat/completions";
   return async (messages, tools) => {
-    let res: Response;
-    try {
-      res = await fetch(url, { method: "POST", signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
-        headers: { "content-type": "application/json", ...(p.apiKey ? { authorization: "Bearer " + p.apiKey } : {}) },
-        body: JSON.stringify({ model: p.model, messages, ...(tools.length ? { tools, tool_choice: "auto" } : {}), ...(p.provider === "openrouter" ? { usage: { include: true } } : {}) }) });
-    } catch (err) {
-      throw new ToolError("The model endpoint " + url + " could not be reached" + (err instanceof Error && err.name === "TimeoutError" ? " in time." : "."));
+    let res: Response, text = "";
+    for (let attempt = 0; ; attempt++) {
+      try {
+        res = await fetch(url, { method: "POST", signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+          headers: { "content-type": "application/json", ...(p.apiKey ? { authorization: "Bearer " + p.apiKey } : {}) },
+          body: JSON.stringify({ model: p.model, messages, ...(tools.length ? { tools, tool_choice: "auto" } : {}), ...(p.provider === "openrouter" ? { usage: { include: true } } : {}) }) });
+        text = await res.text();
+      } catch (err) {
+        throw new ToolError("The model endpoint " + url + " could not be reached" + (err instanceof Error && err.name === "TimeoutError" ? " in time." : "."));
+      }
+      // A per-minute rate limit (Groq's free tier, for one) says how long to wait: wait it out, up to six times.
+      const wait = res.status === 429 ? retryAfterMs(res.headers.get("retry-after"), text) : null;
+      if (wait === null || attempt >= 6) break;
+      await new Promise((r) => setTimeout(r, wait));
     }
-    const text = await res.text();
     let body: { choices?: Array<{ message?: { content?: string | null; tool_calls?: ToolCall[] } }>; error?: { message?: string } | string;
       usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; cost?: unknown } } | null = null;
     try { body = JSON.parse(text); } catch { /* reported below */ }

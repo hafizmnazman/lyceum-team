@@ -16,7 +16,7 @@ import { parseSheet } from "./parse/sheet.ts";
 import { parsePdf } from "./parse/pdf.ts";
 import { parseDocx, parsePptx } from "./parse/office.ts";
 import { startWatching, watchRoutes } from "./watch.ts";
-import { agentModel, draftModelItems, proposeMappings, suggestSlides, proposeQuotes, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
+import { agentModel, outlineModel, draftModelItems, proposeMappings, suggestSlides, proposeQuotes, runIntakeLLM, streamAgentLLM, suggestRevision } from "./llm.ts";
 import { CollectError, collectBoard } from "./collect.ts";
 import { filterPostings } from "../shared/lib/collect.ts";
 import { missingSettings, publicSettings, type AgentSettings } from "../shared/lib/agentSettings.ts";
@@ -183,11 +183,19 @@ app.post("/api/agent/outline", async (c) => {
   try { body = await c.req.json(); } catch { return c.json({ error: "Send the outline's text as JSON." }, 400); }
   const text = typeof body.text === "string" ? body.text : "", fileName = typeof body.fileName === "string" ? body.fileName.slice(0, 200) : "outline";
   if (text.trim().length < 40) return c.json({ error: "That file has too little text to read an outline from. Is it a scanned image?" }, 400);
-  const { s, missing: needs } = await agentModel();
+  const { s, missing: needs } = await outlineModel();
   if (needs.length) return c.json({ error: "Reading an outline needs the model set up: add " + needs.join(", ") + " to .env (see Settings). You can type the outcomes below instead." }, 400);
   try {
-    const { ctx, chat } = await recording(c, "folio", s);
-    const outline = await readOutline(text, fileName, s, chat);
+    let { ctx, chat } = await recording(c, "folio", s), outline;
+    try { outline = await readOutline(text, fileName, s, chat); }
+    catch (err) {
+      // The dedicated outline model refused (a free tier's rate limit) or failed: the agent model reads it instead.
+      const main = await agentModel();
+      if (main.s.model.model === s.model.model || main.missing.length) throw err;
+      console.warn("outline model failed, reading with the agent model:", err instanceof Error ? err.message.slice(0, 200) : err);
+      ({ ctx, chat } = await recording(c, "folio", main.s));
+      outline = await readOutline(text, fileName, main.s, chat);
+    }
     const outcomes = await recordProposals(database, ctx, outline.outcomes, (o) => ({ kind: "outcome", summary: o.text, payload: o }));
     const topics = await recordProposals(database, ctx, outline.topics, (t) => ({ kind: "topic", summary: t.title, payload: t }));
     return c.json({ outline: { ...outline, outcomes, topics }, truncated: text.length > MAX_OUTLINE_CHARS });

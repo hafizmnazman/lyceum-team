@@ -172,3 +172,11 @@ test("backups carry briefs, lexicons, decisions and events at schema 6 and older
   assert.equal(workspaceFingerprint(getState()), before);
   assert.equal(getState().evidenceBriefs.length, 1); assert.equal(getState().briefDecisions.length, 1); assert.equal(getState().events.length, 3);
 });
+
+test("a rate-limited model call waits as long as the provider asks, within reason", async () => {
+  const { retryAfterMs } = await import("../api/agentSearch.ts");
+  assert.equal(retryAfterMs(null, "Rate limit reached ... Please try again in 6.0675s. Need more tokens?"), 6318);
+  assert.equal(retryAfterMs("2", ""), 2250, "Retry-After in seconds");
+  assert.equal(retryAfterMs(null, "Please try again in 1m2.5s"), null, "a minute or more is not worth holding the request");
+  assert.equal(retryAfterMs(null, "quota exhausted"), null, "no wait given, no retry");
+});
