@@ -46,8 +46,8 @@ try {
     await page.click(selector);
   };
 
+  // Signed out, the app opens on the public landing page.
   await page.goto(origin, { waitUntil: "networkidle0" });
-  await click("view-index");
   await page.waitForFunction(() => document.body.innerText.includes("Course decisions, with receipts"));
   // The public landing page carries no synthetic figure, so it carries no prototype-data notice.
   assert.equal(await page.$$eval('[aria-label="Prototype data limitations"]', (elements) => elements.length), 0);

@@ -82,7 +82,7 @@ const check = (name, ok, detail = "") => {
 };
 
 try {
-  await page.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle0" });
+  await page.goto(`http://localhost:${PORT}/#/login`, { waitUntil: "networkidle0" }); // signed out, the app opens on the landing page; the walk starts at sign in
   await shot("01-login");
 
   // The public index, reachable without signing in.
@@ -158,7 +158,7 @@ try {
   const term = "2026/2027 semester 1";
   await page.evaluate(() => (window.location.hash = "#/course/CS310"));
   await page.waitForSelector('[data-demo-id="course-term"]', { timeout: 8000 });
-  await page.click('[data-demo-id="course-term"]', { clickCount: 3 });
+  await page.click('[data-demo-id="course-term"]', { count: 3 });
   await page.keyboard.press("Backspace");
   await page.type('[data-demo-id="course-term"]', term);
   await click("course-term-save");
@@ -167,7 +167,7 @@ try {
   await page.waitForSelector('[data-demo-id="sample-results"]', { timeout: 8000 });
   await click("sample-results");
   await page.waitForSelector('[data-demo-id="upload-confirm"]', { timeout: 15000 });
-  await page.click('[data-demo-id="upload-term"]', { clickCount: 3 });
+  await page.click('[data-demo-id="upload-term"]', { count: 3 });
   await page.keyboard.press("Backspace");
   await page.type('[data-demo-id="upload-term"]', term);
   await click("upload-confirm");

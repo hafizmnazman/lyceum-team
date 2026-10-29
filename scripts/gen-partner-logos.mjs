@@ -36,7 +36,7 @@ const SIMPLE = [
 /** Files from their owners' own pages, with the fingerprint taken when they were downloaded. */
 const OFFICIAL = [
   { file: "microsoft-powerpoint.svg", product: "Microsoft PowerPoint", role: "The teaching pack is an editable .pptx", source: MS_CDN + "powerpoint_48x1.svg", sha256: "92c320a7a42a98275a002541ebaf472539c420cc4d054ebdf6586c10fba0c8a9", terms: MS_TERMS },
-  { file: "microsoft-word.svg", product: "Microsoft Word", role: "The course file and the survey document are .docx", source: MS_CDN + "word_48x1.svg", sha256: "32576a28b649b5c6f7f7a06a24ff3c7b5b60a5947554fa6a39912029ec85a862", terms: MS_TERMS },
+  { file: "microsoft-word.svg", product: "Microsoft Word", role: "The survey document for Microsoft Forms Quick Import is .docx", source: MS_CDN + "word_48x1.svg", sha256: "32576a28b649b5c6f7f7a06a24ff3c7b5b60a5947554fa6a39912029ec85a862", terms: MS_TERMS },
   { file: "microsoft-excel.svg", product: "Microsoft Excel", role: "Results are filed as .xlsx; rubrics are written as .xlsx", source: MS_CDN + "excel_48x1.svg", sha256: "3361926725eb7dff31993f1388c9eb6b791f8c3b5a4abcb0d5aa3b3015e0bb2e", terms: MS_TERMS },
   { file: "microsoft-forms.svg", product: "Microsoft Forms", role: "Survey exports read; a document shaped for Quick Import", source: MS_CDN + "forms_48x1.svg", sha256: "83ca91c92ee64f6e66ad9c26c25e6738bc962c2c59f9ea0cccaf8ae1e5800037", terms: MS_TERMS },
   { file: "microsoft-teams.svg", product: "Microsoft Teams", role: "A door, planned", source: MS_CDN + "teams_48x1.svg", sha256: "6eb0521d178af080bce66a4f2af3919a8615caa2965eb1265f9e597a84e0aeb8", terms: MS_TERMS },

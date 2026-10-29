@@ -92,7 +92,7 @@
     {
       "file": "microsoft-word.svg",
       "product": "Microsoft Word",
-      "role": "The course file and the survey document are .docx",
+      "role": "The survey document for Microsoft Forms Quick Import is .docx",
       "source": "https://res-1.cdn.office.net/files/fabric-cdn-prod_20251008.001/assets/brand-icons/product/svg/word_48x1.svg, retrieved 2026-10-23",
       "sha256": "32576a28b649b5c6f7f7a06a24ff3c7b5b60a5947554fa6a39912029ec85a862",
       "terms": "Microsoft Fabric Assets License (November 2019, https://aka.ms/fluentui-assets-license): product icons may illustrate that an application integrates with Microsoft products; in a lineup that is not clickable, each icon is labelled with the full product name in body copy beside or below it; full colour, unmodified, never more prominent than the application's own name, never as a logo or in a corner, no endorsement implied"

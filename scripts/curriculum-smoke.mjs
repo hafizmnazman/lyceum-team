@@ -29,7 +29,7 @@ try {
     assert.ok(await handle.asElement(),"No visible button: "+expected);await handle.asElement().click();await handle.dispose();
   };
   const fill=async(sel,value)=>{
-    await page.waitForSelector(sel,{visible:true});await page.click(sel,{clickCount:3});
+    await page.waitForSelector(sel,{visible:true});await page.click(sel,{count:3});
     await page.keyboard.down("Control");await page.keyboard.press("A");await page.keyboard.up("Control");
     await page.keyboard.press("Backspace");if(value!=="")await page.type(sel,String(value));
   };
@@ -52,7 +52,7 @@ try {
       main:document.querySelector("main").clientWidth,content:document.querySelector("main").scrollWidth }));
     assert.ok(sizes.body<=sizes.viewport+1&&sizes.content<=sizes.main+1,label+" overflow "+JSON.stringify(sizes));
   };
-  await page.goto(origin,{waitUntil:"networkidle0"});await click("login-P-SOBRI");await click("nav-courses");
+  await page.goto(origin,{waitUntil:"networkidle0"});await click("index-signin");await click("login-P-SOBRI");await click("nav-courses");
   await click("course-create-open");await fill(selector("new-course-code"),"BUS205");await fill(selector("new-course-title"),"Financial Planning");
   await fillLabel("Programme (optional)","Business Studies");await click("new-course-create");
   await text("Outcomes & topics");await text("University syllabus approval continues");
@@ -149,7 +149,7 @@ try {
   const outcomeId=await state(()=>window.__lyceum.getState().subjects.find(s=>s.id==="BUS205").cloIds[0]);
   await click("session-clo-"+outcomeId);await fill(selector("session-activity"),"Build a cash-flow plan in pairs.");
   await fill(selector("session-check"),"Explain the assumptions in the worked case.");await page.select(selector("session-status"),"ready");await click("session-save");
-  await clickText("Teaching pack (.pptx)");const packDeck=await JSZip.loadAsync(readFileSync(await waitDownload("BUS205-week-1-teaching-pack.pptx")));
+  await clickText("Slides to add (.pptx)");const packDeck=await JSZip.loadAsync(readFileSync(await waitDownload("BUS205-week-1-teaching-pack.pptx")));
   assert.equal(Object.keys(packDeck.files).filter(n=>/^ppt\/slides\/slide\d+\.xml$/.test(n)).length,6,"teaching pack slides");
   assert.match(await packDeck.file("ppt/slides/slide4.xml").async("string"),/Build a cash-flow plan in pairs/);
   await openDisclosure("teach-assessment");await click("assessment-start");await click("assessment-generate");
