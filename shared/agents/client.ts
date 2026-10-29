@@ -254,7 +254,7 @@ export async function fetchCollection(request: CollectionRequest, onLog: (line: 
     }
     const params = new URLSearchParams({ q: request.query, scope: request.inText ? "text" : "title" });
     const started = Date.now();
-    const res = await withTimeout(fetch("/api/collect/" + request.provider + "/" + encodeURIComponent(request.board) + "?" + params.toString()), COLLECT_TIMEOUT_MS);
+    const res = await withTimeout(fetch("/api/collect/" + request.provider + "/" + encodeURIComponent(request.board) + "?" + params.toString(), { headers: await agentHeaders() }), COLLECT_TIMEOUT_MS);
     const body = (await res.json().catch(() => null)) as { error?: string; postings?: CollectedPosting[]; retrievedAt?: string; cached?: boolean; total?: number; endpoint?: string; bytes?: number; durationMs?: number } | null;
     if (!res.ok || !body || !Array.isArray(body.postings)) {
       return { ok: false, error: body?.error ?? (res.status === 404 ? "The local API is not running. Start it with npm run dev to collect from a live board." : "The board could not be collected (HTTP " + res.status + ").") };
