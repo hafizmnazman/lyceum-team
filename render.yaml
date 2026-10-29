@@ -19,8 +19,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "24" # the API runs its .ts files directly
-      - key: LYCEUM_REQUIRE_SIGN_IN
-        value: "1" # online, the model, search, settings and parse routes answer signed-in people only
+      # LYCEUM_REQUIRE_SIGN_IN is left out, so anyone with the link, demo personas included, can use the helpers (the
+      # owner's word, 29 October 2026). Set it to "1" to answer signed-in accounts only on the model, search, settings and
+      # parse routes.
       - key: LYCEUM_WATCH
         value: "on"
       - key: APP_URL
