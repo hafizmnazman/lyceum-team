@@ -857,6 +857,8 @@ export async function restoreAccountSession(): Promise<void> {
 export let accountRestoreError: string | null = null;
 function reportRestore(message: string) {
   accountRestoreError = message;
+  // The reason is shown on the sign-in screen, so a failed return from Google lands there, not on the landing page.
+  if (!state.currentPersonId) state = { ...state, screen: "login" };
   console.error("[lyceum] " + message);
   for (const l of listeners) l();
 }

@@ -17,6 +17,14 @@ import { JudgeScreen } from "./ui/screens/Judge.tsx";
 import { KioskIdle, KioskScreen } from "./ui/screens/Kiosk.tsx";
 import { WalkOverlay } from "./demo/WalkOverlay.tsx";
 import { SurveyPage } from "./ui/screens/SurveyPage.tsx";
+import { Spinner } from "./ui/primitives/index.tsx";
+
+/** A sign-in is coming back from Google (?code=), or Supabase kept a session from an earlier visit (its sb-*-auth-token
+ *  in localStorage): an account is about to open, so the landing page should not flash first. */
+function signInPending(): boolean {
+  try { return new URLSearchParams(window.location.search).has("code") || Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k)); }
+  catch { return false; }
+}
 
 /** The survey route's reference (the encoded form, or t/<token>), or null on every other address. */
 const surveyOf = (hash: string) => { const route = parseRoute(hash); return route && "survey" in route ? route.survey : null; };
@@ -82,8 +90,10 @@ export default function App() {
   // A Supabase session from an earlier visit, or one Google's redirect just finished, opens that account's workspace
   // again. A session that ends elsewhere (another tab signed out, or it expired) returns this window to sign in. The
   // callback stays synchronous, as Supabase asks: it calls no Supabase method itself.
+  // While that check runs, a returning sign-in shows "Opening your workspace" instead of the landing page.
+  const [opening, setOpening] = useState(signInPending);
   useEffect(() => {
-    void restoreAccountSession();
+    void restoreAccountSession().finally(() => setOpening(false));
     return onAuthChange((event) => { if (event === "SIGNED_OUT") accountSignedOut(); });
   }, []);
 
@@ -100,7 +110,11 @@ export default function App() {
   // overlay is a stable last sibling in every branch, so a login/shell swap
   // never unmounts a running demo.
   let content;
-  if (!state.currentPersonId) {
+  if (opening && !state.account) {
+    content = <div className="signin forest-backdrop h-full" role="status" aria-live="polite">
+      <div className="flex items-center gap-3 text-[16px] font-semibold text-on-forest"><Spinner size={20} decorative /> Opening your workspace...</div>
+    </div>;
+  } else if (!state.currentPersonId) {
     // Signed out, the index route is the public landing page. The Relevance
     // Index sandbox itself stays behind sign-in, labelled as illustrative.
     const Public = state.screen === "index" ? LandingScreen : state.screen === "judge" ? JudgeScreen : state.screen === "kiosk" ? KioskScreen : SCREENS.login;

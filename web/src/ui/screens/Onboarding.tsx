@@ -6,7 +6,7 @@
 // the account count) and opens the course. Cancelling, or signing out first, deletes the account.
 
 import { useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, ArrowRight, Check, Copy, FileUp, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, FileUp, Plus, Sparkles, X } from "lucide-react";
 import { JOB_ROLE_LABEL, JOB_ROLES } from "../../app/account.ts";
 import { readOutlineFile, sendVerdict } from "../../../../shared/agents/client.ts";
 import { applyOnboardingOutline, completeOnboarding, createCourseWorkspace, saveOnboardingProfile, signOutAccount, useStore } from "../../app/store.ts";
@@ -17,7 +17,6 @@ import { Button, Field, Input, Tag, Textarea } from "../primitives/index.tsx";
 import { Dropdown } from "../primitives/Dropdown.tsx";
 import { COUNTRIES, RULESETS, isCountry } from "../../../../shared/lib/compliance.ts";
 import { DataNotice } from "./DataAndAi.tsx";
-import { Segmented } from "../primitives/Segmented.tsx";
 
 const STEPS = ["About you", "Your course", "Its outline"] as const;
 // proposalId and from: a row Folio proposed, with what it proposed, so creating the course can record the lecturer's verdict.
@@ -50,6 +49,11 @@ const KEEP_BOX = "size-[18px] accent-emerald";
 const FORM = "grid gap-4 [&>p]:mx-0 [&>p]:-mt-2 [&>p]:mb-0";
 const TITLE = "m-0 font-display text-[28px] font-extrabold tracking-[-0.02em]";
 const numberOrNull = (s: string) => (s.trim() && Number.isFinite(Number(s)) && Number(s) > 0 ? Number(s) : null);
+
+const IMPORT_WAYS = [
+  { value: "file", label: "Upload your outline", hint: "Lyceum's model reads its outcomes and topics.", icon: FileUp },
+  { value: "assistant", label: "Use your own AI", hint: "Copy a prompt into ChatGPT, Claude or Gemini, paste its reply back.", icon: Sparkles },
+] as const;
 
 export function OnboardingScreen() {
   const state = useStore();
@@ -87,6 +91,7 @@ export function OnboardingScreen() {
   const [importWay, setImportWay] = useState<"file" | "assistant">("file");
   const [reply, setReply] = useState("");
   const [copied, setCopied] = useState(false);
+  const [dragging, setDragging] = useState(false);
   if (!me) return null;
 
   function moveTo(next: number) {
@@ -131,6 +136,10 @@ export function OnboardingScreen() {
   function fillFrom(o: OutlineProposal, checked: boolean) {
     if (o.code && !code) setCode(o.code);
     if (o.title && !title) setTitle(o.title);
+    if (o.year) setYear(String(o.year));
+    if (o.semester) setSemester(String(o.semester));
+    if (o.term && !term) setTerm(o.term);
+    if (o.careers && !targetRoles) setTargetRoles(o.careers);
     setSource(o.source);
     const outcomeRows = o.outcomes.map((x): OutcomeRow => ({ key: ++rowKey, text: x.text, bloom: x.bloom, keep: true, inDocument: checked ? x.inDocument : null, proposalId: x.proposalId }));
     const topicRows = o.topics.map((t): TopicRow => ({ key: ++rowKey, title: t.title, hours: t.hours === null ? "" : String(t.hours), week: t.week, outcomes: t.outcomes, keep: true, proposalId: t.proposalId }));
@@ -194,11 +203,11 @@ export function OnboardingScreen() {
   const narrow = useSyncExternalStore(watchNarrow, isNarrow, () => false);
   const compact = step === 1; // the longest form: a little tighter, and tighter again on a short screen
   return (
-    <div className="signin forest-backdrop">
-      <div className={"grid w-full animate-[popIn_480ms_var(--ease-out)_both] items-center gap-10 short:gap-7 narrow:grid-cols-1 narrow:gap-4 " + (step === 2 ? "max-w-[1100px] grid-cols-[240px_minmax(0,760px)]" : "max-w-[1120px] grid-cols-[300px_minmax(0,720px)]")}>
+    <div className="signin forest-backdrop h-full overflow-hidden">
+      <div className={"grid max-h-full w-full animate-[popIn_480ms_var(--ease-out)_both] items-center gap-10 short:gap-7 narrow:h-full narrow:grid-cols-1 narrow:grid-rows-[auto_minmax(0,1fr)] narrow:items-stretch narrow:gap-4 " + (step === 2 ? "max-w-[1100px] grid-cols-[240px_minmax(0,760px)]" : "max-w-[1120px] grid-cols-[300px_minmax(0,720px)]")}>
         <aside className={"[&_.mascot-chat-bubble]:bg-white" + (compact ? " short:[&_.mascot-chat]:scale-90" : "")}><MascotChat key={step} who="host" mood="greeting" size={120} name={HOST_NAME} lines={lines} layout={narrow ? "side" : "stack"} /></aside>
-        <section className={"card card-focal " + (compact ? "px-7 py-6 short:py-5" : "p-7")} aria-labelledby="onboarding-title">
-          <div className={"flex items-center border-b border-border " + (compact ? "mb-6 pb-5 short:mb-3.5 short:pb-3.5" : "mb-6 pb-5")} role="list" aria-label={"Step " + (step + 1) + " of " + STEPS.length}>
+        <section className={"card card-focal max-h-[calc(100dvh-64px)] overflow-y-auto overscroll-contain pt-0 [scrollbar-width:none] short:max-h-[calc(100dvh-32px)] narrow:max-h-full [&::-webkit-scrollbar]:hidden " + (compact ? "px-7 pb-6 short:pb-5" : "px-7 pb-7")} aria-labelledby="onboarding-title">
+          <div className={"sticky top-0 z-10 flex items-center border-b border-border bg-white " + (compact ? "mb-6 pt-6 pb-5 short:mb-3.5 short:pt-5 short:pb-3.5" : "mb-6 pt-7 pb-5")} role="list" aria-label={"Step " + (step + 1) + " of " + STEPS.length}>
             {STEPS.map((label, i) => {
               const at: StepState = i < step ? "done" : i === step ? "current" : "next";
               const body = <>
@@ -232,23 +241,30 @@ export function OnboardingScreen() {
           {step === 1 ? <form className={"grid gap-3 short:gap-2 [&_.control]:min-h-11 [&_.field-hint]:mt-1 [&_.field-label]:mb-1 [&_.form-field]:mb-1 short:[&_.form-field]:mb-0 [&>p]:mx-0 [&>p]:-mt-2 [&>p]:mb-0" + (direction === "back" ? " animate-step-back" : " animate-step-forward")} onSubmit={(e) => { e.preventDefault(); toOutline(); }}>
             <h1 id="onboarding-title" className={TITLE}>Your first course</h1>
             <p className="muted">A personal course workspace in {state.programme.title}. It is yours to prepare; it is not an official approval.</p>
-            <div className="grid gap-3 rounded-xl border-2 border-dashed border-border bg-tint-1 px-3.5 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <strong>Import your course outline</strong>
-                <Segmented label="How to read your outline" value={importWay} onChange={(v) => { setImportWay(v); setError(""); }}
-                  options={[{ value: "file", label: "Upload a file" }, { value: "assistant", label: "Use your own AI" }]} />
+            <fieldset className="m-0 grid gap-3 border-0 p-0">
+              <legend className="mb-2.5 p-0 text-[15px] font-semibold text-ink">Import your course outline <span className="font-normal text-ink-3">· optional, or type it in below</span></legend>
+              <div className="grid grid-cols-2 gap-3 phone:grid-cols-1">
+                {IMPORT_WAYS.map((w) => <label key={w.value} className={"flex cursor-pointer items-start gap-3 rounded-xl border-2 bg-white px-3.5 py-3 transition-[border-color,background-color,box-shadow] duration-200 ease-out hover:border-emerald has-checked:border-emerald has-checked:bg-tint-1 has-checked:shadow-[3px_3px_0_var(--emerald)] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-emerald " + (importWay === w.value ? "" : "border-border")}>
+                  <input type="radio" name="import-way" value={w.value} checked={importWay === w.value} onChange={() => { setImportWay(w.value); setError(""); }} className="sr-only" />
+                  <span className={"mt-0.5 inline-flex size-9 flex-none items-center justify-center rounded-full transition-colors duration-200 " + (importWay === w.value ? "bg-emerald text-white" : "bg-tint-2 text-emerald-text")}><w.icon size={17} aria-hidden="true" /></span>
+                  <span className="grid gap-0.5"><strong className="text-[15px] text-ink">{w.label}</strong><span className="text-[13px] leading-[1.45] text-ink-2">{w.hint}</span></span>
+                </label>)}
               </div>
-              {importWay === "file" ? <div className="flex flex-wrap items-center justify-between gap-4">
-                <span className="muted min-w-0 flex-[1_1_260px]">PDF or Word. The model set up in Settings reads its outcomes and topics; you check every one before it is saved.</span>
+              {importWay === "file" ? <div onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
+                onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files?.[0]; if (f && !reading) void importOutline(f); }}
+                className={"flex flex-wrap items-center justify-between gap-x-5 gap-y-3 rounded-xl border-2 border-dashed px-4 py-3.5 transition-colors duration-200 " + (dragging ? "border-emerald bg-tint-2" : "border-border bg-tint-1")}>
+                <span className="grid min-w-0 flex-[1_1_240px] gap-0.5">
+                  <strong className="text-[14px] text-ink">{reading ? "Reading your outline..." : source ? "Read: " + source : "Drop your outline here"}</strong>
+                  <span className="text-[13px] leading-[1.45] text-ink-2">PDF or Word. You check every outcome and topic before anything is saved.</span>
+                </span>
                 <input ref={fileInput} type="file" accept=".pdf,.docx" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void importOutline(f); }} />
-                <Button loading={reading} onClick={() => fileInput.current?.click()}><FileUp size={16} /> {reading ? "Reading your outline..." : source ? "Import another" : "Choose a file"}</Button>
-              </div> : <div className="grid gap-2.5">
-                <ol className="muted m-0 grid gap-1 pl-5">
-                  <li>Copy the prompt and paste it into ChatGPT, Claude, Gemini or any assistant you use.</li>
-                  <li>Attach your outline there, or paste its text under the prompt.</li>
-                  <li>Copy the assistant's whole reply and paste it below.</li>
+                <Button loading={reading} onClick={() => fileInput.current?.click()}><FileUp size={16} /> {source ? "Import another" : "Choose a file"}</Button>
+              </div> : <div className="grid gap-3 rounded-xl border-2 border-border bg-tint-1 px-4 py-3.5">
+                <ol className="m-0 grid list-none gap-2 p-0 text-[14px] text-ink-2">
+                  {["Copy the prompt into ChatGPT, Claude, Gemini or any assistant you use.", "Attach your outline there, or paste its text under the prompt.", "Paste the assistant's whole reply below."].map((t, i) =>
+                    <li key={i} className="flex items-start gap-2.5"><span className="inline-flex size-6 flex-none items-center justify-center rounded-full bg-white text-[12px] font-bold text-emerald-text">{i + 1}</span><span className="pt-0.5">{t}</span></li>)}
                 </ol>
-                <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <Button onClick={() => void copyPrompt()}>{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "Prompt copied" : "Copy the prompt"}</Button>
                   <details className="text-[13px] [&_summary]:cursor-pointer [&_summary]:text-emerald-text">
                     <summary>See the prompt</summary>
@@ -258,7 +274,7 @@ export function OnboardingScreen() {
                 <Textarea aria-label="Your assistant's reply" rows={4} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Paste the assistant's reply here, all of it" maxLength={200_000} />
                 <Button className="justify-self-start" variant="primary" disabled={!reply.trim()} onClick={readReply}>Read the reply <ArrowRight size={15} /></Button>
               </div>}
-            </div>
+            </fieldset>
             {note ? <p role="status" className="save-status pop-in">{note}</p> : null}
             <div className="form-grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] narrow:grid-cols-1">
               <Field label="Course code"><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} required maxLength={40} placeholder="CS101" /></Field>
