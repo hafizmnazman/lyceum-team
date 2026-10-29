@@ -1,16 +1,19 @@
-// Settings: what agent web search will use, as the local API reads it from .env. Read-only by design: keys stay in .env on
+// Settings, in two tabs: the lecturer's country and how their data is handled (DataAndAi.tsx), and for the operator what
+// the helpers and agent web search will use, as the API reads it from .env. Read-only by design: keys stay in .env on
 // this computer and this screen sees only their last four characters. Editing .env takes effect on the next request.
 
 import { useEffect, useState } from "react";
 import { ENV, MODEL_PROVIDERS, SEARCH_ENV, SEARCH_PROVIDERS, type PublicAgentSettings } from "../../../../shared/lib/agentSettings.ts";
 import { Button, Page, PageHead, Spinner, Tag } from "../primitives/index.tsx";
 import { DataAndAiPanel } from "./DataAndAi.tsx";
+import { Segmented } from "../primitives/Segmented.tsx";
+import { agentHeaders } from "../../../../shared/agents/client.ts";
 
 type Loaded = { settings: PublicAgentSettings; missing: string[]; path: string };
 type TestResult = { ok: boolean; detail?: string; error?: string } | null;
 
 async function api(path: string, init?: RequestInit): Promise<unknown> {
-  const res = await fetch(path, init);
+  const res = await fetch(path, { ...init, headers: await agentHeaders() }); // online these routes answer signed-in people only
   const body = await res.json().catch(() => null);
   if (!res.ok || !body) throw new Error((body as { error?: string } | null)?.error ?? (res.status === 404 ? "The local API is not running. Start it with npm run dev." : "HTTP " + res.status));
   return body;
@@ -21,6 +24,7 @@ export function SettingsScreen() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<"" | "model" | "search">("");
   const [tests, setTests] = useState<{ model: TestResult; search: TestResult }>({ model: null, search: null });
+  const [tab, setTab] = useState<"data" | "helpers">("data");
   const reload = () => api("/api/agent-settings").then((d) => { setLoaded(d as Loaded); setError(""); }).catch((e: Error) => setError(e.message));
   useEffect(() => { void reload(); }, []);
 
@@ -35,11 +39,13 @@ export function SettingsScreen() {
 
   return (
     <Page>
-      <PageHead title="Settings" context="Your country and how your data is handled, then the model and search provider behind the helpers. Any provider with an OpenAI-compatible API and tool calling can drive them."
-        actions={<Button disabled={Boolean(busy)} onClick={() => void reload()}>Reload from .env</Button>} />
-      <DataAndAiPanel />
-      {error ? <p role="alert" className="form-error">{error}</p> : null}
-      {s && loaded ? <>
+      <PageHead title="Settings" context="Your country and how your data is handled, and, for whoever runs this Lyceum, the AI model and web search behind the helpers."
+        actions={tab === "helpers" ? <Button disabled={Boolean(busy)} onClick={() => void reload()}>Reload from .env</Button> : undefined} />
+      <div className="mb-6"><Segmented label="Settings section" value={tab} onChange={setTab}
+        options={[{ value: "data", label: "Your country & data" }, { value: "helpers", label: "AI model & search" }]} /></div>
+      {tab === "data" ? <DataAndAiPanel /> : null}
+      {tab === "helpers" && error ? <p role="alert" className="form-error">{error}</p> : null}
+      {tab === "helpers" && s && loaded ? <>
         <p className="muted">
           Set these in <code>{loaded.path}</code> (see <code>.env.example</code>). The local API reads the file again on every request, so a change applies without a restart. Keys never reach this page.{" "}
           {loaded.missing.length ? <Tag tone="warn">Still needed: {loaded.missing.join(", ")}</Tag> : <Tag tone="ok">Ready to run</Tag>}
@@ -83,7 +89,7 @@ export function SettingsScreen() {
             {row("Postings kept", ENV.maxPostings, String(s.maxPostings))}
           </dl>
         </section>
-      </> : error ? null : <p className="muted settings-loading"><Spinner size={14} decorative /> Loading settings from the local API...</p>}
+      </> : tab !== "helpers" || error ? null : <p className="muted settings-loading"><Spinner size={14} decorative /> Loading settings from the local API...</p>}
     </Page>
   );
 }

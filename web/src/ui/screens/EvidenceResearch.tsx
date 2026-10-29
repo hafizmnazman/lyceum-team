@@ -3,6 +3,7 @@
 // confirm each exact quotation, vouch for the extraction, then turn the result
 // into a meeting brief that can be downloaded or sent to a colleague.
 
+import { agentHeaders } from "../../../../shared/agents/client.ts";
 import { useEffect, useState } from "react";
 import {
   addProposals, openWatchRun, clearCollection, clearProposals, definitionForCourse, navigate, confirmProposals, dismissProposal, downloadPack, evidenceTrendNote, importCollectedPostings, nowIso, prepareEvidenceBrief, runCollection,
@@ -31,7 +32,7 @@ export function ResearchRun({ state, subject, mayEdit }: Props) {
   // Agent web search is the default source; when .env does not set it up yet, the panel says what is missing.
   const [agentMissing, setAgentMissing] = useState<string[] | null>(null);
   useEffect(() => {
-    fetch("/api/agent-settings").then((r) => (r.ok ? r.json() : null)).then((d: { missing?: string[] } | null) => setAgentMissing(d && Array.isArray(d.missing) ? d.missing : null))
+    agentHeaders().then((headers) => fetch("/api/agent-settings", { headers })).then((r) => (r.ok ? r.json() : null)).then((d: { missing?: string[] } | null) => setAgentMissing(d && Array.isArray(d.missing) ? d.missing : null))
       .catch(() => setAgentMissing(null));
   }, []);
   const [query, setQuery] = useState("");

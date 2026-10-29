@@ -171,7 +171,7 @@ has real data; the demo runs on the fixtures.
       model reads a results file; the upload notes say what was removed.
 - [x] **Data notice** in onboarding and the **Data & AI** section in Settings (services and regions, retention, no
       training, the 72-hour/7-day breach aim, the country's rules with sources). A summary, not a legal document.
-- [ ] **AI use statement in the teaching-pack .pptx** and the course file manifest.
+- [x] **AI use statement in the teaching-pack .pptx and the course file manifest** (`sessionAiUse` in `shared/lib/slides.ts`): a slide before the close listing the citations of Prism's items and the suggestions marked done; the manifest lists the whole course's.
 - [ ] **Privacy notice, terms and a DPA template** for procurement: need a legal entity and a lawyer.
 - [ ] **Rules for more countries**, each from a dated research note, never from memory.
 

@@ -55,6 +55,11 @@ function markSeen(personId: string, keys: string[]) {
   try { localStorage.setItem(SEEN(personId), JSON.stringify([...new Set([...seen(personId), ...keys])])); } catch { /* the tour shows again next time */ }
 }
 
+/** Forget which pages this person has toured, so each one shows its tour again on the next visit (the Guide's button). */
+export function resetPageTours(personId: string) {
+  try { localStorage.removeItem(SEEN(personId)); } catch { /* nothing was kept */ }
+}
+
 /** Replay the tour of the page in view: the guides' "Show me around" calls this. */
 export function showPageTour() {
   window.dispatchEvent(new Event("lyceum:page-tour"));

@@ -111,7 +111,7 @@ export interface InterpretOutcome {
 // read the Supabase session's token (web/src/app/account.ts); a demo persona has none and is recorded as demo.
 let sessionToken: () => Promise<string | null> = async () => null;
 export function setSessionToken(read: () => Promise<string | null>) { sessionToken = read; }
-async function agentHeaders(course?: string | null, extra: Record<string, string> = {}): Promise<Record<string, string>> {
+export async function agentHeaders(course?: string | null, extra: Record<string, string> = {}): Promise<Record<string, string>> {
   const headers: Record<string, string> = { "content-type": "application/json", ...extra };
   const token = await sessionToken().catch(() => null);
   if (token) headers.authorization = "Bearer " + token;

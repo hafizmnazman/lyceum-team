@@ -56,6 +56,8 @@ export function DataAndAiPanel() {
     <div className="section-heading"><div><h2 id="settings-data">Data &amp; AI</h2>
       <p className="muted">A summary of where your data goes and which rules the helpers follow. It is not a privacy policy or terms of service, and not legal advice.</p></div></div>
 
+    <div className="grid items-start gap-x-10 gap-y-6 min-[1100px]:grid-cols-2">
+    <div className="grid content-start gap-3 [&_h3]:mt-3 [&_h3]:mb-0">
     {user ? <div className="flex flex-wrap items-end gap-3">
       <div className="min-w-60 flex-1"><Field label="Country you teach in" hint="Every helper's prompt carries this country's framework and data rules."><Dropdown value={country} onChange={setCountry} options={COUNTRIES.map((c) => ({ value: c, label: RULESETS[c].label }))} /></Field></div>
       <Button className="sm:mt-[30px]" variant="primary" loading={busy} disabled={!isCountry(country) || country === user.country} onClick={() => void save()}>Save country</Button>
@@ -77,6 +79,8 @@ export function DataAndAiPanel() {
       <li>What it writes is a draft for you to review and declare to your students.</li>
     </ul>
 
+    </div>
+    <div className="grid content-start gap-3 [&_h3]:mt-3 [&_h3]:mb-0 [&_h3:first-child]:mt-0">
     <h3>Services that hold or read your data</h3>
     <div className="table-scroll"><table className="evidence-table">
       <thead><tr><th scope="col">Service</th><th scope="col">What for</th><th scope="col">Where</th></tr></thead>
@@ -96,5 +100,7 @@ export function DataAndAiPanel() {
       <li>The model provider applies its own data policy to what it receives; the operator should choose one that does not train on prompts.</li>
       <li>If a breach affects your data, the aim is to notify the regulator within 72 hours of finding it and you within 7 days after that, as Malaysia's PDPA breach guideline asks.</li>
     </ul>
+    </div>
+    </div>
   </section>;
 }

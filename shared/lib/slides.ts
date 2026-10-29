@@ -195,6 +195,15 @@ export function pngAspect(base64: string): number | null {
  *  the evidence, the check for understanding, the resources and a closing slide. A sample session without slides: an outline
  *  pack built from the topic record and labelled so. A lecturer's session without slides: outcomes, the evidence behind them,
  *  the activity, the check and the resources. Every slide has a unique title and notes. */
+/** The AI use a session's teaching carries: the citation of each quiz item Prism drafted and of each Prism suggestion the
+ *  lecturer marked done, each once. Slides drafted by Prism before citations were recorded say so without one. */
+export function sessionAiUse(session: TeachingSession): string[] {
+  const cited = [...(session.items ?? []).filter((i) => i.source === "model").map((i) => i.aiUse),
+    ...(session.slideRounds ?? []).flatMap((r) => r.suggestions.filter((x) => x.status === "done").map((x) => x.aiUse))];
+  const list = [...new Set(cited.filter((c): c is string => Boolean(c)))];
+  return list.length || !(session.slidesBy === "prism" && session.slides?.length) ? list : ["The slide text was drafted by the model (Prism); the model and date were not recorded."];
+}
+
 export function sessionDeck(subject: Subject, session: TeachingSession, clos: CLO[], report: EvidenceReport, mentions: SkillMention[], sources: EvidenceSource[], people: Person[], generatedAt: string,
   context: { definition?: CourseDefinition | null; brand?: Brand | null } = {}): DeckSpec {
   const linked = clos.filter((c) => session.cloIds.includes(c.id));
@@ -247,6 +256,14 @@ export function sessionDeck(subject: Subject, session: TeachingSession, clos: CL
     slides = [cover, outcomes, evidence,
       { title: "Learning activity", paragraphs: [session.activity || "Add an activity students will take part in."], notes: "Describe what students do, not only what you present." },
       check, resources];
+  }
+  // Declared before the close (UTM Circular 3/2024 2.2.3 and 2.3.3): what of this session generative AI drafted, as cited.
+  const aiUse = sessionAiUse(session);
+  if (aiUse.length) {
+    const statement: DeckSlide = { title: "AI use statement", paragraphs: ["Parts of this session were drafted with generative AI and reviewed by the lecturer:"], bullets: aiUse,
+      notes: "Tell the class how AI was used in preparing this session and its check, as your institution's guideline asks." };
+    const at = slides.at(-1)?.master === "CLOSING" ? slides.length - 1 : slides.length;
+    slides = [...slides.slice(0, at), statement, ...slides.slice(at)];
   }
   return { fileName: safeFile(subject.id) + "-week-" + session.week + "-teaching-pack.pptx", title: subject.id + " week " + session.week + " teaching pack",
     author: session.sample ? "Lyceum prototype (sample)" : name(people, session.updatedBy), generatedAt, footer: brand.footer, slides, brand };
