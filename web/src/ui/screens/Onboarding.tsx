@@ -5,7 +5,7 @@
 // Creating the course makes the accepted outline its first version, sets its term, finishes onboarding (only then does
 // the account count) and opens the course. Cancelling, or signing out first, deletes the account.
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, ArrowRight, Check, FileUp, Plus, X } from "lucide-react";
 import { JOB_ROLE_LABEL, JOB_ROLES } from "../../app/account.ts";
 import { readOutlineFile, sendVerdict } from "../../../../shared/agents/client.ts";
@@ -23,6 +23,29 @@ interface TopicRow { key: number; title: string; hours: string; week: number | n
 const outcomeSig = (r: OutcomeRow) => JSON.stringify([r.text.trim(), r.bloom]);
 const topicSig = (r: TopicRow) => JSON.stringify([r.title.trim(), r.hours.trim(), r.week, r.outcomes]);
 let rowKey = 0;
+// On a narrow screen the host speaks from beside the card rather than above it.
+const NARROW = "(max-width: 760px)";
+const watchNarrow = (onChange: () => void) => { const m = matchMedia(NARROW); m.addEventListener("change", onChange); return () => m.removeEventListener("change", onChange); };
+const isNarrow = () => matchMedia(NARROW).matches;
+
+// The stepper, by state: a finished step is a filled check you can go back to, the current one is filled and ringed.
+type StepState = "done" | "current" | "next";
+const STEP_LABEL: Record<StepState, string> = { done: "font-semibold text-ink", current: "font-bold text-ink", next: "font-semibold text-ink-2" };
+const STEP_NODE: Record<StepState, string> = {
+  done: "border-emerald bg-emerald text-white",
+  current: "border-emerald bg-emerald text-white shadow-[0_0_0_4px_var(--color-tint-2)]",
+  next: "border-border bg-white text-ink-2",
+};
+// One outline row: keep box, label, wording and level; a topic row is keep box, title, hours, the outcomes it serves, remove.
+const ROW = "grid gap-2.5 transition-opacity duration-[160ms] ease-out";
+const ROWS = "m-0 grid list-none gap-2.5 p-0";
+const SECTION = "m-0 grid gap-2.5 border-0 p-0";
+const LEGEND = "mb-2 font-display text-[17px] font-bold";
+const KEEP = "grid min-h-11 place-items-center";
+const KEEP_BOX = "size-[18px] accent-emerald";
+// Each step's form: a grid whose intro line tucks up under the title.
+const FORM = "grid gap-4 [&>p]:mx-0 [&>p]:-mt-2 [&>p]:mb-0";
+const TITLE = "m-0 font-display text-[28px] font-extrabold tracking-[-0.02em]";
 const numberOrNull = (s: string) => (s.trim() && Number.isFinite(Number(s)) && Number(s) > 0 ? Number(s) : null);
 
 export function OnboardingScreen() {
@@ -141,22 +164,33 @@ export function OnboardingScreen() {
       ? ["Have a course outline? Upload it and I'll read its outcomes and topics for you to check.", "The term dates every record in the loop. Where your graduates go is what I search the web for on Watch."]
       : ["Check each outcome. A green tag means its words are in your outline; an amber one means it was reworded, so read it against yours.", "Untick anything you don't want. You can change all of it later in Update."];
 
+  const narrow = useSyncExternalStore(watchNarrow, isNarrow, () => false);
+  const compact = step === 1; // the longest form: a little tighter, and tighter again on a short screen
   return (
     <div className="signin forest-backdrop">
-      <div className={"onboarding is-step-" + step + (step === 2 ? " is-wide" : "")}>
-        <aside className="onboarding-host"><MascotChat key={step} who="host" mood="greeting" size={120} name={HOST_NAME} lines={lines} /></aside>
-        <section className="onboarding-card card card-focal" aria-labelledby="onboarding-title">
-          <div className="onboarding-progress" role="list" aria-label={"Step " + (step + 1) + " of " + STEPS.length}>
-            {STEPS.map((label, i) => <div key={label} className={"onboarding-step-marker" + (i < step ? " is-done" : i === step ? " is-current" : "")} role="listitem" aria-current={i === step ? "step" : undefined}>
-              {i < step ? <button type="button" className="onboarding-step-button" onClick={() => moveTo(i)} aria-label={"Back to step " + (i + 1) + ": " + label}><span className="onboarding-step-node"><Check size={14} strokeWidth={3} /></span><span>{label}</span></button>
-                : <span className="onboarding-step-button"><span className="onboarding-step-node">{i + 1}</span><span>{label}</span></span>}
-              {i < STEPS.length - 1 ? <span className="onboarding-step-connector" aria-hidden /> : null}
-            </div>)}
+      <div className={"grid w-full animate-[popIn_480ms_var(--ease-out)_both] items-center gap-10 short:gap-7 narrow:grid-cols-1 narrow:gap-4 " + (step === 2 ? "max-w-[1100px] grid-cols-[240px_minmax(0,760px)]" : "max-w-[1120px] grid-cols-[300px_minmax(0,720px)]")}>
+        <aside className={"[&_.mascot-chat-bubble]:bg-white" + (compact ? " short:[&_.mascot-chat]:scale-90" : "")}><MascotChat key={step} who="host" mood="greeting" size={120} name={HOST_NAME} lines={lines} layout={narrow ? "side" : "stack"} /></aside>
+        <section className={"card card-focal " + (compact ? "px-7 py-6 short:py-5" : "p-7")} aria-labelledby="onboarding-title">
+          <div className={"flex items-center border-b border-border " + (compact ? "mb-6 pb-5 short:mb-3.5 short:pb-3.5" : "mb-6 pb-5")} role="list" aria-label={"Step " + (step + 1) + " of " + STEPS.length}>
+            {STEPS.map((label, i) => {
+              const at: StepState = i < step ? "done" : i === step ? "current" : "next";
+              const body = <>
+                <span className={"inline-flex size-7 flex-[0_0_28px] items-center justify-center rounded-full border-[1.5px] text-[13px] font-bold transition-[background-color,border-color,color,box-shadow] duration-[240ms] ease-out phone:size-6 phone:basis-6 phone:text-[12px] " + STEP_NODE[at]}>{at === "done" ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
+                <span className={"overflow-hidden text-ellipsis" + (at === "current" ? "" : " phone:hidden")}>{label}</span>
+              </>;
+              const button = "inline-flex min-w-0 flex-[0_1_auto] items-center gap-2.5 rounded-full border-0 bg-transparent py-1 pr-1.5 pl-1 text-left text-[14px] leading-[inherit] whitespace-nowrap transition-[color,background-color] duration-200 ease-out phone:gap-1.5 phone:text-[12px] " + STEP_LABEL[at];
+              return <div key={label} className="flex min-w-0 flex-[1_1_0] items-center last:flex-none" role="listitem" aria-current={at === "current" ? "step" : undefined}>
+                {at === "done"
+                  ? <button type="button" className={button + " cursor-pointer hover:bg-tint-1 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald"} onClick={() => moveTo(i)} aria-label={"Back to step " + (i + 1) + ": " + label}>{body}</button>
+                  : <span className={button}>{body}</span>}
+                {i < STEPS.length - 1 ? <span className={"mx-3 h-0.5 min-w-4 flex-auto rounded-[1px] transition-colors duration-300 ease-out phone:mx-1.5 phone:min-w-2 " + (at === "done" ? "bg-emerald" : "bg-border")} aria-hidden /> : null}
+              </div>;
+            })}
           </div>
           <p className="sr-only" aria-live="polite">Step {step + 1} of {STEPS.length}: {STEPS[step]}</p>
 
-          {step === 0 ? <form className={"onboarding-step-form " + direction} onSubmit={(e) => { e.preventDefault(); void saveProfile(); }}>
-            <h1 id="onboarding-title" className="onboarding-title">Set up your workspace</h1>
+          {step === 0 ? <form className={FORM + (direction === "back" ? " animate-step-back" : " animate-step-forward")} onSubmit={(e) => { e.preventDefault(); void saveProfile(); }}>
+            <h1 id="onboarding-title" className={TITLE}>Set up your workspace</h1>
             <p className="muted">Signed in as {me.email}. Everything you make is saved to your account on this Lyceum server.</p>
             <Field label="Your name" hint="As colleagues know you, e.g. Dr Aina Rahim."><Input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></Field>
             <Field label="Your role"><Dropdown value={jobRole} onChange={setJobRole} options={JOB_ROLES.map((r) => ({ value: r, label: JOB_ROLE_LABEL[r] }))} /></Field>
@@ -166,11 +200,11 @@ export function OnboardingScreen() {
             <div className="button-row"><Button type="submit" variant="primary" loading={busy}>Continue <ArrowRight size={15} /></Button><Button variant="quiet" onClick={() => void cancel()}>Cancel sign-up</Button></div>
           </form> : null}
 
-          {step === 1 ? <form className={"onboarding-step-form " + direction} onSubmit={(e) => { e.preventDefault(); toOutline(); }}>
-            <h1 id="onboarding-title" className="onboarding-title">Your first course</h1>
+          {step === 1 ? <form className={"grid gap-3 short:gap-2 [&_.control]:min-h-11 [&_.field-hint]:mt-1 [&_.field-label]:mb-1 [&_.form-field]:mb-1 short:[&_.form-field]:mb-0 [&>p]:mx-0 [&>p]:-mt-2 [&>p]:mb-0" + (direction === "back" ? " animate-step-back" : " animate-step-forward")} onSubmit={(e) => { e.preventDefault(); toOutline(); }}>
+            <h1 id="onboarding-title" className={TITLE}>Your first course</h1>
             <p className="muted">A personal course workspace in {state.programme.title}. It is yours to prepare; it is not an official approval.</p>
-            <div className="outline-drop">
-              <div>
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border-2 border-dashed border-border bg-tint-1 px-3.5 py-3">
+              <div className="grid min-w-0 flex-[1_1_260px] gap-0.5">
                 <strong>Import your course outline</strong>
                 <span className="muted">PDF or Word. The model set up in Settings reads its outcomes and topics; you check every one before it is saved.</span>
               </div>
@@ -178,7 +212,7 @@ export function OnboardingScreen() {
               <Button loading={reading} onClick={() => fileInput.current?.click()}><FileUp size={16} /> {reading ? "Reading your outline..." : source ? "Import another" : "Choose a file"}</Button>
             </div>
             {note ? <p role="status" className="save-status pop-in">{note}</p> : null}
-            <div className="form-grid onboarding-grid">
+            <div className="form-grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] narrow:grid-cols-1">
               <Field label="Course code"><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} required maxLength={40} placeholder="CS101" /></Field>
               <Field label="Year"><Dropdown value={year} onChange={setYear} options={["1", "2", "3", "4", "5"].map((y) => ({ value: y, label: "Year " + y }))} /></Field>
               <Field label="Semester"><Dropdown value={semester} onChange={setSemester} options={["1", "2", "3"].map((n) => ({ value: n, label: "Semester " + n }))} /></Field>
@@ -194,38 +228,38 @@ export function OnboardingScreen() {
             </div>
           </form> : null}
 
-          {step === 2 ? <form className={"onboarding-step-form " + direction} onSubmit={(e) => { e.preventDefault(); void createCourse(); }}>
-            <h1 id="onboarding-title" className="onboarding-title">{code} outline</h1>
+          {step === 2 ? <form className={FORM + (direction === "back" ? " animate-step-back" : " animate-step-forward")} onSubmit={(e) => { e.preventDefault(); void createCourse(); }}>
+            <h1 id="onboarding-title" className={TITLE}>{code} outline</h1>
             <p className="muted">{source ? "Proposed from " + source + ". Untick what you don't want and edit the rest." : "Write the course's learning outcomes; topics are optional and can wait for Update."}</p>
 
-            <fieldset className="outline-section">
-              <legend>Learning outcomes</legend>
-              <ol className="outline-rows">
-                {outcomes.map((o, i) => <li key={o.key} className={"outline-row pop-in" + (o.keep ? "" : " is-off")}>
-                  <label className="outline-keep"><input type="checkbox" checked={o.keep} onChange={(e) => setOutcome(o.key, { keep: e.target.checked })} /><span className="sr-only">Keep CLO{i + 1}</span></label>
-                  <span className="outline-label">CLO{i + 1}</span>
-                  <Textarea aria-label={"CLO" + (i + 1) + " wording"} rows={2} value={o.text} onChange={(e) => setOutcome(o.key, { text: e.target.value })} placeholder="Students will be able to..." maxLength={600} />
-                  <div className="outline-meta">
+            <fieldset className={SECTION}>
+              <legend className={LEGEND}>Learning outcomes</legend>
+              <ol className={ROWS}>
+                {outcomes.map((o, i) => <li key={o.key} className={ROW + " pop-in grid-cols-[24px_52px_minmax(0,1fr)_190px] items-start narrow:grid-cols-[24px_minmax(0,1fr)]" + (o.keep ? "" : " opacity-50")}>
+                  <label className={KEEP}><input type="checkbox" className={KEEP_BOX} checked={o.keep} onChange={(e) => setOutcome(o.key, { keep: e.target.checked })} /><span className="sr-only">Keep CLO{i + 1}</span></label>
+                  <span className="pt-3 font-extrabold tabular-nums narrow:pt-2.5">CLO{i + 1}</span>
+                  <Textarea aria-label={"CLO" + (i + 1) + " wording"} className="narrow:col-[2]" rows={2} value={o.text} onChange={(e) => setOutcome(o.key, { text: e.target.value })} placeholder="Students will be able to..." maxLength={600} />
+                  <div className="grid justify-items-start gap-1.5 narrow:col-[2]">
                     <Dropdown value={o.bloom} onChange={(b) => setOutcome(o.key, { bloom: b })} options={BLOOM_LEVELS.map((b) => ({ value: b, label: b }))} />
                     {o.inDocument === true ? <Tag tone="ok">In your outline</Tag> : o.inDocument === false ? <Tag tone="warn">Reworded, check it</Tag> : null}
                   </div>
                 </li>)}
               </ol>
-              <Button variant="quiet" onClick={() => setOutcomes((rows) => [...rows, { key: ++rowKey, text: "", bloom: "Understand", keep: true, inDocument: null }])}><Plus size={15} /> Add an outcome</Button>
+              <Button variant="quiet" className="justify-self-start" onClick={() => setOutcomes((rows) => [...rows, { key: ++rowKey, text: "", bloom: "Understand", keep: true, inDocument: null }])}><Plus size={15} /> Add an outcome</Button>
             </fieldset>
 
-            <fieldset className="outline-section">
-              <legend>Topics</legend>
-              {topics.length ? <ol className="outline-rows">
-                {topics.map((t, i) => <li key={t.key} className={"outline-row is-topic" + (t.keep ? "" : " is-off")}>
-                  <label className="outline-keep"><input type="checkbox" checked={t.keep} onChange={(e) => setTopic(t.key, { keep: e.target.checked })} /><span className="sr-only">Keep topic {i + 1}</span></label>
+            <fieldset className={SECTION}>
+              <legend className={LEGEND}>Topics</legend>
+              {topics.length ? <ol className={ROWS}>
+                {topics.map((t, i) => <li key={t.key} className={ROW + " grid-cols-[24px_minmax(0,1fr)_90px_auto_32px] items-center narrow:grid-cols-[24px_minmax(0,1fr)_80px_32px]" + (t.keep ? "" : " opacity-50")}>
+                  <label className={KEEP}><input type="checkbox" className={KEEP_BOX} checked={t.keep} onChange={(e) => setTopic(t.key, { keep: e.target.checked })} /><span className="sr-only">Keep topic {i + 1}</span></label>
                   <Input aria-label={"Topic " + (i + 1)} value={t.title} onChange={(e) => setTopic(t.key, { title: e.target.value })} maxLength={200} />
-                  <Input aria-label={"Topic " + (i + 1) + " contact hours"} className="outline-hours" inputMode="decimal" value={t.hours} onChange={(e) => setTopic(t.key, { hours: e.target.value })} placeholder="Hours" />
-                  <span className="muted outline-serves">{t.outcomes.length ? "CLO" + t.outcomes.join(", CLO") : ""}</span>
-                  <button type="button" className="outline-remove" aria-label={"Remove topic " + (i + 1)} onClick={() => setTopics((rows) => rows.filter((r) => r.key !== t.key))}><X size={16} /></button>
+                  <Input aria-label={"Topic " + (i + 1) + " contact hours"} className="text-right" inputMode="decimal" value={t.hours} onChange={(e) => setTopic(t.key, { hours: e.target.value })} placeholder="Hours" />
+                  <span className="muted text-[13px] whitespace-nowrap narrow:hidden">{t.outcomes.length ? "CLO" + t.outcomes.join(", CLO") : ""}</span>
+                  <button type="button" className="grid size-8 cursor-pointer place-items-center rounded-lg border-0 bg-transparent text-ink-2 hover:bg-tint-1 hover:text-ink" aria-label={"Remove topic " + (i + 1)} onClick={() => setTopics((rows) => rows.filter((r) => r.key !== t.key))}><X size={16} /></button>
                 </li>)}
               </ol> : <p className="muted">No topics yet. Add them now or later in Update.</p>}
-              <Button variant="quiet" onClick={() => setTopics((rows) => [...rows, { key: ++rowKey, title: "", hours: "", week: null, outcomes: [], keep: true }])}><Plus size={15} /> Add a topic</Button>
+              <Button variant="quiet" className="justify-self-start" onClick={() => setTopics((rows) => [...rows, { key: ++rowKey, title: "", hours: "", week: null, outcomes: [], keep: true }])}><Plus size={15} /> Add a topic</Button>
             </fieldset>
 
             <div className="form-grid">
