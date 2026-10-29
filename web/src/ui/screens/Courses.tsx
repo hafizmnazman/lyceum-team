@@ -7,6 +7,7 @@ import { currentPerson, navigate, selectSubject, useStore } from "../../app/stor
 import { planSummary } from "../../../../shared/lib/teachingPlan.ts";
 import { Button, Field, Input, Page, PageHead, Select, Tag } from "../primitives/index.tsx";
 import { ProgrammeWall } from "./ProgrammeWall.tsx";
+import { LoopBar } from "./Inbox.tsx";
 
 export function CoursesScreen() {
   const state = useStore();
@@ -45,6 +46,7 @@ export function CoursesScreen() {
       <div className="section-heading"><span className="eyebrow">{subject.id} · Year {subject.year}, semester {subject.semester}</span><Tag>{subject.workspaceOnly ? "Personal workspace" : subject.status}</Tag></div>
       <h2>{subject.title}</h2>
       <p className="muted">{hatsOn(person.id, subject.id, state.assignments).map((h) => h === "coordinator" ? "Coordinator" : "Lecturer").join(" & ") || "Programme view"} · {plan?.term || "Term not set"}</p>
+      <div className="mb-4"><LoopBar subjectId={subject.id} /></div>
       <dl className="course-facts"><div><dt>Outcomes</dt><dd>{clos.length} recorded</dd></div><div><dt>Teaching plan</dt><dd>{summary.sessions.length} sessions · {summary.ready} ready{summary.samples.length ? " · " + summary.samples.length + " sample" : ""}</dd></div><div><dt>Curriculum proposal</dt><dd>{proposal ? proposal.status.replaceAll("-", " ") : "No open proposal"}</dd></div></dl>
       <div className="course-next"><strong>Next preparation step</strong><p>{summary.next ? "Week " + summary.next.week + ": " + summary.next.topic : summary.sessions.length ? "Review delivered sessions and prepare your next class." : "Plan the first session and link it to a learning outcome."}</p></div>
       <Button data-demo-id={"course-open-" + subject.id} onClick={() => open(subject.id)}>Open course <ArrowRight size={15} /></Button>

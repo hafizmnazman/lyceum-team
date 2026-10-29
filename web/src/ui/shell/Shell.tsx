@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, Check, ChevronDown, LogOut, Menu, RotateCcw, Search, ShieldCheck } from "lucide-react";
 import type { Screen } from "../../app/roles.ts";
 import { hatsOn, navFor, subjectsForPerson } from "../../app/roles.ts";
-import { stepDef } from "../../app/loop.ts";
+import { LOOP_STEPS, RING_STEPS, loopState, stepDef, type CourseStep } from "../../app/loop.ts";
 import { effectiveStep } from "../../app/routes.ts";
 import {
   currentPerson,
@@ -210,31 +210,13 @@ export function Shell(props: { children: ReactNode }) {
             {railCourse && mySubjects.length > 0 ? (
               <>
                 <div className="nav-group-label">Your courses</div>
-                <div className="course-chips">
-                  {mySubjects.map((sid) => {
-                    const hats = hatsOn(person.id, sid, state.assignments);
-                    const role = hats.includes("coordinator") && hats.includes("lecturer") ? "coordinator and lecturer" : hats.includes("coordinator") ? "coordinator" : "lecturer";
-                    const title = state.subjects.find((x) => x.id === sid)?.title;
-                    return (
-                      <Tooltip key={sid} content={<><span className="tooltip-title">{sid}{title ? " " + title : ""}</span><span>You are {role}.</span></>}>
-                      <button
-                        type="button"
-                        data-demo-id={`subject-${sid}`}
-                        className="course-chip tabular"
-                        aria-pressed={sid === railCourse}
-                        aria-label={sid + ", you are " + role}
-                        onClick={() => openStep(sid, "course")}
-                      >
-                        {sid}
-                      </button>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
+                <ul className="m-0 grid list-none gap-1 p-0">
+                  {mySubjects.map((sid) => <SidebarCourse key={sid} sid={sid} open={Boolean(step) && sid === railCourse} personId={person.id} activeStep={sid === state.selectedSubjectId ? step : null} />)}
+                </ul>
               </>
             ) : null}
 
-            <div className="nav-group-label">Explore</div>
+            <div className="nav-group-label">Learn more</div>
             {EXPLORE.filter((s) => s === "guide" || nav.includes(s)).map((s) => (
               <NavItem key={s} screen={s} active={state.screen === s} badge={0} />
             ))}
@@ -256,7 +238,8 @@ export function Shell(props: { children: ReactNode }) {
           {NOTICE_SCREENS.includes(state.screen) ? <PrototypeNotice /> : null}
           {state.persistenceStatus === "unavailable" ? <div role="alert" className="storage-warning">Browser storage is unavailable. Changes only last while this page is open. Export your teaching plan before closing.</div> : null}
           {/* The Guide page is the guide itself; its Institution entry is for the catalogue, not a pill above the page. */}
-          {state.screen === "guide" ? null : <SectionHelp screen={state.screen} label={state.screen === "studio" && step ? stepDef(step).label : state.screen === "office" ? "this page" : undefined} />}
+          {/* A course step opens its guide from its own header ("?", StepFrame); the Guide page is the guide itself. */}
+          {state.screen === "guide" || (step && state.selectedSubjectId) ? null : <SectionHelp screen={state.screen} label={state.screen === "office" ? "this page" : undefined} />}
           {props.children}
         </main>
       </div>
@@ -271,6 +254,36 @@ export function Shell(props: { children: ReactNode }) {
       ) : null}
     </div>
   );
+}
+
+/** One of your courses: a row naming it and your role, and for the course in view its loop's seven steps, each marked
+ *  done, next or open, so any step is one click from anywhere. */
+function SidebarCourse({ sid, open, personId, activeStep }: { sid: string; open: boolean; personId: string; activeStep: CourseStep | null }) {
+  const state = useStore();
+  const hats = hatsOn(personId, sid, state.assignments);
+  const role = hats.includes("coordinator") && hats.includes("lecturer") ? "coordinator and lecturer" : hats.includes("coordinator") ? "coordinator" : "lecturer";
+  const title = state.subjects.find((x) => x.id === sid)?.title ?? "";
+  const loop = loopState(state, sid);
+  const done = loop.steps.filter((s) => RING_STEPS.includes(s.id) && s.done).length;
+  return <li>
+    <button type="button" data-demo-id={`subject-${sid}`} aria-pressed={open} aria-label={sid + " " + title + ", you are " + role} onClick={() => openStep(sid, loop.next ?? "course")}
+      className={"grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-[var(--radius-button)] border-2 px-3 py-2 text-left transition-colors " + (open ? "border-emerald bg-tint-1" : "border-transparent hover:bg-tint-1")}>
+      <span className="truncate text-[14px] font-bold text-ink"><span className="tabular">{sid}</span> <span className="font-normal text-ink-2">{title}</span></span>
+      <span className="text-[12px] font-semibold text-ink-3 tabular">{done}/{RING_STEPS.length}</span>
+    </button>
+    {open ? <ol className="m-0 mt-1 mb-2 ml-4 grid list-none gap-0.5 border-l-2 border-tint-2 p-0 pl-2" aria-label={"Steps of " + sid}>
+      {LOOP_STEPS.filter((s) => RING_STEPS.includes(s.id)).map((s) => {
+        const st = loop.steps.find((x) => x.id === s.id)!, here = activeStep === s.id, isNext = !st.done && loop.next === s.id;
+        return <li key={s.id}><button type="button" data-demo-id={"side-" + s.id} aria-current={here ? "page" : undefined} onClick={() => openStep(sid, s.id)}
+          className={"flex min-h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg border-0 px-2 text-left text-[14px] transition-colors " + (here ? "bg-forest font-bold text-white" : "bg-transparent text-ink hover:bg-tint-1")}>
+          <span aria-hidden className={"inline-flex size-[18px] flex-none items-center justify-center rounded-full border-2 " + (st.done ? "border-emerald bg-emerald text-white" : isNext ? "border-dashed border-emerald" : "border-border")}>{st.done ? <Check size={11} strokeWidth={3.5} /> : null}</span>
+          <span className="flex-1">{s.label}</span>
+          {isNext && !here ? <span className="text-[11px] font-bold text-emerald-text uppercase">Next</span> : null}
+          <span className="sr-only">{st.done ? ", done" : isNext ? ", next" : ""}</span>
+        </button></li>;
+      })}
+    </ol> : null}
+  </li>;
 }
 
 function NavItem(props: { screen: Screen; active: boolean; badge: number }) {

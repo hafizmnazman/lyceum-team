@@ -28,26 +28,35 @@ export interface LoopStepDef {
   question: string; // the one line under the step's title (Section 4)
   helper: string; // who assists at this step (Section 7.1); people decide at Decide
   handoff: string; // the line that ends the step and the question the next one answers (Section 4.1)
+  doneWhen: string; // the rule loopState applies, in words, for the step's side rail
   screen: Screen;
   tab?: StudioTab;
 }
 
 export const LOOP_STEPS: LoopStepDef[] = [
   { id: "course", label: "Course", number: null, question: "What does this course promise today?", helper: "Folio, the course reader",
+    doneWhen: "The course has at least one learning outcome.",
     handoff: "A course is a promise, not evidence. Next: Watch what employers ask for.", screen: "studio", tab: "overview" },
   { id: "watch", label: "Watch", number: 1, question: "What are employers asking for, right now and over time?", helper: "Scout, the industry researcher",
+    doneWhen: "At least one source is kept and reviewed this term.",
     handoff: "Postings are not evidence until someone reads them. Next: Report.", screen: "watch" },
   { id: "report", label: "Report", number: 2, question: "What exactly do they ask, how often, and what does the course do about it?", helper: "Atlas, Lens and Steward",
+    doneWhen: "Quotations are taken from reviewed postings, a skill is mapped to an outcome, and a brief is prepared.",
     handoff: "A count is not a decision. Next: Decide.", screen: "report" },
   { id: "decide", label: "Decide", number: 3, question: "What will we do, and who said so?", helper: "People decide; the sandbox can try a change on a mock cohort",
+    doneWhen: "Someone records adopt or retain on this term's brief.",
     handoff: "A decision is not a course. Next: Update.", screen: "decide" },
   { id: "update", label: "Update", number: 4, question: "What does the approved change look like, within our hours and rules?", helper: "Quill, the course designer",
+    doneWhen: "A revision is adopted after an adopt decision, or the decision was retain.",
     handoff: "A course is not a class. Next: Teach.", screen: "studio", tab: "curriculum" },
   { id: "teach", label: "Teach", number: 5, question: "What will the class do, and with what?", helper: "Prism, the teaching-material creator",
+    doneWhen: "A session this term teaches one of the current outcomes.",
     handoff: "A class is not proof. Next: Learn.", screen: "studio", tab: "plan" },
   { id: "learn", label: "Learn", number: 6, question: "Did it work, as far as we can honestly tell?", helper: "Lens, the evidence analyst",
+    doneWhen: "This term's results are filed against the course version taught.",
     handoff: "Next semester the loop runs again.", screen: "learn" },
   { id: "history", label: "History", number: null, question: "Versions and decisions on one timeline.", helper: "Folio, the course reader",
+    doneWhen: "",
     handoff: "", screen: "studio", tab: "history" },
 ];
 

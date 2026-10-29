@@ -49,7 +49,7 @@ try {
   await page.goto(origin, { waitUntil: "networkidle0" });
   await click("index-signin"); // signed out, the app opens on the landing page
   await click("login-P-SOBRI");
-  await textIncludes("Briefs waiting for a decision");
+  await textIncludes("Waiting on you");
   await click("nav-courses");
   await page.type(selector("course-search"), "no matching course");
   await textIncludes("No courses match");

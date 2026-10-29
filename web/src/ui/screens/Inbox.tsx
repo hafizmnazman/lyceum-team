@@ -1,13 +1,12 @@
-// Home for every role (plan Section 5.3): one visual, the ring for the course in
-// view with the next step lit, and one action, "Continue". The work queue, the
-// notifications and the courses sit behind disclosures that open by themselves
-// when something is waiting. A brief opened here carries its receipts and, for
+// Home for every role (plan Section 5.3; redesigned 29 October 2026): one action, the next step on the course in view
+// with its question and its rule; beside it everything waiting on this person (briefs to decide and notifications, one
+// list) and what happened lately; under them each course with its loop as seven segments. A brief opened here carries its receipts and, for
 // a recipient who decides, the four decisions with a required note.
 
-import type { ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { ArrowRight, X } from "lucide-react";
 import { subjectsForPerson } from "../../app/roles.ts";
-import { loopState, plural, stepDef } from "../../app/loop.ts";
+import { RING_STEPS, loopState, plural, stepDef } from "../../app/loop.ts";
 import { planSummary } from "../../../../shared/lib/teachingPlan.ts";
 import { RECOMMENDATION_LABEL } from "../../../../shared/lib/evidence.ts";
 import { downloadText } from "../../../../shared/lib/download.ts";
@@ -26,7 +25,6 @@ import {
   useStore,
 } from "../../app/store.ts";
 import { Button, Page, PageHead, Tag } from "../primitives/index.tsx";
-import { Ring, RingPanel } from "../primitives/loop.tsx";
 import { runTimeline } from "../../app/runs.ts";
 import { HOST_NAME, MascotChat, useCourseMoods } from "../mascots/index.tsx";
 import { BriefDecisionPanel } from "./Decide.tsx";
@@ -103,58 +101,61 @@ export function InboxScreen() {
         <BriefDecisionPanel brief={brief} subjectId={brief.subjectId} compact />
       </section> : null}
 
-      <div className="home-grid">
-      {person.orgRole === "academic" && recentCourse ? <StartHere subjectId={recentCourse.id}
+      <div className="mb-8 grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      {person.orgRole === "academic" && recentCourse ? <NextAction subjectId={recentCourse.id}
         resume={<Button onClick={() => openStep(recentCourse.id, recentPlan ? "teach" : "course")} data-demo-id="home-resume">{recentPlan ? "Continue teaching plan" : "Open course workspace"}</Button>}
         resumeNote={nextSession ? "Next class: week " + nextSession.week + ", " + nextSession.topic + "." : recentPlan ? recentPlan.sessions.filter((s) => !s.sample).length + " saved sessions · " + (recentPlan.term || "teaching term not set") : undefined} />
-        : <section className="workspace-panel home-focus" aria-labelledby="resume-heading">
-          <span className="eyebrow">{person.orgRole === "academic" ? "Your teaching workspace" : "Your review workspace"}</span>
-          <h2 id="resume-heading">{person.orgRole === "management" ? "The illustrative approval sandbox" : person.orgRole === "department" ? "Decide on the briefs your colleagues send" : "Start with an assigned course"}</h2>
-          <p>{person.orgRole === "management" ? "The approval chain is kept in the research sandbox and labelled illustrative. Course decisions are recorded in each course's Decide step." : person.orgRole === "department" ? "As programme owner you record decisions on the briefs lecturers send, and assign positions." : "The department can assign a course so you can start planning teaching sessions."}</p>
+        : <section className={CARD + " grid gap-3 p-6"} aria-labelledby="resume-heading">
+          <span className={EYEBROW}>{person.orgRole === "academic" ? "Your teaching workspace" : "Your review workspace"}</span>
+          <h2 id="resume-heading" className="m-0 text-[24px]">{person.orgRole === "management" ? "The illustrative approval sandbox" : person.orgRole === "department" ? "Decide on the briefs your colleagues send" : "Start with an assigned course"}</h2>
+          <p className="m-0 text-ink-2">{person.orgRole === "management" ? "The approval chain is kept in the research sandbox and labelled illustrative. Course decisions are recorded in each course's Decide step." : person.orgRole === "department" ? "As programme owner you record decisions on the briefs lecturers send, and assign positions." : "The department can assign a course so you can start planning teaching sessions."}</p>
           <div className="button-row"><Button variant="primary" onClick={() => navigate(person.orgRole === "management" ? "approval" : person.orgRole === "department" ? "programme" : "guide")}>{person.orgRole === "management" ? "Open the approvals sandbox" : person.orgRole === "department" ? "Open programme" : "Read the guide"}</Button></div>
         </section>}
 
-      <section className="home-queues" aria-labelledby="home-queues-title">
-        <h2 id="home-queues-title" className="home-queues-title">Your work</h2>
-        <div className="home-queue" data-demo-id="home-briefs">
-          <h3>Briefs waiting for a decision <Tag>{waiting.length}</Tag></h3>
-          {waiting.length ? <ul className="work-list">{waiting.slice(0, 4).map((b) => <li key={b.id}><div><strong>{b.subjectId}</strong><span>{b.recipients.includes(person.id) ? "From " + (state.people.find((p) => p.id === b.createdBy)?.name ?? b.createdBy) + ": " + RECOMMENDATION_LABEL[b.recommendation] : "Your brief: waiting for a second person's decision"}</span></div><Button aria-label={"Open the brief for " + b.subjectId} data-demo-id={"waiting-" + b.id} onClick={() => { if (b.recipients.includes(person.id)) selectBrief(b.id); else openStep(b.subjectId, "decide"); }}>Open</Button></li>)}</ul>
-            : <p className="muted">No brief is waiting for you.</p>}
-          {legacy.length ? <ul className="work-list">{legacy.map((p) => <li key={p.id}><div><strong>{p.subjectId}</strong><span>Illustrative sandbox: proposal awaits approval</span></div><Button aria-label={"Open proposal for " + p.subjectId} onClick={() => { selectProposal(p.id); navigate("approval"); }}>Open</Button></li>)}</ul> : null}
+      <section className={CARD + " grid gap-4 p-5"} aria-labelledby="home-queues-title">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="home-queues-title" className="m-0 text-[20px]">Waiting on you</h2>
+          <Tag tone={waiting.length + unread.length ? "accent" : undefined}>{waiting.length + unread.length} {waiting.length + unread.length === 1 ? "item" : "items"}</Tag>
         </div>
-        <div className="home-queue" data-demo-id="home-notifications">
-          <h3>Notifications <Tag>{unread.length} unread</Tag></h3>
-          {top ? <div className="home-note-top" data-demo-id="inbox-top">
-            <div className="button-row"><Tag tone={KIND_TONE[top.kind]}>{KIND_LABEL[top.kind]}</Tag>{top.subjectId ? <span className="num muted">{top.subjectId}</span> : null}</div>
-            {top.agentFindings ? <p>{top.agentFindings}</p> : null}
-            <div className="button-row"><Button variant="primary" data-demo-id="inbox-open-top" onClick={() => openNotification(top.id)}>{top.kind === "evidence-brief" ? "Read brief" : top.kind === "brief-decision" ? "Open Decide" : "Open " + (top.subjectId ?? "it")} <ArrowRight size={15} /></Button>{sender(top) ? <span className="muted">{sender(top)}</span> : null}</div>
-          </div> : <p className="muted">No unread notifications.</p>}
-          {rest.length ? <ul className="home-rows">{rest.slice(0, 3).map((n) => <li key={n.id}><button type="button" data-demo-id={`inbox-${n.id}`} onClick={() => openNotification(n.id)}>
-            <span className={n.read ? "muted" : ""}>{n.agentFindings ?? KIND_LABEL[n.kind]}</span><span className="num muted">{n.subjectId ?? ""}</span></button></li>)}</ul> : null}
+        <div className="grid gap-2 empty:hidden" data-demo-id="home-briefs">
+          {waiting.slice(0, 4).map((b) => <Row key={b.id} title={b.subjectId + " · evidence brief"} note={b.recipients.includes(person.id) ? "From " + (state.people.find((p) => p.id === b.createdBy)?.name ?? b.createdBy) + ": " + RECOMMENDATION_LABEL[b.recommendation] : "Your brief: waiting for a second person's decision"}
+            action={<Button aria-label={"Open the brief for " + b.subjectId} data-demo-id={"waiting-" + b.id} onClick={() => { if (b.recipients.includes(person.id)) selectBrief(b.id); else openStep(b.subjectId, "decide"); }}>Open</Button>} />)}
+          {legacy.map((p) => <Row key={p.id} title={p.subjectId} note="Illustrative sandbox: proposal awaits approval"
+            action={<Button aria-label={"Open proposal for " + p.subjectId} onClick={() => { selectProposal(p.id); navigate("approval"); }}>Open</Button>} />)}
         </div>
-        {recentCourse ? <div className="home-queue">
-          <h3>Recent on {recentCourse.id}</h3>
-          {activity.length ? <ul className="home-rows">{activity.map((e, i) => <li key={i}><button type="button" onClick={() => openStep(recentCourse.id, e.step ?? "history")}>
-            <span>{e.title}</span><span className="num muted">{when(e.at)}</span></button></li>)}</ul>
-            : <p className="muted">Nothing recorded on {recentCourse.id} yet. Your first research run, brief or decision shows here.</p>}
+        <div className="grid gap-2 empty:hidden" data-demo-id="home-notifications">
+          {top ? <div className="grid gap-2 rounded-xl border-2 border-emerald bg-tint-1 p-3.5" data-demo-id="inbox-top">
+            <div className="flex flex-wrap items-center gap-2"><Tag tone={KIND_TONE[top.kind]}>{KIND_LABEL[top.kind]}</Tag>{top.subjectId ? <span className="num text-[13px] text-ink-3">{top.subjectId}</span> : null}</div>
+            {top.agentFindings ? <p className="m-0 text-[14px]">{top.agentFindings}</p> : null}
+            <div className="flex flex-wrap items-center gap-3"><Button variant="primary" data-demo-id="inbox-open-top" onClick={() => openNotification(top.id)}>{top.kind === "evidence-brief" ? "Read brief" : top.kind === "brief-decision" ? "Open Decide" : "Open " + (top.subjectId ?? "it")} <ArrowRight size={15} /></Button>{sender(top) ? <span className="text-[13px] text-ink-3">{sender(top)}</span> : null}</div>
+          </div> : null}
+          {rest.slice(0, 3).map((n) => <button key={n.id} type="button" data-demo-id={`inbox-${n.id}`} onClick={() => openNotification(n.id)}
+            className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border-0 bg-transparent px-2 py-2 text-left text-[14px] hover:bg-tint-1">
+            <span className={n.read ? "text-ink-3" : "font-semibold text-ink"}>{n.agentFindings ?? KIND_LABEL[n.kind]}</span><span className="num text-[13px] text-ink-3">{n.subjectId ?? ""}</span></button>)}
+        </div>
+        {!waiting.length && !legacy.length && !top ? <p className="m-0 rounded-xl bg-tint-1 px-4 py-3 text-[14px] text-ink-2">Nothing is waiting on you. Briefs to decide and messages from colleagues land here.</p> : null}
+        {recentCourse ? <div className="grid gap-1 border-t-2 border-tint-2 pt-3">
+          <h3 className="m-0 text-[14px] text-ink-2">Recent on {recentCourse.id}</h3>
+          {activity.length ? activity.map((e, i) => <button key={i} type="button" onClick={() => openStep(recentCourse.id, e.step ?? "history")}
+            className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border-0 bg-transparent px-2 py-1.5 text-left text-[14px] text-ink hover:bg-tint-1">
+            <span>{e.title}</span><span className="num text-[13px] text-ink-3">{when(e.at)}</span></button>)
+            : <p className="m-0 text-[13px] text-ink-3">Nothing recorded on {recentCourse.id} yet. Your first research run, brief or decision shows here.</p>}
+          <Button variant="quiet" className="justify-self-start" onClick={() => openStep(recentCourse.id, "history")}>Open {recentCourse.id}'s history <ArrowRight size={15} /></Button>
         </div> : null}
-        <Button variant="quiet" className="home-queues-foot" onClick={() => recentCourse ? openStep(recentCourse.id, "history") : navigate("courses")}>{recentCourse ? "Open " + recentCourse.id + "'s history" : "Browse courses"} <ArrowRight size={15} /></Button>
       </section>
       </div>
 
-      {ownCourses.length ? <section className="home-courses" aria-labelledby="home-courses-title" data-demo-id="home-courses">
-        <div className="section-heading"><h2 id="home-courses-title">Your courses</h2><Button variant="quiet" onClick={() => navigate("courses")}>Browse courses <ArrowRight size={15} /></Button></div>
-        <div className="home-course-grid">{ownCourses.map((course) => {
+      {ownCourses.length ? <section aria-labelledby="home-courses-title" data-demo-id="home-courses">
+        <div className="mb-4 flex items-center justify-between gap-3"><h2 id="home-courses-title" className="m-0 text-[22px]">Your courses</h2><Button variant="quiet" onClick={() => navigate("courses")}>Browse courses <ArrowRight size={15} /></Button></div>
+        <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]">{ownCourses.map((course) => {
           const summary = planSummary(state.teachingPlans.find((p) => p.subjectId === course.id), state.clos.filter((c) => c.subjectId === course.id));
           const loop = loopState(state, course.id);
-          return <article className="workspace-panel home-course" key={course.id}>
-            <Ring loop={loop} size={128} />
-            <div className="home-course-body">
-              <h3><span className="num">{course.id}</span> {course.title}</h3>
-              <p className="muted">Year {course.year}, semester {course.semester} · {plural(summary.sessions.length, "teaching session", "teaching sessions")}, {summary.delivered} delivered</p>
-              <p>{loop.closed ? "Loop closed this term." : loop.next ? stepDef(loop.next).label + " is next." : loop.summary}</p>
-              <Button onClick={() => openStep(course.id, loop.next ?? "course")}>Open {course.id} <ArrowRight size={15} /></Button>
-            </div>
+          return <article className={CARD + " grid content-start gap-3 p-5"} key={course.id}>
+            <div className="grid gap-0.5"><h3 className="m-0 text-[18px]"><span className="num">{course.id}</span> {course.title}</h3>
+              <p className="m-0 text-[13px] text-ink-3">Year {course.year}, semester {course.semester} · {plural(summary.sessions.length, "session", "sessions")}, {summary.delivered} delivered</p></div>
+            <LoopBar subjectId={course.id} />
+            <p className="m-0 text-[14px] text-ink-2">{loop.closed ? "Loop closed this term." : loop.next ? stepDef(loop.next).label + " is next." : loop.summary}</p>
+            <Button className="justify-self-start" onClick={() => openStep(course.id, loop.next ?? "course")}>Open {course.id} <ArrowRight size={15} /></Button>
           </article>;
         })}</div>
       </section> : null}
@@ -184,26 +185,64 @@ function when(at: string): string {
   return at.slice(0, 10);
 }
 
-/** Start here (plan Section 5.3): the host, the ring with the next step lit, and one action. */
-function StartHere({ subjectId, resume, resumeNote }: { subjectId: string; resume?: ReactNode; resumeNote?: string }) {
+const CARD = "rounded-[var(--radius-card)] border-2 border-forest bg-white shadow-[0_4px_0_var(--forest)]";
+const EYEBROW = "font-mono text-[12px] tracking-[0.08em] text-emerald-text uppercase";
+const TIPS_OFF = "lyceum-home-tips-off";
+
+/** One row of the "Waiting on you" list: what it is, a line on it, and its action. */
+function Row({ title, note, action }: { title: string; note: string; action: ReactNode }) {
+  return <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-border px-3.5 py-3">
+    <div className="grid min-w-0 gap-0.5"><strong className="text-[14px]">{title}</strong><span className="text-[13px] text-ink-2">{note}</span></div>{action}
+  </div>;
+}
+
+/** The loop's seven steps as segments: filled done, dashed next. */
+export function LoopBar({ subjectId }: { subjectId: string }) {
+  const state = useStore();
+  const loop = loopState(state, subjectId);
+  const ring = loop.steps.filter((s) => RING_STEPS.includes(s.id));
+  return <div className="grid gap-1.5">
+    <ol className="m-0 grid list-none grid-cols-7 gap-1 p-0" aria-label={ring.filter((s) => s.done).length + " of " + ring.length + " steps done"}>
+      {ring.map((s) => <li key={s.id} title={stepDef(s.id).label + (s.done ? ", done" : s.id === loop.next ? ", next" : "")}
+        className={"h-2 rounded-full " + (s.done ? "bg-emerald" : s.id === loop.next ? "border-2 border-dashed border-emerald bg-white" : "bg-tint-2")} />)}
+    </ol>
+    <span className="text-[12px] text-ink-3">{ring.filter((s) => s.done).length} of {ring.length} steps done{loop.window.term ? " · " + loop.window.term : ""}</span>
+  </div>;
+}
+
+/** Home's one action (plan Section 5.3): the course's next step, its question and why it matters, one button; the host's
+ *  tips beside it until the lecturer puts them away. */
+function NextAction({ subjectId, resume, resumeNote }: { subjectId: string; resume?: ReactNode; resumeNote?: string }) {
   const state = useStore();
   const loop = loopState(state, subjectId);
   const moods = useCourseMoods(subjectId);
-  // What the host says: the next step and its question first, then the term's progress, then one tip.
-  const done = loop.steps.filter((s) => s.done).length, next = loop.next ? stepDef(loop.next) : null;
+  const [tips, setTips] = useState(() => { try { return localStorage.getItem(TIPS_OFF) !== "1"; } catch { return true; } });
+  const next = loop.next ? stepDef(loop.next) : null;
+  const done = loop.steps.filter((s) => s.done).length;
   const lines = [
     loop.closed ? "The loop is closed on " + subjectId + " for this term. The recap has every receipt." : next ? next.label + " is next on " + subjectId + ". " + next.question : "Open the course to carry on.",
     done + " of " + loop.steps.length + " steps done" + (loop.window.term ? " for " + loop.window.term + "." : ". Set the term at the Course step so the loop counts this term's records."),
-    "Every step saves in this browser. Guide & progress has the backup, and Settings sets up agent web search.",
+    "Every step saves as you go. Guide & progress has the backup, and Settings sets up agent web search.",
   ];
-  return <section className="workspace-panel start-here" aria-labelledby="start-here-title" data-demo-id="journey-card">
-    <div className="start-here-host">{moods ? <MascotChat key={subjectId} who="host" mood={moods.host} size={96} name={HOST_NAME} lines={lines} /> : null}</div>
-    <div className="start-here-body">
-      <div className="section-heading"><div><span className="eyebrow">Start here · {subjectId}</span><h2 id="start-here-title">{loop.closed ? "The loop is closed for this term" : "Continue the loop on " + subjectId}</h2></div>
-        {loop.next ? <Button variant="primary" data-demo-id="journey-next" onClick={() => openStep(subjectId, loop.next!)}>Continue: {stepDef(loop.next).label} <ArrowRight size={15} /></Button>
-          : loop.closed ? <Button data-demo-id="journey-recap" onClick={() => openRecap(subjectId)}>The term recap <ArrowRight size={15} /></Button> : null}</div>
-      <RingPanel loop={loop} onStep={(step) => openStep(subjectId, step)} size={148} />
-      {resume ? <div className="start-here-resume button-row">{resume}{resumeNote ? <span className="muted">{resumeNote}</span> : null}</div> : null}
+  const hide = () => { setTips(false); try { localStorage.setItem(TIPS_OFF, "1"); } catch { /* the tips just come back next time */ } };
+  return <section className={CARD + " grid gap-5 p-6 narrow:p-5"} aria-labelledby="start-here-title" data-demo-id="journey-card">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="grid min-w-0 flex-[1_1_320px] gap-2">
+        <span className={EYEBROW}>{loop.closed ? "This term · " + subjectId : "Next on " + subjectId}</span>
+        <h2 id="start-here-title" className="m-0 text-[28px] leading-[1.15] narrow:text-[24px]">{loop.closed ? "The loop is closed for this term" : next ? next.label + ": " + next.question : "Continue the loop on " + subjectId}</h2>
+        {next ? <p className="m-0 text-[15px] text-ink-2"><strong className="text-ink">Done when:</strong> {next.doneWhen} {next.helper ? "Helped by " + next.helper + "." : ""}</p> : null}
+      </div>
+      {tips && moods ? <div className="relative flex-[0_1_260px] narrow:hidden [&_.mascot-chat-bubble]:bg-tint-1">
+        <MascotChat key={subjectId} who="host" mood={moods.host} size={72} name={HOST_NAME} lines={lines} />
+        <button type="button" onClick={hide} aria-label="Hide the tips" className="absolute top-0 right-0 inline-flex size-8 cursor-pointer items-center justify-center rounded-full border-0 bg-white text-ink-3 hover:text-ink"><X size={16} /></button>
+      </div> : null}
+    </div>
+    <LoopBar subjectId={subjectId} />
+    <div className="flex flex-wrap items-center gap-3">
+      {loop.next ? <Button variant="primary" data-demo-id="journey-next" onClick={() => openStep(subjectId, loop.next!)}>Continue: {stepDef(loop.next).label} <ArrowRight size={15} /></Button>
+        : loop.closed ? <Button data-demo-id="journey-recap" onClick={() => openRecap(subjectId)}>The term recap <ArrowRight size={15} /></Button> : null}
+      {resume}
+      {resumeNote ? <span className="text-[13px] text-ink-3">{resumeNote}</span> : null}
     </div>
   </section>;
 }

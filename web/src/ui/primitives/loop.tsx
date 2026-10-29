@@ -220,7 +220,7 @@ export function Handoff({ step, record, onNext }: { step: CourseStep; record: st
   const nextIndex = LOOP_STEPS.findIndex((s) => s.id === step) + 1;
   const next = LOOP_STEPS[nextIndex];
   return (
-    <aside className="handoff" data-demo-id={"handoff-" + step}>
+    <aside className="handoff min-[1200px]:hidden" data-demo-id={"handoff-" + step}> {/* the step's rail says this on a wide screen */}
       <span className="handoff-mark" aria-hidden><Check size={24} strokeWidth={3} /></span>
       <p><strong>{record}</strong> {def.handoff}</p>
       {onNext && next && next.id !== "history" ? <Button variant="primary" onClick={onNext}>Go to {next.label} <ArrowRight size={15} /></Button> : null}
