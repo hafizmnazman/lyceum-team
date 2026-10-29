@@ -46,9 +46,11 @@ const app = new Hono();
 const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/;
 const phoneRoute = (method: string, path: string) =>
   (method === "POST" && /^\/api\/survey\/[A-Za-z0-9_-]{22}$/.test(path)) || (method === "GET" && /^\/api\/survey\/[A-Za-z0-9_-]{22}\/form$/.test(path));
-// Online (LYCEUM_REQUIRE_SIGN_IN=1, on Render) every request comes from elsewhere, the host's health check and the web
-// app's proxy included, so the guard is off there and sign-in protects the routes that spend instead (below).
-const ONLINE = process.env.LYCEUM_REQUIRE_SIGN_IN === "1";
+// Online (LYCEUM_ONLINE=1, on Render) every request comes from elsewhere, the host's health check and the web app's
+// proxy included, so the guard is off there. LYCEUM_REQUIRE_SIGN_IN=1 also limits the routes that spend to signed-in
+// people (below), and on its own still means online.
+const REQUIRE_SIGN_IN = process.env.LYCEUM_REQUIRE_SIGN_IN === "1";
+const ONLINE = process.env.LYCEUM_ONLINE === "1" || REQUIRE_SIGN_IN;
 app.use("/api/*", async (c, next) => {
   const from = (c.env as HttpBindings | undefined)?.incoming?.socket?.remoteAddress ?? "";
   if (!ONLINE && !LOOPBACK.test(from) && !phoneRoute(c.req.method, c.req.path)) return c.json({ error: "this API answers the laptop it runs on" }, 403);
@@ -69,7 +71,7 @@ accountRoutes(app, accounts, authDeps);
 // Online, the model, search, settings and parse routes spend money or CPU, so LYCEUM_REQUIRE_SIGN_IN=1 limits them to
 // signed-in people. Off by default: on a laptop the loopback guard above already protects them, and the demo's people
 // (who have no Supabase account) still use them. Registered before those routes, as Hono runs handlers in order.
-if (ONLINE)
+if (REQUIRE_SIGN_IN)
   for (const path of ["/api/agent/*", "/api/agent-search", "/api/agent-settings", "/api/agent-settings/*", "/api/parse", "/api/collect/*"]) app.use(path, requireUser(authDeps));
 // Sign-ups left unfinished for a day are deleted, at start and then hourly.
 const purgePending = () => accounts.purgePending().catch((err) => console.error("purging unfinished sign-ups failed:", err instanceof Error ? err.message : err));
