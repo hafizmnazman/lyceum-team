@@ -1,10 +1,10 @@
-// The demo overlay: one Play control, three intro cards, then the cursor
+// The demo overlay: started from a screen's own "Watch the tour" button, three intro cards, then the cursor
 // walkthrough over the real app, with a caption bar and a thin progress bar.
 // Playing pins the clock and resets the workspace so every recording is
 // identical; Escape stops it and unpins.
 
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Pause, Volume2, VolumeX } from "lucide-react";
 import { resetDemoState, resetSignalReveal, setClockPinned, useStore } from "../app/store.ts";
 import { estimateTotalMs, INTRO_HOLDS } from "./script.ts";
 import { runDemo } from "./runner.ts";
@@ -109,39 +109,10 @@ export function DemoOverlay() {
   const total = estimateTotalMs();
   const elapsed = Math.min(now - startedAt, total);
 
-  if (phase === "idle") {
-    // Keep the signed-in workspace free of a floating control that could cover content or a
-    // focused element (WCAG 2.4.11); signed in, the Guide page offers the tour inline. The kiosk offers the walk alone.
-    if (state.currentPersonId || state.screen === "kiosk") return null;
-    return (
-      <button
-        data-demo-id="play-demo"
-        onClick={() => void play()}
-        title="Play the self-driving demo"
-        style={{
-          position: "fixed",
-          bottom: 20,
-          right: 20,
-          zIndex: 100,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          height: 38,
-          padding: "0 16px",
-          borderRadius: 999,
-          border: "1px solid var(--border)",
-          background: "var(--white)",
-          boxShadow: "var(--depth-menu)",
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 500,
-          color: "var(--ink)",
-        }}
-      >
-        <Play size={14} /> Play demo
-      </button>
-    );
-  }
+  // No floating control: one could cover content or a focused element (WCAG 2.4.11), and on a phone it sat on the
+  // Sign in button. Each screen offers the tour inline instead (the landing page, sign in, the judges' page, the Guide),
+  // through the lyceum:play-demo event above. The kiosk offers the walk alone.
+  if (phase === "idle") return null;
 
   return (
     <>

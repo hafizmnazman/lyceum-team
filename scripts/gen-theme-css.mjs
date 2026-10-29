@@ -5,7 +5,10 @@
 //   - the three bundled font files (Fontsource variable, Latin subset) and their
 //     licences, copied into web/public/fonts/;
 //   - the preload links for the two faces above the fold, between the markers
-//     in index.html.
+//     in index.html;
+//   - the Tailwind theme, between the markers in web/src/theme/index.css: each
+//     token as a Tailwind name pointing at its custom property, so bg-forest,
+//     text-ink-2 and rounded-card are the tokens, and nothing else exists.
 // Usage: node scripts/gen-theme-css.mjs [--check]
 //   --check writes nothing and exits 1 if any output has drifted from tokens.ts.
 
@@ -18,12 +21,15 @@ const T = await import(pathToFileURL(join(ROOT, "shared/theme/tokens.ts")).href)
 const check = process.argv.includes("--check");
 
 const CSS_FILE = join(ROOT, "web/src/theme/global.css");
+const TW_FILE = join(ROOT, "web/src/theme/index.css");
 const HTML_FILE = join(ROOT, "web", "index.html");
 const FONT_DIR = join(ROOT, "web/public/fonts");
 const CSS_START = "/* BEGIN GENERATED TOKENS: written by scripts/gen-theme-css.mjs from shared/theme/tokens.ts. Do not edit by hand. */";
 const CSS_END = "/* END GENERATED TOKENS */";
 const HTML_START = "<!-- BEGIN GENERATED PRELOADS: scripts/gen-theme-css.mjs -->";
 const HTML_END = "<!-- END GENERATED PRELOADS -->";
+const TW_START = "/* BEGIN GENERATED THEME: scripts/gen-theme-css.mjs from shared/theme/tokens.ts. Do not edit by hand. */";
+const TW_END = "/* END GENERATED THEME */";
 
 export function cssBlock() {
   const lines = [CSS_START, ":root {", "  /* colour (plan Section 6.1) */"];
@@ -74,6 +80,17 @@ export function cssBlock() {
   return lines.join("\n");
 }
 
+// Tailwind's own palette and faces are cleared, so a utility can only name a token. The values are var() references, so
+// the :root properties above stay the one definition (global.css's layer comes after Tailwind's theme layer and wins).
+function themeBlock() {
+  const lines = [TW_START, "@theme {", "  --color-*: initial;", "  --font-*: initial;"];
+  for (const key of Object.keys(T.color)) lines.push("  --color-" + T.cssName(key).slice(2) + ": var(" + T.cssName(key) + ");");
+  for (const face of ["display", "body", "mono"]) lines.push("  --font-" + face + ": var(--font-" + face + ");");
+  for (const name of Object.keys(T.radius)) lines.push("  --radius-" + name + ": var(--radius-" + name + ");");
+  lines.push("}", TW_END);
+  return lines.join("\n");
+}
+
 function htmlBlock() {
   return [HTML_START,
     ...T.fontFiles.filter((f) => f.preload).map((f) => "    <link rel=\"preload\" href=\"/fonts/" + f.file + "\" as=\"font\" type=\"font/woff2\" crossorigin />"),
@@ -98,6 +115,12 @@ const htmlParts = between(html, HTML_START, HTML_END);
 if (!htmlParts && !html.includes("</head>")) throw new Error("index.html has no </head>");
 const nextHtml = htmlParts ? htmlParts.before + htmlBlock() + htmlParts.after : html.replace("</head>", "    " + htmlBlock() + "\n  </head>");
 if (nextHtml !== html) drift.push("index.html");
+// index.css
+const tw = readFileSync(TW_FILE, "utf8").replace(/\r\n/g, "\n");
+const twParts = between(tw, TW_START, TW_END);
+if (!twParts) throw new Error("web/src/theme/index.css has no generated theme markers");
+const nextTw = twParts.before + themeBlock() + twParts.after;
+if (nextTw !== tw) drift.push("web/src/theme/index.css");
 // fonts and licences
 const fontCopies = [];
 for (const f of T.fontFiles) {
@@ -117,10 +140,11 @@ for (const c of fontCopies) {
 
 if (check) {
   if (drift.length) { console.error("Theme drift from shared/theme/tokens.ts (run node scripts/gen-theme-css.mjs):\n  " + drift.join("\n  ")); process.exit(1); }
-  console.log("Theme outputs match shared/theme/tokens.ts: global.css block, index.html preloads, " + T.fontFiles.length + " fonts and their licences.");
+  console.log("Theme outputs match shared/theme/tokens.ts: global.css block, index.html preloads, the Tailwind theme, " + T.fontFiles.length + " fonts and their licences.");
 } else {
   writeFileSync(CSS_FILE, nextCss);
   writeFileSync(HTML_FILE, nextHtml);
+  writeFileSync(TW_FILE, nextTw);
   mkdirSync(FONT_DIR, { recursive: true });
   for (const c of fontCopies) {
     if (!existsSync(c.from)) throw new Error("Missing " + c.from + ". Run npm install first.");

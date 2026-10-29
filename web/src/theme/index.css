@@ -1,0 +1,55 @@
+/* The app's stylesheet: global.css and Tailwind, in that order of precedence from low to high.
+   global.css sits in its own layer, between Tailwind's theme and its utilities: unlayered, every one of its rules would
+   beat every utility whatever the specificity, so a class moved to Tailwind would silently do nothing. Tailwind's base
+   (preflight) is left out: global.css already sets the base, and a second reset would change every screen. */
+@layer theme, legacy, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "./global.css" layer(legacy);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* BEGIN GENERATED THEME: scripts/gen-theme-css.mjs from shared/theme/tokens.ts. Do not edit by hand. */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --color-forest: var(--forest);
+  --color-lime: var(--lime);
+  --color-emerald: var(--emerald);
+  --color-emerald-text: var(--emerald-text);
+  --color-mint: var(--mint);
+  --color-white: var(--white);
+  --color-tint-1: var(--tint-1);
+  --color-tint-2: var(--tint-2);
+  --color-moods: var(--moods);
+  --color-border: var(--border);
+  --color-dots: var(--dots);
+  --color-gridline: var(--gridline);
+  --color-next-dashed: var(--next-dashed);
+  --color-forest-2: var(--forest-2);
+  --color-forest-border: var(--forest-border);
+  --color-on-forest: var(--on-forest);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-shadow-mascot: var(--shadow-mascot);
+  --color-shadow-mascot-moods: var(--shadow-mascot-moods);
+  --color-ray-1: var(--ray-1);
+  --color-ray-2: var(--ray-2);
+  --color-ray-3: var(--ray-3);
+  --color-forest-deep: var(--forest-deep);
+  --color-control-border: var(--control-border);
+  --color-focus-light: var(--focus-light);
+  --color-focus-dark: var(--focus-dark);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+  --radius-chip: var(--radius-chip);
+  --radius-input: var(--radius-input);
+  --radius-button: var(--radius-button);
+  --radius-card: var(--radius-card);
+  --radius-hero: var(--radius-hero);
+}
+/* END GENERATED THEME */

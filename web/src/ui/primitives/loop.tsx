@@ -37,7 +37,7 @@ export function Ring({ loop, size = 132, compact = false, leaf }: { loop: LoopSt
   const { tip, open, close } = useTooltipAnchor<CourseStep>();
   const tipStep = tip ? loop.steps.find((s) => s.id === tip.key) : null;
   return (<>
-    <svg className={"ring" + (tip ? " is-pointing" : "")} viewBox={"0 0 " + size + " " + size} width={size} height={size} role="img" aria-label={label}>
+    <svg className={"receipts-ring" + (tip ? " is-pointing" : "")} viewBox={"0 0 " + size + " " + size} width={size} height={size} role="img" aria-label={label}>
       <title>{label}</title>
       {RING_STEPS.map((id, i) => {
         const st = loop.steps.find((s) => s.id === id)!;

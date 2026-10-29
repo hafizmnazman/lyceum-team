@@ -2,6 +2,7 @@ import type { IncomingMessage } from "node:http";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
 // The local API behind /api. Served with --host for the booth, the proxy forwards a phone's two survey routes (posting an
 // answer, reading a form by its token) and refuses every other route to any machine but this one, so the model route, the
@@ -21,7 +22,7 @@ const api = {
 };
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   // Built into the repo root's dist/, where the smokes, the film capture and the booth look for it.
   build: { outDir: "../dist", emptyOutDir: true },
   server: { proxy: api },

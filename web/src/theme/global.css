@@ -1327,7 +1327,6 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .stat-tile { display: grid; gap: 4px; align-content: start; justify-items: start; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
 .stat-value { font-family: var(--font-display); font-size: 36px; line-height: 1.05; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 14px; color: var(--ink-2); line-height: 1.45; }
-.stat-source { font-size: 13px; }
 /* One frame for the whole landing page: every band pads in to the same column, up to --landing-max, so the margins
    match at every width and wide screens get a wider page rather than wider gutters. */
 .landing { --landing-max: 1600px; --landing-gutter: clamp(16px, 4vw, 64px); --landing-pad: max(var(--landing-gutter), calc((100% - var(--landing-max)) / 2)); min-height: 100%; overflow-y: auto; scrollbar-width: none; }
@@ -1345,50 +1344,25 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .landing-hero { margin: clamp(24px, 3vw, 48px) 0 0; padding: 0 var(--landing-pad); }
 .landing-hero-card { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: clamp(32px, 4vw, 72px); align-items: center; padding: clamp(32px, 4.5vw, 80px); }
 .landing-hero h1 { font-family: var(--font-display); font-size: clamp(32px, 4.6vw, 96px); line-height: var(--leading-display); margin: 0 0 clamp(16px, 1.6vw, 28px); font-weight: 800; letter-spacing: -0.03em; color: var(--white); text-wrap: balance; }
-.landing-hero-loop .loop-graphic.is-compact { max-width: 560px; }
 .landing-lead { font-size: 17px; line-height: 1.6; color: var(--ink-2); max-width: 64ch; margin: 0 0 18px; text-wrap: pretty; }
 .on-forest .landing-lead { color: var(--on-forest); font-size: 18px; }
 .landing-section { padding: clamp(48px, 6vw, 112px) var(--landing-pad) 0; }
 .landing-section h2 { font-family: var(--font-display); font-size: clamp(28px, 1.6vw + 18px, 48px); font-weight: 600; margin: 0 0 12px; line-height: 1.1; letter-spacing: -0.02em; text-wrap: balance; }
 /* Wide, a section's heading and its lead sit side by side instead of the lead leaving the right half empty */
 @media (min-width: 1100px) {
-  .landing-section-head { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(32px, 4vw, 96px); align-items: end; margin-bottom: 28px; }
-  .landing-section-head h2, .landing-section-head .landing-lead { margin: 0; }
   .landing-hero h1 span { white-space: nowrap; }
-  .accreditor-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .accreditor-list > li:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .proof-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
 }
 .proof-list { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; }
 .proof-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 16px; line-height: 1.5; color: var(--ink); }
 .proof-list li svg { flex-shrink: 0; margin-top: 3px; color: var(--emerald-text); }
 .proof-list li:last-child svg { color: var(--warn); }
-.who-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
-.who-grid div { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
-.who-grid p { margin: 6px 0 0; font-size: 16px; color: var(--ink-2); line-height: 1.5; }
 .landing .stat-label { font-size: 16px; }
 .landing-footer { margin: clamp(48px, 6vw, 112px) 0 0; padding: 24px var(--landing-pad); background: var(--tint-1); font-size: 13px; color: var(--ink-2); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .landing-note { font-size: 14px; color: var(--ink-2); max-width: 760px; line-height: 1.55; margin: 14px 0 0; }
 
 /* ---------- the sign-in screen: forest-deep backdrop, every line of text on a card ---------- */
 .signin { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 32px; background: var(--forest-deep); overflow-y: auto; }
-.signin-panel { display: flex; gap: 24px; max-width: 1040px; width: 100%; flex-wrap: wrap; align-items: stretch; }
-.signin-brand { flex: 1 1 380px; min-width: 280px; padding: 40px; display: flex; flex-direction: column; gap: 12px; }
-.signin-brand .wordmark { font-size: 48px; padding: 0; cursor: default; margin: 0; line-height: 1; }
-.signin-tagline { font-family: var(--font-display); font-size: 28px; font-weight: 600; line-height: 1.2; color: var(--white) !important; margin: 4px 0 0; }
-.signin-lead { font-size: 16px; line-height: 1.6; margin: 0; max-width: 460px; }
-.signin-foot { margin: auto 0 0; padding-top: 24px; font-size: 13px; }
-.people-list { border: 1px solid var(--border); border-radius: var(--radius-card); overflow: hidden; margin-bottom: 12px; }
-.person-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px 16px; border: 0; border-top: 1px solid var(--border); background: var(--white); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color var(--motion-feedback) var(--ease-out); }
-.person-row:first-child { border-top: 0; }
-.person-row:hover { background: var(--tint-1); }
-.person-row:focus-visible { outline-offset: -3px; }
-.person-row > svg { color: var(--ink-2); flex-shrink: 0; }
-.avatar-lg { width: 36px; height: 36px; font-size: 13px; }
-.person-text { flex: 1; min-width: 0; }
-.person-name { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
-.person-name svg { color: var(--emerald-text); }
-.person-scope { display: block; font-size: 13px; color: var(--ink-2); }
 
 /* ---------- evaluation ---------- */
 .protocol { padding-left: 22px; display: grid; gap: 8px; font-size: 14px; line-height: 1.55; }
@@ -1406,7 +1380,6 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
   .landing-bar { padding-top: 10px; padding-bottom: 10px; }
   .landing-hero-card { padding: 24px 20px; }
   .signin { padding: 16px; }
-  .signin-brand { padding: 24px; }
 }
 
 /* ---------- the loop's step screens (Sections 5.2, 5.3 and 8) ---------- */
@@ -1419,7 +1392,7 @@ summary { cursor: pointer; padding: 10px 2px; min-height: 44px; }
 .handoff p { margin: 0 !important; }
 
 /* the receipts ring */
-.ring { display: block; flex-shrink: 0; overflow: visible; }
+.receipts-ring { display: block; flex-shrink: 0; overflow: visible; }
 .ring-count { font-family: var(--font-display); font-weight: 800; font-size: 22px; fill: var(--ink); }
 .ring-term { font-family: var(--font-mono); font-size: 12px; fill: var(--ink-2); }
 .ring-panel { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
@@ -1631,44 +1604,19 @@ button.loop-station-button:hover { background: var(--tint-1); }
 .on-forest button.loop-station-button:hover { background: var(--forest-2); }
 
 /* Landing */
-.landing-hero-loop { min-width: 0; }
-.level-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-.level-tile .stat-value { font-size: 48px; }
-.stat-sources { font-size: 13px; line-height: 1.5; }
-.accreditor-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
-.accreditor-list > li { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 24px; padding: 24px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
-.accreditor-step { display: grid; gap: 4px; align-content: start; justify-items: start; }
-.accreditor-step strong { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
-.accreditor-what { font-size: 15px; line-height: 1.45; color: var(--ink-2); }
-.accreditor-helper-figures { display: flex; align-items: flex-end; gap: 4px; min-height: 56px; margin-bottom: 8px; }
-.accreditor-helper-figures .loop-station-people { width: 48px; height: 48px; margin: 4px; }
-.accreditor-helper-names { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--emerald-text); }
 /* The scroll reveal (Landing.tsx): parts rise in slowly, one after another, the first time they come into view. An
    animation rather than a transition, with no fill after it ends, so the cards' own hover transition stays theirs. */
-.landing.is-revealing :is(.landing-section-head, .landing-section > h2, .stat-tile, .landing-note, .accreditor-list > li, .doors-strip > li, .proof-list > li, .who-grid > div, .landing-ways .button-row) { opacity: 0; }
-.landing.is-revealing :is(.landing-section-head, .landing-section > h2, .stat-tile, .landing-note, .accreditor-list > li, .doors-strip > li, .proof-list > li, .who-grid > div, .landing-ways .button-row).is-in { opacity: 1; animation: landingReveal 1100ms var(--ease-out) calc(var(--reveal-i, 0) * 110ms) backwards; }
+.landing.is-revealing [data-reveal] { opacity: 0; }
+.landing.is-revealing [data-reveal].is-in { opacity: 1; animation: landingReveal 1100ms var(--ease-out) calc(var(--reveal-i, 0) * 110ms) backwards; }
 @keyframes landingReveal { from { opacity: 0; translate: 0 32px; } }
-/* The landing's cards lift a little under the pointer, their offset shadow deepening as they rise */
-.landing :is(.stat-tile, .accreditor-list > li, .who-grid > div, .doors-strip > li.is-built) { transition: translate 200ms var(--ease-out), box-shadow 200ms var(--ease-out); }
+/* The landing's stat tiles lift a little under the pointer, as its other cards do (CARD in Landing.tsx) */
+.landing .stat-tile { transition: translate 200ms var(--ease-out), box-shadow 200ms var(--ease-out); }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .landing :is(.stat-tile, .accreditor-list > li, .who-grid > div, .doors-strip > li.is-built):hover { translate: 0 -3px; box-shadow: 0 7px 0 var(--forest); }
+  .landing .stat-tile:hover { translate: 0 -3px; box-shadow: 0 7px 0 var(--forest); }
 }
-.accreditor-clauses { display: grid; gap: 18px; align-content: start; } /* top-aligned: each bar is as tall as its quote */
-.accreditor-clause { margin: 0; padding: 2px 0 2px 14px; border-left: 3px solid var(--emerald); }
-.accreditor-clause p { margin: 0 0 6px; font-size: 16px; line-height: 1.55; color: var(--ink); }
-.accreditor-clause footer { font-size: 13px; }
-.doors-strip { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
-.doors-strip li { display: grid; gap: 4px; align-content: start; justify-items: start; padding: 14px; border: 1px dashed var(--next-dashed); border-radius: var(--radius-card); background: var(--white); color: var(--ink-2); }
-.doors-strip li strong { color: var(--ink); font-size: 14px; }
-.doors-strip li span { font-size: 13px; line-height: 1.4; }
-.doors-strip li.is-built { border: 1px solid var(--emerald); }
-.doors-strip li.is-built svg { color: var(--emerald-text); }
-.who-grid div svg { color: var(--emerald-text); display: block; margin-bottom: 6px; }
-.landing-ways .button-row { margin-top: 8px; }
 
 @media (max-width: 900px) {
   .landing-hero-card { grid-template-columns: minmax(0, 1fr); padding: 32px; }
-  .accreditor-list > li { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .attainment-rows li { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 }
 @media (max-width: 640px) {
@@ -1682,7 +1630,6 @@ button.loop-station-button:hover { background: var(--tint-1); }
   .history-time { text-align: left; }
   .session-cards { grid-template-columns: minmax(0, 1fr); }
   .landing-hero-card { padding: 24px; }
-  .level-tile .stat-value { font-size: 36px; }
 }
 
 /* ---------- mascots (Section 7): static at rest; the prop moves only while a request runs,
@@ -1807,7 +1754,7 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
 .card.is-clickable:hover { border-color: var(--forest); background: var(--tint-1); }
 .card-forest { box-shadow: 0 4px 0 var(--forest-deep); }
 .course-grid { gap: 24px; }
-.outline-card, .session-card, .skill-card, .source-card, .proposal-item, .ladder-row, .stat-tile, .accreditor-list > li, .term-setter, .guide-entry, .section-help-body,
+.outline-card, .session-card, .skill-card, .source-card, .proposal-item, .ladder-row, .stat-tile, .term-setter, .guide-entry, .section-help-body,
 .workspace-panel .card, .home-queues .card, .home-queues .workspace-panel { border: 2px solid var(--border); border-bottom-width: 4px; box-shadow: none; }
 .empty-state { border: 2px dashed var(--next-dashed); }
 .menu-popover { border: 2px solid var(--forest); box-shadow: 0 4px 0 var(--forest); }
@@ -1921,21 +1868,11 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
 .principle-strip div { border: 2px solid var(--border); border-left: 6px solid var(--emerald); border-bottom-width: 4px; border-radius: var(--radius-card); padding: 14px 16px; }
 
 /* sign-in: each person is a big pressable card; the lime edge marks the one thing to do */
-.signin-brand .wordmark { font-size: 64px; }
-.signin-tagline { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; }
-.people-list { display: grid; gap: 12px; border: 0; overflow: visible; margin-bottom: 16px; }
-.person-row, .person-row:first-child { min-height: 76px; padding: 12px 18px; border: 2px solid var(--forest); border-radius: var(--radius-card); box-shadow: 0 4px 0 var(--forest); transition: transform var(--motion-feedback) var(--ease-out), box-shadow var(--motion-feedback) var(--ease-out), background-color var(--motion-feedback) var(--ease-out); }
-.person-row:active { transform: translateY(4px); box-shadow: 0 0 0 var(--forest); }
-.person-row:focus-visible { outline-offset: 2px; }
-.person-name { font-family: var(--font-display); font-size: 17px; font-weight: 800; }
-.avatar-lg { width: 48px; height: 48px; font-size: 16px; border: 2px solid var(--forest); }
 
 /* the landing page: its cards stand on the dot grid with an outline and a lip */
 .landing-hero-card { box-shadow: 0 8px 0 var(--forest-deep); }
 .landing-section h2 { font-weight: 800; letter-spacing: -0.03em; }
-.landing .stat-tile, .landing .accreditor-list > li, .landing .who-grid div, .landing .doors-strip li.is-built { border: 2px solid var(--forest); box-shadow: 0 4px 0 var(--forest); }
-.landing .doors-strip li { border-width: 2px; }
-.level-tile .stat-value { font-size: 56px; }
+.landing .stat-tile { border: 2px solid var(--forest); box-shadow: 0 4px 0 var(--forest); }
 .landing-bar .btn { min-height: 40px; padding: 6px 14px; font-size: 14px; }
 
 @media (max-width: 1100px) {
@@ -1960,8 +1897,6 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
   .step-hero-people { width: 64px; height: 64px; }
   .speech { padding: 16px 18px 18px; box-shadow: 4px 4px 0 var(--forest); }
   .speech .speech-question { font-size: 18px; }
-  .signin-brand .wordmark { font-size: 48px; }
-  .signin-tagline { font-size: 26px; }
   .form-grid-wide-first { grid-template-columns: minmax(0, 1fr); }
   .landing-bar .btn-ghost { display: none; } /* the hero repeats it just below */
 }
@@ -2203,7 +2138,7 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
 .wall-rings { list-style: none; margin: 12px 0 20px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
 .wall-ring { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--white); }
 .wall-ring.is-closed { border-color: var(--emerald); background: var(--tint-1); }
-.wall-ring .ring { flex: none; }
+.wall-ring .receipts-ring { flex: none; }
 .wall-ring-text { display: grid; gap: 3px; min-width: 0; font-size: 13px; justify-items: start; }
 .wall-ring-title { color: var(--ink); overflow-wrap: anywhere; }
 .wall-ring-open { color: var(--ink-2); }
@@ -2438,48 +2373,13 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
 .tooltip.on-forest .tooltip-state { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--lime); color: var(--forest); font-size: 11px; font-weight: 800; }
 .tooltip-note { color: var(--tint-2); }
 /* the ring under the pointer: the segment pointed at stays full, the others step back */
-.ring g { transition: opacity 160ms var(--ease-out); }
-.ring.is-pointing g:not(.is-hover) { opacity: 0.4; }
+.receipts-ring g { transition: opacity 160ms var(--ease-out); }
+.receipts-ring.is-pointing g:not(.is-hover) { opacity: 0.4; }
 
 /* ---------- Sign in: two equal columns, the brand and one working card ----------
    The brand column carries the host and its bubble, so it never stands empty beside the card; the card holds sign in,
    Google, then the demo's people as one list of compact rows (a hairline between, no box per person). */
 .signin { align-items: center; padding: 32px 24px; }
-.signin-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 24px; max-width: 1040px; align-items: stretch; flex-wrap: nowrap; }
-.signin-brand { padding: 40px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; min-width: 0; }
-.signin-brand-copy { display: grid; gap: 12px; }
-.signin-brand .wordmark { margin: 0; }
-.signin-brand .mascot-chat-bubble { color: var(--ink); }
-.signin-brand-foot { display: grid; gap: 12px; justify-items: start; }
-.signin-brand-foot p { margin: 0; font-size: 13px; opacity: 0.85; }
-.signin-card { padding: 28px; display: flex; flex-direction: column; gap: 0; min-width: 0; }
-.forest-backdrop .signin-card.card { border-color: var(--white); box-shadow: 0 6px 0 var(--lime); }
-.signin-tabs { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 20px; }
-.signin-form { display: grid; gap: 14px; }
-.signin-submit { width: 100%; justify-content: center; margin-top: 4px; }
-.signin-google { display: flex; width: 100%; justify-content: center; align-items: center; gap: 10px; margin-top: 12px; text-decoration: none; }
-.signin-google-mark { display: block; flex: none; width: 24px; height: 24px; } /* a link or a disabled button, the same full width as Sign in */
-.password-field { position: relative; }
-.password-field .control { padding-right: 52px; }
-.password-toggle { position: absolute; right: 4px; top: 50%; translate: 0 -50%; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--ink-2); cursor: pointer; }
-.password-toggle:hover { color: var(--ink); background: var(--tint-1); }
-.signin-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0 10px; color: var(--ink-2); font-size: 13px; }
-.signin-divider::before, .signin-divider::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
-.signin-card .people-list { list-style: none; margin: 0; padding: 0; display: block; border: 0; }
-.signin-card .people-list li + li { border-top: 1px solid var(--border); }
-.signin-card .person-row, .signin-card .person-row:first-child { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 8px; margin: 0; border: 0; border-radius: 10px; box-shadow: none; background: none; text-align: left; transition: background-color 160ms var(--ease-out); }
-.signin-card .person-row:hover, .signin-card .person-row:focus-visible { background: var(--tint-1); }
-.signin-card .person-row:active { transform: none; box-shadow: none; }
-.signin-card .avatar { width: 32px; height: 32px; flex: none; font-size: 12px; }
-.signin-card .person-text { display: grid; min-width: 0; flex: 1; }
-.signin-card .person-name { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: 14px; }
-.signin-card .person-scope { font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.signin-note { margin: 12px 0 0; font-size: 13px; color: var(--ink-2); }
-@media (max-width: 860px) {
-  .signin-panel { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
-  .signin-brand { padding: 28px; gap: 20px; }
-  .signin-brand .mascot-chat { display: none; }
-}
 .onboarding { display: grid; grid-template-columns: 300px minmax(0, 720px); gap: 40px; align-items: center; width: 100%; max-width: 1120px; animation: popIn 480ms var(--ease-out) both; }
 .onboarding-card { padding: 28px; }
 .onboarding.is-step-1 .onboarding-card { padding: 24px 28px; }
@@ -2553,18 +2453,12 @@ button.onboarding-step-button:focus-visible { outline: 2px solid var(--emerald);
 .segmented-option { min-height: 40px; padding: 8px 16px; border: 0; border-radius: 9px; background: none; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink-2); cursor: pointer; white-space: nowrap; transition: color 200ms var(--ease-out); }
 .segmented-option:hover { color: var(--ink); }
 .segmented-option.is-active { color: var(--ink); }
-.signin-tabs .segmented-option { min-height: 44px; }
 .sub-rail.slider::before { background: var(--tint-2); border-radius: var(--radius-button); box-shadow: inset 0 -3px 0 var(--emerald); }
 .sub-rail-tab { position: relative; transition: color 200ms var(--ease-out), background-color 160ms var(--ease-out); }
 
 /* Text inside a white bubble on a forest surface keeps the ink colours, not the forest surface's light ones. */
 .on-forest .mascot-chat-bubble .muted, .on-forest .mascot-chat-next { color: var(--ink-2); }
 .on-forest .mascot-chat-next { color: var(--ink); }
-.signin-google:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; transform: none; }
-.signin-google-off { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--ink-2); text-align: center; }
-.segmented.signin-tabs { display: grid; width: 100%; } /* the sign in tabs fill the card; other segmented rows fit their options */
-.signin-pair { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
-@media (max-width: 480px) { .signin-pair { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- The custom dropdown (primitives/Dropdown.tsx): a control-styled trigger and a list that pops open under it ---------- */
 @keyframes dropdownIn { from { opacity: 0; scale: 0.97; translate: 0 -4px; } to { opacity: 1; scale: 1; translate: 0 0; } }

@@ -1,9 +1,11 @@
-// Sign in. Two columns on the forest-deep backdrop, the same height: who Lyceum is, with the host saying what happens
-// next, and one card that does the work: sign in or create an account (email and password, or Google, through Supabase), then the
-// demo's people as compact rows, one tap each. The public landing page is reachable from here without signing in.
+// Sign in, on the forest-deep backdrop. Two cards side by side, the same height: who Lyceum is, with the host saying what
+// happens next, and the account card (sign in or create an account: email and password, or Google, through Supabase).
+// Under both, the demo as its own band: its people as cards, one tap each, with the one to start with marked. On a phone
+// the account comes before the demo. The public landing page is reachable from here without signing in.
 
 import { useEffect, useId, useState } from "react";
-import { ArrowRight, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Play, ShieldCheck } from "lucide-react";
+import { PEOPLE_IDS } from "../../../../shared/data/seed.ts";
 import {
   JOB_ROLE_LABEL,
   JOB_ROLES,
@@ -22,7 +24,6 @@ import {
 import { HOST_NAME, MascotChat } from "../mascots/index.tsx";
 import { Button, Field, Input } from "../primitives/index.tsx";
 import { Dropdown } from "../primitives/Dropdown.tsx";
-import { Tooltip } from "../primitives/Tooltip.tsx";
 import { Segmented } from "../primitives/Segmented.tsx";
 import type { Person } from "../../../../shared/types.ts";
 
@@ -59,103 +60,127 @@ export function LoginScreen() {
     return parts.join(" ");
   }
 
+  const demoPeople = state.people.filter((p) => !p.account);
   return (
     <div className="signin forest-backdrop">
-      <div className="signin-panel">
+      <div className="grid w-full max-w-[1080px] grid-cols-[minmax(0,1fr)_minmax(0,440px)] items-stretch gap-6 max-[900px]:max-w-[520px] max-[900px]:grid-cols-1">
         <section
-          className="signin-brand card-forest on-forest"
+          className="card-forest on-forest flex min-w-0 flex-col justify-between gap-8 p-10 max-[900px]:gap-5 max-[900px]:p-7"
           aria-labelledby="signin-title"
         >
-          <div className="signin-brand-copy">
-            <h1 id="signin-title" className="wordmark">
+          <div className="grid gap-3">
+            <h1 id="signin-title" className="wordmark m-0 cursor-default p-0 text-[64px] leading-none max-[760px]:text-[48px]">
               Lyceum
             </h1>
-            <p className="signin-tagline">Course decisions, with receipts.</p>
-            <p className="signin-lead">
+            <p className="mt-1 mb-0 font-display text-[32px] leading-[1.2] font-extrabold tracking-[-0.02em] text-white max-[760px]:text-[26px]">
+              Course decisions, with receipts.
+            </p>
+            <p className="m-0 max-w-[460px] text-base leading-[1.6]">
               Real job postings become a course decision with every quotation on
               record, each semester. Nothing runs by itself.
             </p>
           </div>
-          <MascotChat
-            who="host"
-            mood="greeting"
-            size={104}
-            name={HOST_NAME}
-            layout="side"
-            lines={[
-              "Sign in to pick up your courses where you left them, on any browser.",
-              "New here? Create an account and I'll walk you through your first course.",
-              "Just looking? Try the demo as Dr Sobri to see the whole loop on a sample course.",
-            ]}
-          />
-          <div className="signin-brand-foot">
-            <Button
-              variant="ghost"
-              data-demo-id="view-index"
-              onClick={() => navigate("index")}
-            >
-              See how Lyceum works <ArrowRight size={16} />
-            </Button>
-            <p>
+          <div className="max-[900px]:hidden [&_.mascot-chat-bubble]:text-ink">
+            <MascotChat
+              who="host"
+              mood="greeting"
+              size={104}
+              name={HOST_NAME}
+              layout="side"
+              lines={[
+                "Sign in to pick up your courses where you left them, on any browser.",
+                "New here? Create an account and I'll walk you through your first course.",
+                "Just looking? Try the demo as Dr Sobri to see the whole loop on a sample course.",
+              ]}
+            />
+          </div>
+          <div className="grid justify-items-start gap-3">
+            <div className="button-row">
+              <Button
+                variant="ghost"
+                data-demo-id="view-index"
+                onClick={() => navigate("index")}
+              >
+                See how Lyceum works <ArrowRight size={16} />
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => window.dispatchEvent(new Event("lyceum:play-demo"))}
+              >
+                <Play size={14} /> Watch the tour
+              </Button>
+            </div>
+            <p className="m-0 text-[13px] opacity-85">
               Local prototype. Synthetic examples are labelled where they
               appear.
             </p>
           </div>
         </section>
 
-        <section className="signin-card card" aria-label="Sign in">
+        <section className="card flex min-w-0 flex-col border-white p-7 shadow-[0_6px_0_var(--color-lime)]" aria-label="Sign in">
           <AccountPanel mode={mode} onMode={setMode} />
-          {mode === "signin" ? (
-            <>
-              <div className="signin-divider">
-                <span>or try the demo, no account needed</span>
-              </div>
-              <ul className="people-list" aria-label="Demo people">
-                {state.people
-                  .filter((p) => !p.account)
-                  .map((p) => (
-                    <li key={p.id}>
-                      <Tooltip content={scopeLine(p)}>
-                        <button
-                          type="button"
-                          className="person-row"
-                          data-demo-id={`login-${p.id}`}
-                          onClick={() => login(p.id)}
-                        >
-                          <span aria-hidden className="avatar">
-                            {p.name
-                              .split(" ")
-                              .map((w) => w[0])
-                              .slice(0, 2)
-                              .join("")}
-                          </span>
-                          <span className="person-text">
-                            <span className="person-name">
-                              {p.name}
-                              {p.verified ? (
-                                <ShieldCheck size={13} aria-label="Verified" />
-                              ) : null}
-                            </span>
-                            <span className="person-scope">{scopeLine(p)}</span>
-                          </span>
-                          <ArrowRight size={16} aria-hidden />
-                        </button>
-                      </Tooltip>
-                    </li>
-                  ))}
-              </ul>
-              <p className="signin-note">
-                Demo people have no passwords and save in this browser only.
-                Start with Dr Sobri for the whole loop.
-              </p>
-            </>
-          ) : (
-            <p className="signin-note">
+          {mode === "signup" ? (
+            <p className="mt-auto mb-0 pt-5 text-[13px] text-ink-2">
               Your account and its work are kept by this Lyceum server. Next,
               two short steps set up your first course.
             </p>
+          ) : (
+            <p className="mt-auto mb-0 pt-5 text-[13px] text-ink-2">
+              New here?{" "}
+              <button type="button" className="link-button" onClick={() => setMode("signup")}>
+                Create an account
+              </button>
+              ; two short steps then set up your first course.
+            </p>
           )}
         </section>
+
+        {mode === "signin" ? (
+          <section className="card-forest on-forest col-span-full p-7" aria-labelledby="demo-title">
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+              <h2 id="demo-title" className="m-0 font-display text-[22px] font-extrabold tracking-[-0.02em] text-white">
+                Or try the demo, no account needed
+              </h2>
+              <p className="m-0 text-[13px]">
+                Demo people have no passwords and save in this browser only.
+              </p>
+            </div>
+            <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3 p-0" aria-label="Demo people">
+              {demoPeople.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className="flex h-full w-full cursor-pointer flex-col items-start gap-2 rounded-card border-2 border-forest-border bg-forest-2 p-4 text-left text-white transition-[border-color,translate] duration-200 ease-out hover:border-lime motion-safe:hover:-translate-y-0.5"
+                    data-demo-id={`login-${p.id}`}
+                    onClick={() => login(p.id)}
+                  >
+                    <span className="flex w-full items-center justify-between gap-2">
+                      <span aria-hidden className="avatar size-10 text-[14px]">
+                        {p.name
+                          .split(" ")
+                          .map((w) => w[0])
+                          .slice(0, 2)
+                          .join("")}
+                      </span>
+                      {p.id === PEOPLE_IDS.sobri ? (
+                        <span className="rounded-full bg-lime px-2.5 py-0.5 text-[12px] font-bold text-forest">
+                          Start here
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 font-display text-[17px] font-extrabold">
+                      {p.name}
+                      {p.verified ? (
+                        <ShieldCheck size={14} aria-label="Verified" className="text-lime" />
+                      ) : null}
+                    </span>
+                    <span className="text-[13px] leading-[1.45] text-on-forest">{scopeLine(p)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
     </div>
   );
@@ -230,11 +255,11 @@ function AccountPanel({
     setConfirm("");
   };
   return (
-    <div className="signin-account">
+    <div>
       <Segmented
         kind="tabs"
         label="Your account"
-        className="signin-tabs"
+        className="mb-5 grid w-full grid-cols-2 [&_.segmented-option]:min-h-11"
         value={mode}
         onChange={switchTo}
         options={[
@@ -243,7 +268,7 @@ function AccountPanel({
         ]}
       />
       <form
-        className="signin-form"
+        className="grid gap-3.5"
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
@@ -275,7 +300,7 @@ function AccountPanel({
           />
         </Field>
         {mode === "signup" ? (
-          <div className="signin-pair">
+          <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3 max-[480px]:grid-cols-1">
             <Field label="Institution">
               <Input
                 autoComplete="organization"
@@ -303,7 +328,7 @@ function AccountPanel({
           <label htmlFor={pwId} className="field-label">
             Password
           </label>
-          <div className="password-field">
+          <div className="relative [&_.control]:pr-[52px]">
             <Input
               id={pwId}
               type={shown ? "text" : "password"}
@@ -319,7 +344,7 @@ function AccountPanel({
             />
             <button
               type="button"
-              className="password-toggle"
+              className="absolute top-1/2 right-1 grid size-11 -translate-y-1/2 cursor-pointer place-items-center rounded-lg border-0 bg-transparent text-ink-2 hover:bg-tint-1 hover:text-ink"
               onClick={() => setShown((v) => !v)}
               aria-label={shown ? "Hide password" : "Show password"}
               aria-pressed={shown}
@@ -365,7 +390,7 @@ function AccountPanel({
           type="submit"
           variant="primary"
           loading={busy}
-          className="signin-submit"
+          className="mt-1 w-full justify-center"
         >
           {mode === "signin" ? "Sign in" : "Create account"}{" "}
           <ArrowRight size={15} />
@@ -374,7 +399,7 @@ function AccountPanel({
       {/* Supabase sends this window to Google and back; Google is switched on in Supabase (config.toml or the dashboard). */}
       <button
         type="button"
-        className="btn btn-outline signin-google"
+        className="btn btn-outline mt-3 flex w-full items-center justify-center gap-2.5 no-underline disabled:transform-none disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none"
         onClick={() => void google()}
         disabled={leaving}
       >
@@ -388,7 +413,7 @@ function AccountPanel({
 /** Google's own G from its sign-in branding kit, unmodified (docs/brand-use.md); the words beside it name the button. */
 const GoogleMark = () => (
   <img
-    className="signin-google-mark"
+    className="block size-6 flex-none"
     src="/brand/partners/logos/google-g.png"
     alt=""
     width={24}
