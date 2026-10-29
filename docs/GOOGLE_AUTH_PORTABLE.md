@@ -67,7 +67,7 @@ plain `SameSite=Lax` cookie work with no CORS setup.
 6. For production, **add** `https://<your-domain>/api/auth/google/callback` (and the origin) to the same client. Keep localhost.
 
 Changes can take ~5 minutes to apply. The redirect URI must match `APP_URL + /api/auth/google/callback` **exactly**
-(scheme, host — `localhost` ≠ `127.0.0.1` — port, no trailing slash).
+(scheme, host, port, no trailing slash; `localhost` and `127.0.0.1` are different hosts).
 
 ## 4. Environment
 
@@ -162,7 +162,7 @@ import pg from 'pg';
 export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 ```
 
-### `web/src/auth.ts` — sessions, cookies, audit, `requireUser`
+### `web/src/auth.ts`: sessions, cookies, audit, `requireUser`
 
 ```ts
 import { createHash, randomBytes } from 'node:crypto';
@@ -255,7 +255,7 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
 }
 ```
 
-### `src/routes/auth.ts` — the Google flow
+### `src/routes/auth.ts`: the Google flow
 
 ```ts
 // Google sign-in, built directly on OpenID Connect (authorization code flow + PKCE). No auth vendor.
@@ -418,7 +418,7 @@ wrap async handlers or add `express-async-errors`.
 | Need | Do this |
 |---|---|
 | Same origin | Proxy `/api` → API. Vite: `server: { proxy: { '/api': { target: 'http://localhost:4000', xfwd: true } } }`. Production: CDN/reverse proxy routes `/api/*` to the API. |
-| Sign-in button | A plain link `<a href="/api/auth/google">Continue with Google</a>`. **Not** `fetch` — it must be a full navigation. |
+| Sign-in button | A plain link `<a href="/api/auth/google">Continue with Google</a>`. **Not** `fetch`: it must be a full navigation. |
 | Who am I | `fetch('/api/auth/me', { credentials: 'include' })` → `200 { user: { id, email, displayName, avatarUrl } }` or `401` = signed out. |
 | Sign out | `fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })` → `204`, then clear cached user and go to `/login`. |
 | Route guard | Before protected pages load, call `/me`; on `null`/401 redirect to `/login`. On `/login`, if signed in redirect to `/`. |
@@ -453,7 +453,7 @@ Keep the routes, cookie names/paths, schema and §2 rules; swap only the plumbin
 | No same-origin proxy possible | Then you need CORS with `credentials: true` + exact origin, and `SameSite=None; Secure` cookies. Prefer adding a proxy. |
 
 PKCE note: `code_challenge` is base64url (no padding) of the SHA-256 **bytes** of the verifier string. The verifier here
-is 43 chars of base64url, which satisfies RFC 7636's 43–128 char rule.
+is 43 chars of base64url, which satisfies RFC 7636's 43 to 128 char rule.
 
 ## 9. Verify it works
 
@@ -479,9 +479,9 @@ is 43 chars of base64url, which satisfies RFC 7636's 43–128 char rule.
 
 ## References
 
-- OAuth 2.0, RFC 6749 — https://datatracker.ietf.org/doc/html/rfc6749
-- PKCE, RFC 7636 — https://datatracker.ietf.org/doc/html/rfc7636
-- Cookies, RFC 6265 — https://datatracker.ietf.org/doc/html/rfc6265
-- OpenID Connect Core 1.0 (§3.1.3.7 ID token validation) — https://openid.net/specs/openid-connect-core-1_0.html
-- Google, OpenID Connect — https://developers.google.com/identity/openid-connect/openid-connect
-- Google, OAuth 2.0 for Web Server Applications — https://developers.google.com/identity/protocols/oauth2/web-server
+- OAuth 2.0, RFC 6749: https://datatracker.ietf.org/doc/html/rfc6749
+- PKCE, RFC 7636: https://datatracker.ietf.org/doc/html/rfc7636
+- Cookies, RFC 6265: https://datatracker.ietf.org/doc/html/rfc6265
+- OpenID Connect Core 1.0 (section 3.1.3.7, ID token validation): https://openid.net/specs/openid-connect-core-1_0.html
+- Google, OpenID Connect: https://developers.google.com/identity/openid-connect/openid-connect
+- Google, OAuth 2.0 for Web Server Applications: https://developers.google.com/identity/protocols/oauth2/web-server

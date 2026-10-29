@@ -151,7 +151,7 @@ const FILES = [
   ["googleforms.svg", "Google Forms", "Survey exports in"],
   ["moodle.svg", "Moodle", "Feedback in, quiz XML out; not yet on a Moodle site"],
   ["microsoft-powerpoint.svg", "Microsoft PowerPoint", "The editable pack out"],
-  ["microsoft-word.svg", "Microsoft Word", "The course file out"],
+  ["microsoft-word.svg", "Microsoft Word", "The survey document out"],
 ];
 const chips = (names, cls = "") => names.map((n) => `<span class="chip ${cls}"${ref(n)}>${n}</span>`).join("");
 
@@ -486,7 +486,7 @@ h2 { font-family: var(--font-display); font-weight: 700; font-size: 30pt; line-h
     <div class="proof-grid">
       <div>
         <div class="proof">
-          <div class="pf" data-claim="proof-checks"><strong>${checks.value}</strong><span>automated checks pass, 23 October 2026, plus four headless browser runs</span></div>
+          <div class="pf" data-claim="proof-checks"><strong>${checks.value}</strong><span>automated checks pass, 29 October 2026, plus four headless browser runs</span></div>
           <div class="pf" data-claim="proof-live-board"><strong>${board.value}</strong><span>real postings fetched live from one employer's public board, on request</span></div>
           <div class="pf" data-claim="proof-no-keys"><strong>${keys.value}</strong><span>AI keys needed. The core is deterministic; parsing and collection run on the local API</span></div>
         </div>

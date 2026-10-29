@@ -371,14 +371,15 @@ const PERSISTED_KEYS = [
 
 function loadPersisted(): Partial<AppState> | null {
   if (typeof window === "undefined") return null;
+  // The demo person signed in belongs to this tab, as kiosk mode does: a reload keeps them, a new tab or visit
+  // signs them out. The demo's workspace itself stays in localStorage. The tab is marked on its first load, whether or
+  // not anything was kept yet, or the first reload after a first sign in would sign the person out.
+  let sameTab = false;
+  try { sameTab = sessionStorage.getItem(DEMO_TAB_KEY) === "on"; sessionStorage.setItem(DEMO_TAB_KEY, "on"); } catch { /* no storage: sign out */ }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<AppState>;
-    // The demo person signed in belongs to this tab, as kiosk mode does: a reload keeps them, a new tab or visit
-    // signs them out. The demo's workspace itself stays in localStorage.
-    let sameTab = false;
-    try { sameTab = sessionStorage.getItem(DEMO_TAB_KEY) === "on"; sessionStorage.setItem(DEMO_TAB_KEY, "on"); } catch { /* no storage: sign out */ }
     // A running sim or a mid-demo screen must not resurrect into a fresh page.
     // Signed out, a fresh visit opens on the landing page, not the sign-in screen it was left on.
     if (!sameTab || parsed.screen === "login" || parsed.screen === undefined) { parsed.currentPersonId = null; parsed.screen = "index"; }

@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="#hafizlyceum-team-npm-run-proveall"><img src="https://img.shields.io/badge/checks-185_passing-8BC34A?style=for-the-badge&labelColor=161b22" alt="checks: 185 passing"></a>
+  <a href="#hafizlyceum-team-npm-run-proveall"><img src="https://img.shields.io/badge/checks-290_passing-8BC34A?style=for-the-badge&labelColor=161b22" alt="checks: 290 passing"></a>
   <a href="#hafizlyceum-team-cat-how-we-work"><img src="https://img.shields.io/badge/repo-private_team_sandbox-B8F23A?style=for-the-badge&labelColor=161b22" alt="repo: private team sandbox"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-proprietary-B9CDBF?style=for-the-badge&labelColor=161b22" alt="licence: proprietary"></a>
 </p>
@@ -40,7 +40,7 @@ Choose **Dr Sobri** on the sign-in screen for the whole lecturer workflow, or **
 
 ```bash
 npm run typecheck
-npm run prove:all          # 185 checks in seventeen suites
+npm run prove:all          # 290 checks in twenty-nine suites
 npm run build
 npm run smoke              # the whole tour in a headless browser
 npm run smoke:integrity    # also smoke:workspace and smoke:curriculum, after a build

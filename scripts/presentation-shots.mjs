@@ -35,7 +35,7 @@ page.on("pageerror", (e) => errors.push(String(e)));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sel = (id) => `[data-demo-id="${id}"]`;
 const click = async (id) => { await page.waitForSelector(sel(id), { timeout: 15000 }); await page.$eval(sel(id), (el) => el.scrollIntoView({ block: "center" })); await page.click(sel(id)); await sleep(500); };
-const type = async (id, text) => { await page.waitForSelector(sel(id), { visible: true }); await page.click(sel(id), { clickCount: 3 }); await page.type(sel(id), text); };
+const type = async (id, text) => { await page.waitForSelector(sel(id), { visible: true }); await page.click(sel(id), { count: 3 }); await page.type(sel(id), text); };
 /** Capture one element, scrolled into view. Toasts are hidden by a style rule; removing React's nodes would break the app. */
 const shot = async (selector, file) => {
   await page.waitForSelector(selector, { visible: true, timeout: 15000 });

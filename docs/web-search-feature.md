@@ -47,7 +47,7 @@ Reads known URLs. It fetches up to 12 at once, 4 at a time. `query` returns only
 `web/src/tool_parsing.py:317` maps aliases such as `search`, `google_search` and `fetch_url` to these names, so models with other tool vocabularies still work.
 
 ### `WebSearchTool`: `src/agent_tools/web_tools.py:304`
-1. Parses the input as JSON or plain text, then reads `query`, `time_filter` and `max_pages` (1–10, default 5).
+1. Parses the input as JSON or plain text, then reads `query`, `time_filter` and `max_pages` (1 to 10, default 5).
 2. If there's no `time_filter`, it infers one from the query (`web/src/search_intent.py`).
 3. Scholarly or official-site metadata queries use `searxng_search_results` (links only). Everything else uses `comprehensive_web_search`, which searches, ranks and fetches the pages.
 4. **30 s timeout.** On timeout it falls back to metadata-only results (12 s) so the agent still gets links.

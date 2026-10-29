@@ -7,7 +7,10 @@
 //   3. a generated output has drifted from tokens.ts (the :root block, the font
 //      preloads, the bundled fonts), or a generated SVG uses a colour that is
 //      not a token;
-//   4. a hand-written rule in global.css uses lime outside a forest context.
+//   4. a hand-written rule in global.css uses lime outside a forest context;
+//   5. a class string in a .ts or .tsx file names a colour of Tailwind's own palette (bg-red-500, text-emerald-600)
+//      or an arbitrary colour (a hex, rgb(), hsl() or oklch() value in square brackets): index.css switches the palette
+//      off and maps the theme to tokens.ts, so a class colour is a token's name (bg-forest, text-ink-2).
 // One exception, approved by the owner on 22 October 2026 (docs/lyceum-depth-plan.md Section 3.2, CLAUDE.md):
 // a third-party mark under web/public/brand/partners/ keeps its owner's colours, so parts 2 and 3 leave that folder
 // alone; nothing in it is used for Lyceum's own surfaces, and a hex anywhere else still fails.
@@ -133,11 +136,28 @@ for (const m of handWritten.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
   if (/var\(--lime\)/.test(body) && !FOREST_CONTEXT.test(selector)) problems.push("Lime outside a forest context in global.css: " + selector.replace(/\s+/g, " "));
 }
 
+// ---------- 5. class strings: no colour of Tailwind's own, no arbitrary colour (the move to Tailwind) ----------
+const PALETTE = "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone";
+const CLASS_PATTERNS = [
+  { name: "a colour of Tailwind's palette", re: new RegExp("(?<![\\w#-])(?:[\\w-]+:)*-?[a-z]+(?:-[a-z]+)*-(?:" + PALETTE + ")-(?:50|[1-9]00|950)(?:\\/\\d+)?(?![\\w-])", "g") },
+  { name: "an arbitrary colour", re: /-\[(?:#|(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\()/g },
+];
+const classFiles = files.filter((p) => /\.tsx?$/.test(p));
+for (const file of classFiles) {
+  readFileSync(join(ROOT, file), "utf8").split(/\r?\n/).forEach((line, i) => {
+    for (const { name, re } of CLASS_PATTERNS) {
+      re.lastIndex = 0;
+      const m = re.exec(line);
+      if (m) problems.push("In a class string, " + name + ": " + file + ":" + (i + 1) + ": " + m[0]);
+    }
+  });
+}
+
 // ---------- report ----------
 const width = Math.max(...rows.map((r) => r.pair.length));
 console.log("Pair".padEnd(width) + "  stated  computed  rule");
 for (const r of rows) console.log((r.ok ? "" : "! ") + r.pair.padEnd(width) + "  " + String(r.stated).padEnd(6) + "  " + r.computed.padEnd(8) + "  " + r.rule);
-console.log("\n" + rows.length + " ratios checked against tokens.ts; " + files.length + " files (" + scannedLines + " lines) scanned for hand-written colours; " + generated.length + " generated SVGs checked; theme outputs " + (gen.status === 0 ? "current" : "DRIFTED") + ".");
+console.log("\n" + rows.length + " ratios checked against tokens.ts; " + files.length + " files (" + scannedLines + " lines) scanned for hand-written colours; " + generated.length + " generated SVGs checked; theme outputs " + (gen.status === 0 ? "current" : "DRIFTED") + "; " + classFiles.length + " TypeScript files scanned for class-string colours.");
 if (problems.length) {
   console.error("\nCONTRAST CHECK FAILED\n  " + problems.join("\n  "));
   process.exit(1);

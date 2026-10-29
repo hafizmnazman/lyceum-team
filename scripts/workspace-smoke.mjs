@@ -47,6 +47,7 @@ try {
   }
 
   await page.goto(origin, { waitUntil: "networkidle0" });
+  await click("index-signin"); // signed out, the app opens on the landing page
   await click("login-P-SOBRI");
   await textIncludes("Briefs waiting for a decision");
   await click("nav-courses");
@@ -167,6 +168,8 @@ try {
     Object.defineProperty(window, "localStorage", { get() { throw new DOMException("Storage is blocked", "SecurityError"); } });
   });
   await blocked.goto(origin, { waitUntil: "networkidle0" });
+  await blocked.click(selector("index-signin"));
+  await blocked.waitForSelector(selector("login-P-SOBRI"), { visible: true });
   await blocked.click(selector("login-P-SOBRI"));
   await blocked.waitForFunction(() => window.__lyceum.getState().persistenceStatus === "unavailable");
   assert.ok(await blocked.evaluate(() => document.body.innerText.includes("Browser storage is unavailable.")));
@@ -252,6 +255,8 @@ try {
     };
     const lecturer = await open(1440, 1000, false);
     await lecturer.goto(boothOrigin, { waitUntil: "networkidle0" });
+    await lecturer.click(selector("index-signin"));
+    await lecturer.waitForSelector(selector("login-P-SOBRI"), { visible: true });
     await lecturer.click(selector("login-P-SOBRI"));
     await lecturer.waitForSelector(selector("nav-courses"), { visible: true });
     await lecturer.evaluate(() => { location.hash = "#/course/CS310"; });
@@ -300,7 +305,7 @@ try {
     const docx = await JSZip.loadAsync(readFileSync(docxPath));
     assert.match(await docx.file("word/document.xml").async("string"), />1\. Q1\. I can /, "the document numbers the questions with their ids");
     const csvInput = await lecturer.$(selector("survey-import-" + cosId));
-    await csvInput.uploadFile(join("public", "demo", "course-outcome-survey-google.csv"));
+    await csvInput.uploadFile(join("web", "public", "demo", "course-outcome-survey-google.csv"));
     await lecturer.waitForSelector(selector("survey-import-result-" + cosId), { timeout: 10000 });
     assert.equal(await lecturer.$eval(selector("survey-import-result-" + cosId), (e) => e.textContent),
       "Read as a Google Forms export: 31 responses imported from 32 rows; 1 repeated row dropped; dropped at import: Timestamp.");

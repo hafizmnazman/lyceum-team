@@ -2360,7 +2360,7 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
 /* ---------- The sliding selection (primitives/Segmented.tsx) ----------
    One background per row of options that glides to the chosen one, with a slight spring; the options sit above it.
    Only transform and size move. Reduced motion (above) drops the glide and keeps the move. */
-.slider { position: relative; isolation: isolate; }
+.slider { position: relative; isolation: isolate; overflow: clip; } /* the sliding background, mid-transition, can never widen the page (the curriculum smoke at 390 and 320 px, 29 October 2026) */
 .slider::before { content: ""; position: absolute; left: 0; top: 0; z-index: -1; width: var(--slide-w, 0); height: var(--slide-h, 0); transform: translate(var(--slide-x, 0), var(--slide-y, 0)); pointer-events: none; }
 .slider.is-ready::before { transition: transform 340ms cubic-bezier(0.3, 1.25, 0.5, 1), width 340ms cubic-bezier(0.3, 1.25, 0.5, 1), height 340ms var(--ease-out); }
 .segmented { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 4px; background: var(--tint-1); border-radius: 12px; max-width: 100%; }
