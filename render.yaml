@@ -46,3 +46,12 @@ services:
         value: duckduckgo
       - key: TAVILY_API_KEY
         sync: false
+      # Uploaded files in Cloudflare R2 (api/storage.ts); leave them empty and nothing is stored
+      - key: S3_ENDPOINT
+        sync: false # https://<account id>.r2.cloudflarestorage.com
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false # e.g. lyceum-prod

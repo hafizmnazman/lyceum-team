@@ -74,7 +74,8 @@ export async function parseFile(file: File): Promise<ParseOutcome> {
     const res = await withTimeout(
       fetch(`/api/parse?name=${encodeURIComponent(file.name)}`, {
         method: "POST",
-        headers: { "content-type": "application/octet-stream" },
+        // the session's token: online the parse route answers signed-in people only, and an account's original is kept
+        headers: await agentHeaders(null, { "content-type": "application/octet-stream" }),
         body: file,
       }),
       PARSE_TIMEOUT_MS,

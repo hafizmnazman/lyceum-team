@@ -26,13 +26,14 @@ import type { SuggestionRequest } from "../shared/lib/slides.ts";
 import { ENV_PATH, liveDeps, loadAgentSettings, runAgentSearch, TOOLS, type Chat } from "./agentSearch.ts";
 import { searchWeb } from "./webTools.ts";
 import { readOutline, MAX_OUTLINE_CHARS } from "./outline.ts";
-import { AccountStore, accountRoutes, requireUser, signedInAs, supabaseDeps } from "./account.ts";
+import { AccountStore, accountRoutes, requireUser, signedInAs, supabaseDeps, type AuthDeps } from "./account.ts";
 import { clearOldContent, newContext, recordedChat, describePosting, recordProposals, recordVerdict, VERDICTS, type Helper, type Offer, type Verdict } from "./record.ts";
 import type { MentionProposal } from "../shared/lib/evidence.ts";
 import type { MappingSuggestion } from "../shared/lib/proposals.ts";
 import type { RevisionSuggestion } from "../shared/lib/revision.ts";
 import type { DraftItem, SlideSuggestion } from "../shared/types.ts";
 import { DATABASE_URL, postgresDb } from "./db.ts";
+import { forgetUploads, keepUpload, r2FromEnv } from "./storage.ts";
 import { createHash } from "node:crypto";
 import { networkInterfaces } from "node:os";
 
@@ -54,7 +55,11 @@ app.use("/api/*", cors());
 // Accounts: Supabase Auth signs people in (email and password, or Google) and issues the token each request carries;
 // api/account.ts checks it and keeps each account's profile and workspace in the Supabase database at DATABASE_URL.
 const database = postgresDb(DATABASE_URL); // one pool; it connects when first asked and again after the database restarts
-const authDeps = supabaseDeps();
+// Uploads are kept in R2 when S3_* is set (api/storage.ts). Deleting an account deletes its files first, so a cancelled
+// sign-up leaves nothing behind; if the bucket is unreachable the account waits for the next hourly purge.
+const bucket = r2FromEnv();
+const supabase = supabaseDeps();
+const authDeps: AuthDeps = { ...supabase, async deleteUser(id) { if (bucket) await forgetUploads(database, bucket, id); await supabase.deleteUser(id); } };
 const accounts = new AccountStore(database, authDeps);
 accountRoutes(app, accounts, authDeps);
 // Online, the model, search, settings and parse routes spend money or CPU, so LYCEUM_REQUIRE_SIGN_IN=1 limits them to
@@ -107,12 +112,17 @@ app.post("/api/parse", async (c) => {
   const buf = Buffer.from(await c.req.arrayBuffer());
   if (buf.length === 0) return c.json({ error: "empty file" }, 400);
   if (buf.length > 20 * 1024 * 1024) return c.json({ error: "file too large (20 MB cap)" }, 413);
+  // An account's original is kept before it is read, so a file with no text to read (a scanned outline) is still there
+  // for OCR later. Keeping it never blocks reading it: a bucket that fails is logged and the upload carries on.
+  const who = bucket ? await signedInAs(c, authDeps).catch(() => null) : null;
+  const kept = bucket && who ? await keepUpload(database, bucket, who.id, name, buf).catch((err) => { console.error("keeping the upload failed:", name, err); return null; }) : null;
+  const reply = (doc: object) => c.json(kept ? { ...doc, fileId: kept.id } : doc);
   try {
-    if (ext === "xlsx" || ext === "xls") return c.json(parseSheet(buf, name, "xlsx"));
-    if (ext === "csv") return c.json(parseSheet(buf, name, "csv"));
-    if (ext === "pdf") return c.json(await parsePdf(buf, name));
-    if (ext === "pptx") return c.json(await parsePptx(buf, name));
-    if (ext === "docx") return c.json(await parseDocx(buf, name));
+    if (ext === "xlsx" || ext === "xls") return reply(parseSheet(buf, name, "xlsx"));
+    if (ext === "csv") return reply(parseSheet(buf, name, "csv"));
+    if (ext === "pdf") return reply(await parsePdf(buf, name));
+    if (ext === "pptx") return reply(await parsePptx(buf, name));
+    if (ext === "docx") return reply(await parseDocx(buf, name));
     return c.json({ error: `unsupported extension .${ext}` }, 415);
   } catch (err) {
     console.error("parse failed:", name, err);

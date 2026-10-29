@@ -351,6 +351,8 @@ export interface ParsedDoc {
   tables: Array<{ name: string; rows: string[][] }>; // sheets and detected tables
   // A8: one of the sample files the app ships in web/public/demo; every record filed from it says it is synthetic.
   sample?: boolean;
+  // The original, kept in R2 for a signed-in account (api/storage.ts): the files row's id. Absent for demo people, and with no bucket set.
+  fileId?: string;
 }
 
 /** What the Intake agent makes of a ParsedDoc. The user always confirms this

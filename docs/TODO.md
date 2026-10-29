@@ -135,6 +135,12 @@ has real data; the demo runs on the fixtures.
 - [ ] **Stay Supabase-ready.** Plain Postgres and SQL migrations only (Supabase is Postgres, so the move is a
       `DATABASE_URL` change plus `pg_dump`). Keep auth and permissions in the server, not in Supabase-only features,
       until the move; then decide whether Supabase Auth and row-level security replace ours. Files stay on R2 either way.
+- [x] **Uploaded files in Cloudflare R2: storing** (`main`). `api/storage.ts` keeps a signed-in account's upload in R2 on
+      `/api/parse`, before it is read (so a scanned outline is kept for OCR), and a `files` row (migration
+      `20261030090000_files.sql`); the same file twice is kept once; the parsed reply carries its `fileId`. Deleting an
+      account (a cancelled or stale sign-up) deletes its files first. No `S3_*` set: nothing is stored. `npm run prove:storage`.
+      Also fixed: the browser now sends the session's token to `/api/parse`, which online (`LYCEUM_REQUIRE_SIGN_IN=1`)
+      refused every upload. Still open below: linking a file to its course and its records, reading it back (OCR, re-reading).
 - [ ] **Uploaded files in Cloudflare R2.** Outlines, results and slides are parsed and dropped (`api/index.ts` reads
       the upload into a buffer and keeps only the text); keep the originals so a quotation or a figure can link back to its
       file, OCR and the outline reader can run again on old uploads, and OCR can become a background job.
